@@ -35,7 +35,9 @@ const PORT = process.env.PORT || 5000;
 import cors from 'cors';
 
 app.use(cors({
-  origin: true, // Allow only your frontend domain
+  origin: 'https://aio-final.vercel.app', // Allow only your frontend domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow specific HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow headers used in your requests
   credentials: true // Optional: if your app uses cookies or auth headers
 }));
 
