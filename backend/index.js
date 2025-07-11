@@ -35,7 +35,7 @@ const PORT = process.env.PORT || 5000;
 import cors from 'cors';
 
 app.use(cors({
-  origin: 'https://aio-final.vercel.app/',
+  origin: 'https://aio-final.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
   credentials: true 
 }));
