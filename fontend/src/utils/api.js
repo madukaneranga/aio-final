@@ -6,7 +6,9 @@ export const api = {
     login: (credentials) => 
       fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type':'application/json',
+                    'Access-Control-Allow-Origin':'*',
+                    'Access-Control-Allow-Methods':'POST,PATCH,OPTIONS' },
         body: JSON.stringify(credentials)
       }),
     
