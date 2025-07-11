@@ -45,20 +45,16 @@ app.options('*', (req, res) => {
 //app.use(cors());
 const allowedOrigins = ['https://aio-final.vercel.app'];
 
+import cors from 'cors';
+
 app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like curl, Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+  origin: 'https://aio-final.vercel.app', // frontend origin
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true, // only enable if you use cookies or authorization headers
 }));
+
+// OR to allow all origins temporarily (for testing only):
+// app.use(cors());
 
 
 
