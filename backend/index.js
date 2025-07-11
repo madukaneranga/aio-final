@@ -29,32 +29,11 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-
-// Handle OPTIONS preflight requests for all routes
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
-});
-
 //app.use(cors());
-const allowedOrigins = ['https://aio-final.vercel.app'];
 
 import cors from 'cors';
+app.use(cors());
 
-app.use(cors({
-  origin: 'https://aio-final.vercel.app', // frontend origin
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-// OR to allow all origins temporarily (for testing only):
-// app.use(cors());
 
 
 
