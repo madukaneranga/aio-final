@@ -1,9 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { formatLKR } from '../utils/currency';
-import { Plus, Package, Calendar, DollarSign, Users, TrendingUp, Settings, Store, Edit, Trash2, Eye, Star } from 'lucide-react';
-import LoadingSpinner from '../components/LoadingSpinner';
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { formatLKR } from "../utils/currency";
+import {
+  Plus,
+  Package,
+  Calendar,
+  DollarSign,
+  Users,
+  TrendingUp,
+  Settings,
+  Store,
+  Edit,
+  Trash2,
+  Eye,
+  Star,
+} from "lucide-react";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const StoreDashboard = () => {
   const { user } = useAuth();
@@ -13,7 +26,7 @@ const StoreDashboard = () => {
     totalServices: 0,
     totalOrders: 0,
     totalBookings: 0,
-    totalEarnings: 0
+    totalEarnings: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
@@ -26,126 +39,150 @@ const StoreDashboard = () => {
   const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
-    if (user?.role === 'store_owner') {
+    if (user?.role === "store_owner") {
       fetchDashboardData();
     }
   }, [user]);
 
   useEffect(() => {
-  if (user?.role === 'store_owner' && user?.storeId) {
-    fetchDashboardData();
-  }
-}, [user]);
+    if (user?.role === "store_owner" && user?.storeId) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
-const fetchDashboardData = async () => {
-  setLoading(true);
-  try {
-    // Fetch store data first
-    if (user.storeId) {
-      const storeResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!storeResponse.ok) {
-        throw new Error('Failed to fetch store data');
-      }
-      const storeData = await storeResponse.json();
-      setStore(storeData.store);
-
-      // Fetch products only if store type is 'product'
-      if (storeData.store?.type === 'product') {
-        const productsResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/products?storeId=${user.storeId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Fetch store data first
+      if (user.storeId) {
+        const storeResponse = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }
-        });
-        if (!productsResponse.ok) {
-          throw new Error('Failed to fetch products');
+        );
+        if (!storeResponse.ok) {
+          throw new Error("Failed to fetch store data");
         }
-        const productsData = await productsResponse.json();
-        setProducts(productsData);
-        setStats(prev => ({ ...prev, totalProducts: productsData.length }));
-      } else if (storeData.store?.type === 'service') {
-        const servicesResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/services?storeId=${user.storeId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        const storeData = await storeResponse.json();
+        setStore(storeData.store);
+
+        // Fetch products only if store type is 'product'
+        if (storeData.store?.type === "product") {
+          const productsResponse = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/products?storeId=${
+              user.storeId
+            }`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+          if (!productsResponse.ok) {
+            throw new Error("Failed to fetch products");
           }
-        });
-        if (!servicesResponse.ok) {
-          throw new Error('Failed to fetch services');
+          const productsData = await productsResponse.json();
+          setProducts(productsData);
+          setStats((prev) => ({ ...prev, totalProducts: productsData.length }));
+        } else if (storeData.store?.type === "service") {
+          const servicesResponse = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/services?storeId=${
+              user.storeId
+            }`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+          if (!servicesResponse.ok) {
+            throw new Error("Failed to fetch services");
+          }
+          const servicesData = await servicesResponse.json();
+          setServices(servicesData);
+          setStats((prev) => ({ ...prev, totalServices: servicesData.length }));
         }
-        const servicesData = await servicesResponse.json();
-        setServices(servicesData);
-        setStats(prev => ({ ...prev, totalServices: servicesData.length }));
       }
-    }
 
-    // Fetch orders
-    const ordersResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/store`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      // Fetch orders
+      const ordersResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/orders/store`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (!ordersResponse.ok) {
+        throw new Error("Failed to fetch orders");
       }
-    });
-    if (!ordersResponse.ok) {
-      throw new Error('Failed to fetch orders');
-    }
-    const orders = await ordersResponse.json();
-    setRecentOrders(orders.slice(0, 5));
-    setStats(prev => ({ ...prev, totalOrders: orders.length }));
+      const orders = await ordersResponse.json();
+      setRecentOrders(orders.slice(0, 5));
+      setStats((prev) => ({ ...prev, totalOrders: orders.length }));
 
-    // Fetch bookings
-    const bookingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/bookings/store`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      // Fetch bookings
+      const bookingsResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/bookings/store`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (!bookingsResponse.ok) {
+        throw new Error("Failed to fetch bookings");
       }
-    });
-    if (!bookingsResponse.ok) {
-      throw new Error('Failed to fetch bookings');
-    }
-    const bookings = await bookingsResponse.json();
-    setRecentBookings(bookings.slice(0, 5));
-    setStats(prev => ({ ...prev, totalBookings: bookings.length }));
+      const bookings = await bookingsResponse.json();
+      setRecentBookings(bookings.slice(0, 5));
+      setStats((prev) => ({ ...prev, totalBookings: bookings.length }));
 
-    // Fetch subscription
-    const subscriptionResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      // Fetch subscription
+      const subscriptionResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (!subscriptionResponse.ok) {
+        throw new Error("Failed to fetch subscription");
       }
-    });
-    if (!subscriptionResponse.ok) {
-      throw new Error('Failed to fetch subscription');
+      const subscriptionData = await subscriptionResponse.json();
+      setSubscription(subscriptionData);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      // Optionally show an error message to the user
+      alert("Failed to load dashboard data. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    const subscriptionData = await subscriptionResponse.json();
-    setSubscription(subscriptionData);
-
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    // Optionally show an error message to the user
-    alert('Failed to load dashboard data. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const renewSubscription = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/renew`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/renew`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
+      );
 
       if (response.ok) {
-        alert('Subscription renewed successfully!');
+        alert("Subscription renewed successfully!");
         fetchDashboardData();
       } else {
-        alert('Failed to renew subscription');
+        alert("Failed to renew subscription");
       }
     } catch (error) {
-      console.error('Error renewing subscription:', error);
-      alert('Error renewing subscription');
+      console.error("Error renewing subscription:", error);
+      alert("Error renewing subscription");
     }
   };
 
@@ -153,72 +190,92 @@ const fetchDashboardData = async () => {
     setEditingItem({
       ...item,
       price: item.price.toString(),
-      stock: item.stock?.toString() || '',
-      duration: item.duration?.toString() || ''
+      stock: item.stock?.toString() || "",
+      duration: item.duration?.toString() || "",
     });
     setShowEditModal(true);
   };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    
+
     try {
       const formData = new FormData();
-      formData.append('title', editingItem.title);
-      formData.append('description', editingItem.description);
-      formData.append('price', editingItem.price);
-      formData.append('category', editingItem.category);
-      
-      if (store?.type === 'product') {
-        formData.append('stock', editingItem.stock);
+      formData.append("title", editingItem.title);
+      formData.append("description", editingItem.description);
+      formData.append("price", editingItem.price);
+      formData.append("category", editingItem.category);
+
+      if (store?.type === "product") {
+        formData.append("stock", editingItem.stock);
       } else {
-        formData.append('duration', editingItem.duration);
-        formData.append('priceType', editingItem.priceType || 'fixed');
+        formData.append("duration", editingItem.duration);
+        formData.append("priceType", editingItem.priceType || "fixed");
       }
 
-      const endpoint = store?.type === 'product' ? 'products' : 'services';
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/${endpoint}/${editingItem._id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
-      });
+      const endpoint = store?.type === "product" ? "products" : "services";
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/${endpoint}/${editingItem._id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: formData,
+        }
+      );
 
       if (response.ok) {
         fetchDashboardData();
         setShowEditModal(false);
         setEditingItem(null);
-        alert(`${store?.type === 'product' ? 'Product' : 'Service'} updated successfully!`);
+        alert(
+          `${
+            store?.type === "product" ? "Product" : "Service"
+          } updated successfully!`
+        );
       } else {
-        alert(`Failed to update ${store?.type === 'product' ? 'product' : 'service'}`);
+        alert(
+          `Failed to update ${
+            store?.type === "product" ? "product" : "service"
+          }`
+        );
       }
     } catch (error) {
-      console.error('Error updating item:', error);
-      alert(`Error updating ${store?.type === 'product' ? 'product' : 'service'}`);
+      console.error("Error updating item:", error);
+      alert(
+        `Error updating ${store?.type === "product" ? "product" : "service"}`
+      );
     }
   };
 
   const handleDelete = async (itemId, type) => {
     if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
-    
+
     setDeleting(itemId);
     try {
-      const endpoint = type === 'product' ? 'products' : 'services';
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/${endpoint}/${itemId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const endpoint = type === "product" ? "products" : "services";
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/${endpoint}/${itemId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
+      );
 
       if (response.ok) {
-        if (type === 'product') {
-          setProducts(products.filter(p => p._id !== itemId));
+        if (type === "product") {
+          setProducts(products.filter((p) => p._id !== itemId));
         } else {
-          setServices(services.filter(s => s._id !== itemId));
+          setServices(services.filter((s) => s._id !== itemId));
         }
-        alert(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted successfully!`);
+        alert(
+          `${
+            type.charAt(0).toUpperCase() + type.slice(1)
+          } deleted successfully!`
+        );
       } else {
         alert(`Failed to delete ${type}`);
       }
@@ -230,13 +287,20 @@ const fetchDashboardData = async () => {
     }
   };
 
-  if (!user || user.role !== 'store_owner') {
+  if (!user || user.role !== "store_owner") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
-          <p className="text-gray-600 mb-4">You need to be a store owner to access this page</p>
-          <Link to="/create-store" className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Access Denied
+          </h2>
+          <p className="text-gray-600 mb-4">
+            You need to be a store owner to access this page
+          </p>
+          <Link
+            to="/create-store"
+            className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
+          >
             Create Store
           </Link>
         </div>
@@ -252,9 +316,28 @@ const fetchDashboardData = async () => {
     );
   }
 
-  const categories = store?.type === 'product' 
-    ? ['Electronics', 'Clothing', 'Home & Garden', 'Sports & Outdoors', 'Books', 'Beauty & Health', 'Toys & Games', 'Food & Beverages']
-    : ['Tutoring', 'Home Services', 'Beauty & Wellness', 'Consulting', 'Fitness', 'Technology', 'Creative Services', 'Professional Services'];
+  const categories =
+    store?.type === "product"
+      ? [
+          "Electronics",
+          "Clothing",
+          "Home & Garden",
+          "Sports & Outdoors",
+          "Books",
+          "Beauty & Health",
+          "Toys & Games",
+          "Food & Beverages",
+        ]
+      : [
+          "Tutoring",
+          "Home Services",
+          "Beauty & Wellness",
+          "Consulting",
+          "Fitness",
+          "Technology",
+          "Creative Services",
+          "Professional Services",
+        ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -263,7 +346,7 @@ const fetchDashboardData = async () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Store Dashboard</h1>
           <p className="text-gray-600 mt-2">
-            {store ? `Welcome back to ${store.name}` : 'Manage your store'}
+            {store ? `Welcome back to ${store.name}` : "Manage your store"}
           </p>
         </div>
 
@@ -281,8 +364,8 @@ const fetchDashboardData = async () => {
               </div>
             </Link>
           )}
-          
-          {store?.type === 'product' && (
+
+          {store?.type === "product" && (
             <>
               <Link
                 to="/create-product"
@@ -306,8 +389,8 @@ const fetchDashboardData = async () => {
               </Link>
             </>
           )}
-          
-          {store?.type === 'service' && (
+
+          {store?.type === "service" && (
             <>
               <Link
                 to="/create-service"
@@ -331,7 +414,7 @@ const fetchDashboardData = async () => {
               </Link>
             </>
           )}
-          
+
           <Link
             to="/store-management"
             className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
@@ -349,9 +432,18 @@ const fetchDashboardData = async () => {
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Subscription Status</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Subscription Status
+                </h3>
                 <p className="text-gray-600">
-                  Status: <span className={`font-medium ${subscription.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+                  Status:{" "}
+                  <span
+                    className={`font-medium ${
+                      subscription.status === "active"
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
                     {subscription.status.toUpperCase()}
                   </span>
                 </p>
@@ -380,37 +472,45 @@ const fetchDashboardData = async () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Total Orders</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats.totalOrders}
+                </p>
               </div>
               <Package className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          
+
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Total Bookings</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalBookings}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats.totalBookings}
+                </p>
               </div>
               <Calendar className="w-8 h-8 text-green-500" />
             </div>
           </div>
-          
+
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Total Earnings</p>
-                <p className="text-3xl font-bold text-gray-900">{formatLKR(store?.totalSales || 0)}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {formatLKR(store?.totalSales || 0)}
+                </p>
               </div>
               <DollarSign className="w-8 h-8 text-yellow-500" />
             </div>
           </div>
-          
+
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Store Rating</p>
-                <p className="text-3xl font-bold text-gray-900">{store?.rating || 4.5}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {store?.rating || 4.5}
+                </p>
               </div>
               <TrendingUp className="w-8 h-8 text-purple-500" />
             </div>
@@ -419,40 +519,61 @@ const fetchDashboardData = async () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Product Management for Product Stores */}
-          {store?.type === 'product' && (
+          {store?.type === "product" && (
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Manage Products</h2>
-                <Link to="/create-product" className="text-black hover:text-gray-700 text-sm">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Manage Products
+                </h2>
+                <Link
+                  to="/create-product"
+                  className="text-black hover:text-gray-700 text-sm"
+                >
                   Add New
                 </Link>
               </div>
-              
+
               {products.length === 0 ? (
                 <div className="text-center py-8">
                   <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">No products yet</p>
-                  <Link to="/create-product" className="text-black hover:text-gray-700 text-sm">
+                  <Link
+                    to="/create-product"
+                    className="text-black hover:text-gray-700 text-sm"
+                  >
                     Create your first product
                   </Link>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {products.slice(0, 5).map((product) => (
-                    <div key={product._id} className="border border-gray-200 rounded-lg p-4">
+                    <div
+                      key={product._id}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <img
-                            src={product.images?.[0] ? 
-                              (product.images[0].startsWith('http') ? product.images[0] : `${import.meta.env.VITE_API_URL}${product.images[0]}`) : 
-                              'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
+                            src={
+                              product.images?.[0]
+                                ? product.images[0].startsWith("http")
+                                  ? product.images[0]
+                                  : `${import.meta.env.VITE_API_URL}${
+                                      product.images[0]
+                                    }`
+                                : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
                             }
                             alt={product.title}
                             className="w-12 h-12 object-cover rounded"
                           />
                           <div>
-                            <p className="font-medium text-gray-900">{product.title}</p>
-                            <p className="text-sm text-gray-500">{formatLKR(product.price)} • {product.stock} in stock</p>
+                            <p className="font-medium text-gray-900">
+                              {product.title}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {formatLKR(product.price)} • {product.stock} in
+                              stock
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -469,7 +590,7 @@ const fetchDashboardData = async () => {
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(product._id, 'product')}
+                            onClick={() => handleDelete(product._id, "product")}
                             disabled={deleting === product._id}
                             className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
                           >
@@ -481,7 +602,10 @@ const fetchDashboardData = async () => {
                   ))}
                   {products.length > 5 && (
                     <div className="text-center">
-                      <Link to="/manage-products" className="text-black hover:text-gray-700 text-sm">
+                      <Link
+                        to="/manage-products"
+                        className="text-black hover:text-gray-700 text-sm"
+                      >
                         View all {products.length} products
                       </Link>
                     </div>
@@ -492,41 +616,60 @@ const fetchDashboardData = async () => {
           )}
 
           {/* Service Management for Service Stores */}
-          {store?.type === 'service' && (
+          {store?.type === "service" && (
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Manage Services</h2>
-                <Link to="/create-service" className="text-black hover:text-gray-700 text-sm">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Manage Services
+                </h2>
+                <Link
+                  to="/create-service"
+                  className="text-black hover:text-gray-700 text-sm"
+                >
                   Add New
                 </Link>
               </div>
-              
+
               {services.length === 0 ? (
                 <div className="text-center py-8">
                   <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">No services yet</p>
-                  <Link to="/create-service" className="text-black hover:text-gray-700 text-sm">
+                  <Link
+                    to="/create-service"
+                    className="text-black hover:text-gray-700 text-sm"
+                  >
                     Create your first service
                   </Link>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {services.slice(0, 5).map((service) => (
-                    <div key={service._id} className="border border-gray-200 rounded-lg p-4">
+                    <div
+                      key={service._id}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <img
-                            src={service.images?.[0] ? 
-                              (service.images[0].startsWith('http') ? service.images[0] : `${import.meta.env.VITE_API_URL}${service.images[0]}`) : 
-                              'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop'
+                            src={
+                              service.images?.[0]
+                                ? service.images[0].startsWith("http")
+                                  ? service.images[0]
+                                  : `${import.meta.env.VITE_API_URL}${
+                                      service.images[0]
+                                    }`
+                                : "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop"
                             }
                             alt={service.title}
                             className="w-12 h-12 object-cover rounded"
                           />
                           <div>
-                            <p className="font-medium text-gray-900">{service.title}</p>
+                            <p className="font-medium text-gray-900">
+                              {service.title}
+                            </p>
                             <p className="text-sm text-gray-500">
-                              {formatLKR(service.price)} • {service.duration} min
+                              {formatLKR(service.price)} • {service.duration}{" "}
+                              min
                             </p>
                           </div>
                         </div>
@@ -544,7 +687,7 @@ const fetchDashboardData = async () => {
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(service._id, 'service')}
+                            onClick={() => handleDelete(service._id, "service")}
                             disabled={deleting === service._id}
                             className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
                           >
@@ -556,7 +699,10 @@ const fetchDashboardData = async () => {
                   ))}
                   {services.length > 5 && (
                     <div className="text-center">
-                      <Link to="/manage-services" className="text-black hover:text-gray-700 text-sm">
+                      <Link
+                        to="/manage-services"
+                        className="text-black hover:text-gray-700 text-sm"
+                      >
                         View all {services.length} services
                       </Link>
                     </div>
@@ -569,44 +715,63 @@ const fetchDashboardData = async () => {
           {/* Recent Activity */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Recent Activity</h2>
-              <Link 
-                to={store?.type === 'product' ? "/orders" : "/bookings"} 
+              <h2 className="text-xl font-semibold text-gray-900">
+                Recent Activity
+              </h2>
+              <Link
+                to={store?.type === "product" ? "/orders" : "/bookings"}
                 className="text-black hover:text-gray-700 text-sm"
               >
                 View All
               </Link>
             </div>
-            
-            {(store?.type === 'product' ? recentOrders : recentBookings).length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No recent activity</p>
+
+            {(store?.type === "product" ? recentOrders : recentBookings)
+              .length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                No recent activity
+              </p>
             ) : (
               <div className="space-y-4">
-                {(store?.type === 'product' ? recentOrders : recentBookings).map((item) => (
-                  <div key={item._id} className="border border-gray-200 rounded-lg p-4">
+                {(store?.type === "product"
+                  ? recentOrders
+                  : recentBookings
+                ).map((item) => (
+                  <div
+                    key={item._id}
+                    className="border border-gray-200 rounded-lg p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-gray-900">
-                          {store?.type === 'product' 
+                          {store?.type === "product"
                             ? `Order #${item._id.slice(-6)}`
-                            : item.serviceId?.title || 'Service'
-                          }
+                            : item.serviceId?.title || "Service"}
                         </p>
                         <p className="text-sm text-gray-500">
-                          {item.customerId?.name || 'Customer'}
+                          {item.customerId?.name || "Customer"}
                         </p>
                         <p className="text-sm text-gray-500">
                           {new Date(item.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">{formatLKR(item.totalAmount)}</p>
-                        <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                          item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          item.status === 'confirmed' || item.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                          item.status === 'completed' || item.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
+                        <p className="font-semibold text-gray-900">
+                          {formatLKR(item.totalAmount)}
+                        </p>
+                        <span
+                          className={`inline-block px-2 py-1 text-xs rounded-full ${
+                            item.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : item.status === "confirmed" ||
+                                item.status === "processing"
+                              ? "bg-blue-100 text-blue-800"
+                              : item.status === "completed" ||
+                                item.status === "delivered"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
                           {item.status}
                         </span>
                       </div>
@@ -625,7 +790,7 @@ const fetchDashboardData = async () => {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-gray-900">
-                    Edit {store?.type === 'product' ? 'Product' : 'Service'}
+                    Edit {store?.type === "product" ? "Product" : "Service"}
                   </h2>
                   <button
                     onClick={() => setShowEditModal(false)}
@@ -643,7 +808,12 @@ const fetchDashboardData = async () => {
                     <input
                       type="text"
                       value={editingItem.title}
-                      onChange={(e) => setEditingItem({...editingItem, title: e.target.value})}
+                      onChange={(e) =>
+                        setEditingItem({
+                          ...editingItem,
+                          title: e.target.value,
+                        })
+                      }
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                       required
                     />
@@ -655,7 +825,12 @@ const fetchDashboardData = async () => {
                     </label>
                     <textarea
                       value={editingItem.description}
-                      onChange={(e) => setEditingItem({...editingItem, description: e.target.value})}
+                      onChange={(e) =>
+                        setEditingItem({
+                          ...editingItem,
+                          description: e.target.value,
+                        })
+                      }
                       rows={3}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                       required
@@ -670,7 +845,12 @@ const fetchDashboardData = async () => {
                       <input
                         type="number"
                         value={editingItem.price}
-                        onChange={(e) => setEditingItem({...editingItem, price: e.target.value})}
+                        onChange={(e) =>
+                          setEditingItem({
+                            ...editingItem,
+                            price: e.target.value,
+                          })
+                        }
                         className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                         required
                         min="0"
@@ -678,7 +858,7 @@ const fetchDashboardData = async () => {
                       />
                     </div>
 
-                    {store?.type === 'product' ? (
+                    {store?.type === "product" ? (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Stock Quantity
@@ -686,7 +866,12 @@ const fetchDashboardData = async () => {
                         <input
                           type="number"
                           value={editingItem.stock}
-                          onChange={(e) => setEditingItem({...editingItem, stock: e.target.value})}
+                          onChange={(e) =>
+                            setEditingItem({
+                              ...editingItem,
+                              stock: e.target.value,
+                            })
+                          }
                           className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                           required
                           min="0"
@@ -700,7 +885,12 @@ const fetchDashboardData = async () => {
                         <input
                           type="number"
                           value={editingItem.duration}
-                          onChange={(e) => setEditingItem({...editingItem, duration: e.target.value})}
+                          onChange={(e) =>
+                            setEditingItem({
+                              ...editingItem,
+                              duration: e.target.value,
+                            })
+                          }
                           className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                           required
                           min="15"
@@ -716,7 +906,12 @@ const fetchDashboardData = async () => {
                     </label>
                     <select
                       value={editingItem.category}
-                      onChange={(e) => setEditingItem({...editingItem, category: e.target.value})}
+                      onChange={(e) =>
+                        setEditingItem({
+                          ...editingItem,
+                          category: e.target.value,
+                        })
+                      }
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                       required
                     >
@@ -729,14 +924,19 @@ const fetchDashboardData = async () => {
                     </select>
                   </div>
 
-                  {store?.type === 'service' && (
+                  {store?.type === "service" && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Price Type
                       </label>
                       <select
-                        value={editingItem.priceType || 'fixed'}
-                        onChange={(e) => setEditingItem({...editingItem, priceType: e.target.value})}
+                        value={editingItem.priceType || "fixed"}
+                        onChange={(e) =>
+                          setEditingItem({
+                            ...editingItem,
+                            priceType: e.target.value,
+                          })
+                        }
                         className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                       >
                         <option value="fixed">Fixed Price</option>
@@ -757,7 +957,7 @@ const fetchDashboardData = async () => {
                       type="submit"
                       className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
                     >
-                      Update {store?.type === 'product' ? 'Product' : 'Service'}
+                      Update {store?.type === "product" ? "Product" : "Service"}
                     </button>
                   </div>
                 </form>
