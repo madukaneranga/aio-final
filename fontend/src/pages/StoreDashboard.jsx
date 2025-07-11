@@ -31,75 +31,102 @@ const StoreDashboard = () => {
     }
   }, [user]);
 
-  const fetchDashboardData = async () => {
-    try {
-      // Fetch store data
-      if (user.storeId) {
-        const storeResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`);
-        if (storeResponse.ok) {
-          const storeData = await storeResponse.json();
-          setStore(storeData.store);
-        }
-      }
+  useEffect(() => {
+  if (user?.role === 'store_owner' && user?.storeId) {
+    fetchDashboardData();
+  }
+}, [user]);
 
-      // Fetch orders
-      const ordersResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/store`, {
+const fetchDashboardData = async () => {
+  setLoading(true);
+  try {
+    // Fetch store data first
+    if (user.storeId) {
+      const storeResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      if (ordersResponse.ok) {
-        const orders = await ordersResponse.json();
-        setRecentOrders(orders.slice(0, 5));
-        setStats(prev => ({ ...prev, totalOrders: orders.length }));
+      if (!storeResponse.ok) {
+        throw new Error('Failed to fetch store data');
       }
+      const storeData = await storeResponse.json();
+      setStore(storeData.store);
 
-      // Fetch bookings
-      const bookingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/bookings/store`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (bookingsResponse.ok) {
-        const bookings = await bookingsResponse.json();
-        setRecentBookings(bookings.slice(0, 5));
-        setStats(prev => ({ ...prev, totalBookings: bookings.length }));
-      }
-
-      // Fetch products or services based on store type
-      if (user.storeId) {
-        if (store?.type === 'product') {
-          const productsResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/products?storeId=${user.storeId}`);
-          if (productsResponse.ok) {
-            const productsData = await productsResponse.json();
-            setProducts(productsData);
+      // Fetch products only if store type is 'product'
+      if (storeData.store?.type === 'product') {
+        const productsResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/products?storeId=${user.storeId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
-        } else if (store?.type === 'service') {
-          const servicesResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/services?storeId=${user.storeId}`);
-          if (servicesResponse.ok) {
-            const servicesData = await servicesResponse.json();
-            setServices(servicesData);
+        });
+        if (!productsResponse.ok) {
+          throw new Error('Failed to fetch products');
+        }
+        const productsData = await productsResponse.json();
+        setProducts(productsData);
+        setStats(prev => ({ ...prev, totalProducts: productsData.length }));
+      } else if (storeData.store?.type === 'service') {
+        const servicesResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/services?storeId=${user.storeId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
+        });
+        if (!servicesResponse.ok) {
+          throw new Error('Failed to fetch services');
         }
+        const servicesData = await servicesResponse.json();
+        setServices(servicesData);
+        setStats(prev => ({ ...prev, totalServices: servicesData.length }));
       }
-
-      // Fetch subscription
-      const subscriptionResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (subscriptionResponse.ok) {
-        const subscriptionData = await subscriptionResponse.json();
-        setSubscription(subscriptionData);
-      }
-
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // Fetch orders
+    const ordersResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/store`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!ordersResponse.ok) {
+      throw new Error('Failed to fetch orders');
+    }
+    const orders = await ordersResponse.json();
+    setRecentOrders(orders.slice(0, 5));
+    setStats(prev => ({ ...prev, totalOrders: orders.length }));
+
+    // Fetch bookings
+    const bookingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/bookings/store`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!bookingsResponse.ok) {
+      throw new Error('Failed to fetch bookings');
+    }
+    const bookings = await bookingsResponse.json();
+    setRecentBookings(bookings.slice(0, 5));
+    setStats(prev => ({ ...prev, totalBookings: bookings.length }));
+
+    // Fetch subscription
+    const subscriptionResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    if (!subscriptionResponse.ok) {
+      throw new Error('Failed to fetch subscription');
+    }
+    const subscriptionData = await subscriptionResponse.json();
+    setSubscription(subscriptionData);
+
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    // Optionally show an error message to the user
+    alert('Failed to load dashboard data. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const renewSubscription = async () => {
     try {
