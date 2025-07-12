@@ -4,6 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import ImageUpload from '../components/ImageUpload';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Store, Camera, Eye, EyeOff, MessageSquare, Star } from 'lucide-react';
+//  ADDED: Firebase storage imports
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+
 
 const StoreManagement = () => {
   const { user } = useAuth();
@@ -86,23 +90,32 @@ const StoreManagement = () => {
     setError('');
     setSuccess('');
 
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('description', formData.description);
-      formDataToSend.append('themeColor', formData.themeColor);
-      formDataToSend.append('contactInfo', JSON.stringify(formData.contactInfo));
-      
-      heroImages.forEach((file) => {
-        formDataToSend.append('heroImages', file);
-      });
+      try {
+
+          //  CHANGED: Upload images to Firebase
+          const uploadPromises = images.map(async (file) => {
+              const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`); //  ADDED
+              await uploadBytes(imageRef, file); //  ADDED
+              return getDownloadURL(imageRef); //  ADDED
+          });
+
+          const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+          const payload = {
+              name: formData.name,
+              description: formData.description,
+              themeColor: formData.themeColor,
+              contactInfo: formData.contactInfo,  // assuming this is an object
+              heroImages: imageUrls
+          };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${store._id}`, {
         method: 'PUT',
-        headers: {
+          headers: {
+              "Content-Type": "application/json",
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formDataToSend
+          },
+          body: JSON.stringify(payload);
       });
 
       if (response.ok) {
@@ -125,15 +138,27 @@ const StoreManagement = () => {
     if (!profileImage) return;
 
     try {
-      const formData = new FormData();
-      formData.append('profileImage', profileImage);
+
+        //  CHANGED: Upload images to Firebase
+        const uploadPromises = images.map(async (file) => {
+            const imageRef = ref(storage, `users/${Date.now()}_${file.name}`); //  ADDED
+            await uploadBytes(imageRef, file); //  ADDED
+            return getDownloadURL(imageRef); //  ADDED
+        });
+
+        const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+        const payload = {
+            profileImage: imageUrls
+        };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${store._id}/profile-image`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
+          headers: {
+              "Content-Type": "application/json",
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify(payload);
       });
 
       if (response.ok) {

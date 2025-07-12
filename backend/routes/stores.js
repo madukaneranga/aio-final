@@ -92,7 +92,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create store
-router.post('/', authenticate, authorize('customer', 'store_owner'), upload.array('heroImages', 5), async (req, res) => {
+router.post('/', authenticate, authorize('customer', 'store_owner'), async (req, res) => {
   try {
     // Check if user already has a store
     const existingStore = await Store.findOne({ ownerId: req.user._id });
@@ -100,10 +100,9 @@ router.post('/', authenticate, authorize('customer', 'store_owner'), upload.arra
       return res.status(400).json({ error: 'You can only create one store per account' });
     }
 
-    const { name, type, description, themeColor, contactInfo } = req.body;
+      const { name, type, description, themeColor, contactInfo, heroImages } = req.body;
     const timeSlots = req.body.timeSlots ? JSON.parse(req.body.timeSlots) : [];
     
-    const heroImages = req.files ? req.files.map(file => `/uploads/stores/${file.filename}`) : [];
 
     const store = new Store({
       name,
@@ -131,7 +130,7 @@ router.post('/', authenticate, authorize('customer', 'store_owner'), upload.arra
 });
 
 // Update store
-router.put('/:id', authenticate, authorize('store_owner'), upload.array('heroImages', 5), async (req, res) => {
+router.put('/:id', authenticate, authorize('store_owner'), async (req, res) => {
   try {
     const store = await Store.findById(req.params.id);
     
@@ -144,9 +143,7 @@ router.put('/:id', authenticate, authorize('store_owner'), upload.array('heroIma
     }
 
     const updates = req.body;
-    if (req.files && req.files.length > 0) {
-      updates.heroImages = req.files.map(file => `/uploads/stores/${file.filename}`);
-    }
+    
 
     if (updates.contactInfo) {
       updates.contactInfo = JSON.parse(updates.contactInfo);
@@ -180,8 +177,7 @@ router.put('/:id/profile-image', authenticate, authorize('store_owner'), upload.
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
-
-    const profileImage = `/uploads/stores/${req.file.filename}`;
+      const { profileImage } = req.body;
     
     const updatedStore = await Store.findByIdAndUpdate(
       req.params.id,

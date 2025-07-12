@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import { User, Mail, Phone, MapPin, Camera } from 'lucide-react';
+//  ADDED: Firebase storage imports
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+
 
 const Profile = () => {
   const { user } = useAuth();
@@ -67,23 +71,36 @@ const Profile = () => {
     setError('');
     setSuccess('');
 
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('email', formData.email);
-      formDataToSend.append('phone', formData.phone);
-      formDataToSend.append('address', JSON.stringify(formData.address));
+      try {
+
+          try {
+              //  CHANGED: Upload images to Firebase
+              const uploadPromises = images.map(async (file) => {
+                  const imageRef = ref(storage, `users/${Date.now()}_${file.name}`); //  ADDED
+                  await uploadBytes(imageRef, file); //  ADDED
+                  return getDownloadURL(imageRef); //  ADDED
+              });
+
+              const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+
+              const payload = {
+                  name: formData.name,
+                  email: formData.email,
+                  phone: formData.phone,
+                  address: formData.address, // assuming address is already an object
+                  profileImage: imageUrls
+              };
       
-      if (profileImage) {
-        formDataToSend.append('profileImage', profileImage);
-      }
+
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/profile`, {
         method: 'PUT',
-        headers: {
+          headers: {
+              "Content-Type": "application/json",
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formDataToSend
+          },
+          body: JSON.stringify(payload);
       });
 
       if (response.ok) {

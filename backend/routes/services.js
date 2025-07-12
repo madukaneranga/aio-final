@@ -79,9 +79,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create service
-router.post('/', authenticate, authorize('store_owner'), upload.array('images', 5), async (req, res) => {
+router.post('/', authenticate, authorize('store_owner'), async (req, res) => {
   try {
-    const { title, description, price, priceType, category, duration, availability } = req.body;
+    const { title, description, price, priceType, category, duration, availability, images } = req.body;
     
     // Verify store ownership
     const store = await Store.findOne({ ownerId: req.user._id, type: 'service' });
@@ -90,7 +90,7 @@ router.post('/', authenticate, authorize('store_owner'), upload.array('images', 
     }
 
 
-    const images = req.files ? req.files.map(file => `/uploads/services/${file.filename}`) : [];
+   
 
     // Parse timeSlots if provided
     let timeSlots = [];
@@ -122,7 +122,7 @@ router.post('/', authenticate, authorize('store_owner'), upload.array('images', 
 });
 
 // Update service
-router.put('/:id', authenticate, authorize('store_owner'), upload.array('images', 5), async (req, res) => {
+router.put('/:id', authenticate, authorize('store_owner'), async (req, res) => {
   try {
     const service = await Service.findById(req.params.id).populate('storeId');
     
@@ -135,9 +135,6 @@ router.put('/:id', authenticate, authorize('store_owner'), upload.array('images'
     }
 
     const updates = req.body;
-    if (req.files && req.files.length > 0) {
-      updates.images = req.files.map(file => `/uploads/services/${file.filename}`);
-    }
 
     if (updates.price) updates.price = parseFloat(updates.price);
     if (updates.duration) updates.duration = parseInt(updates.duration);

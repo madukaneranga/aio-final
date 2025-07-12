@@ -6,6 +6,10 @@ import ColorThemeSelector from '../components/ColorThemeSelector';
 import TimeSlotManager from '../components/TimeSlotManager';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Store, Package, Calendar, MapPin, Phone, Mail } from 'lucide-react';
+//  ADDED: Firebase storage imports
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+
 
 const CreateStore = () => {
   const [formData, setFormData] = useState({
@@ -41,14 +45,26 @@ const CreateStore = () => {
     setLoading(true);
     setError('');
 
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('type', formData.type);
-      formDataToSend.append('description', formData.description);
-      formDataToSend.append('themeColor', formData.themeColor);
-      formDataToSend.append('contactInfo', JSON.stringify(formData.contactInfo));
-      formDataToSend.append('timeSlots', JSON.stringify(timeSlots));
+      try {
+          //  CHANGED: Upload images to Firebase
+          const uploadPromises = images.map(async (file) => {
+              const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`); //  ADDED
+              await uploadBytes(imageRef, file); //  ADDED
+              return getDownloadURL(imageRef); //  ADDED
+          });
+
+          const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+          const payload = {
+              name: formData.name,
+              type: formData.type,
+              description: formData.description,
+              themeColor: formData.themeColor,
+              contactInfo: formData.contactInfo, // assuming it's already an object
+              timeSlots: timeSlots,              // assuming it's already an array or object
+              heroImages: imageUrls
+          };
+
       
       heroImages.forEach((file) => {
         formDataToSend.append('heroImages', file);
@@ -56,10 +72,11 @@ const CreateStore = () => {
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formDataToSend
+          headers: {
+              "Content-Type": "application/json",
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify(payload),
       });
 
       if (response.ok) {
