@@ -80,73 +80,69 @@ const Admin = () => {
   }, [user]);
 
   const fetchAdminData = async () => {
-    try {
-      // Fetch all data for admin dashboard
-      const [storesRes, productsRes, servicesRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/stores`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/products`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/services`)
-      ]);
+  try {
+    // Fetch all data in parallel
+    const [usersRes, storesRes, productsRes, servicesRes] = await Promise.all([
+      fetch(`${import.meta.env.VITE_API_URL}/api/users`),
+      fetch(`${import.meta.env.VITE_API_URL}/api/stores`),
+      fetch(`${import.meta.env.VITE_API_URL}/api/products`),
+      fetch(`${import.meta.env.VITE_API_URL}/api/services`)
+    ]);
 
-      if (storesRes.ok) {
-        const storesData = await storesRes.json();
-        setData(prev => ({ ...prev, stores: storesData }));
-      }
+    // Parse JSON if responses ok, otherwise empty arrays
+    const usersData = usersRes.ok ? await usersRes.json() : [];
+    const storesData = storesRes.ok ? await storesRes.json() : [];
+    const productsData = productsRes.ok ? await productsRes.json() : [];
+    const servicesData = servicesRes.ok ? await servicesRes.json() : [];
 
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        setData(prev => ({ ...prev, products: productsData }));
-      }
+    // Fetch subscriptions
+    const subscriptionsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/admin/all`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    });
+    const subscriptionsData = subscriptionsRes.ok ? await subscriptionsRes.json() : [];
 
-      if (servicesRes.ok) {
-        const servicesData = await servicesRes.json();
-        setData(prev => ({ ...prev, services: servicesData }));
-      }
+    // Fetch commissions
+    const commissionsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/commissions/admin/all`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    });
+    const commissionsData = commissionsRes.ok ? await commissionsRes.json() : [];
 
-      // Fetch subscriptions
-      const subscriptionsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/admin/all`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (subscriptionsRes.ok) {
-        const subscriptionsData = await subscriptionsRes.json();
-        setData(prev => ({ ...prev, subscriptions: subscriptionsData }));
-      }
+    // Fetch commission stats
+    const commissionStatsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/commissions/admin/stats`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    });
+    const commissionStatsData = commissionStatsRes.ok ? await commissionStatsRes.json() : {};
 
-      // Fetch commissions
-      const commissionsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/commissions/admin/all`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (commissionsRes.ok) {
-        const commissionsData = await commissionsRes.json();
-        setData(prev => ({ ...prev, commissions: commissionsData }));
-      }
+    // Set all fetched data at once
+    setData({
+      users: usersData,
+      stores: storesData,
+      products: productsData,
+      services: servicesData,
+      subscriptions: subscriptionsData,
+      commissions: commissionsData
+    });
 
-      // Fetch commission stats
-      const commissionStatsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/commissions/admin/stats`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (commissionStatsRes.ok) {
-        const commissionStatsData = await commissionStatsRes.json();
-        setCommissionStats(commissionStatsData);
-      }
+    setCommissionStats(commissionStatsData);
 
-      // Calculate stats
-      setStats({
-        totalUsers: data.stores.reduce((acc, store) => acc + (store.ownerId ? 1 : 0), 0),
-        totalStores: data.stores.length,
-        totalProducts: data.products.length,
-        totalServices: data.services.length,
-        totalOrders: 0,
-        totalBookings: 0,
-        totalRevenue: commissionStats.overall?.totalCommissions || 0
-      });
+    // Now calculate stats based on the fetched data (not from `data` state)
+    setStats({
+      totalUsers: usersData.length,
+      totalStores: storesData.length,
+      totalProducts: productsData.length,
+      totalServices: servicesData.length,
+      totalOrders: 0,
+      totalBookings: 0,
+      totalRevenue: commissionStatsData.overall?.totalCommissions || 0
+    });
 
-    } catch (error) {
-      console.error('Error fetching admin data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error('Error fetching admin data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const generateQRCode = async (storeId, storeName) => {
     const storeUrl = `${window.location.origin}/store/${storeId}`;
@@ -463,6 +459,16 @@ const Admin = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     {/* Dynamic headers based on active tab */}
+                    {activeTab === 'users' && (
+                      <>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Register Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </>
+                    )}
                     {activeTab === 'stores' && (
                       <>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Store</th>
@@ -519,6 +525,47 @@ const Admin = () => {
                   {filteredData(activeTab).map((item) => (
                     <tr key={item._id}>
                       {/* Dynamic table rows based on active tab */}
+                      {activeTab === 'users' && (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <img
+                                src={item.profileImage?.[0] || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop'}
+                                alt={item.name}
+                                className="w-10 h-10 rounded object-cover mr-3"
+                              />
+                              <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="capitalize text-sm text-gray-500">{item.email}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.role}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.createdAt}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              item.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {item.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => openModal('view', item)}
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              
+                            </div>
+                          </td>
+                        </>
+                      )}
                       {activeTab === 'stores' && (
                         <>
                           <td className="px-6 py-4 whitespace-nowrap">

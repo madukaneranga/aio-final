@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
   subscriptionStatus: {
     type: String,
     enum: ['active', 'inactive', 'expired'],
-    default: 'inactive'
+    default: 'active'
   },
   subscriptionId: String,
   createdAt: {
