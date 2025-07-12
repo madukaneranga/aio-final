@@ -29,7 +29,7 @@ const CreateStore = () => {
   const [error, setError] = useState('');
   const [checkingStore, setCheckingStore] = useState(true);
   
-  const { user } = useAuth();
+  const { user, refreshUser} = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,7 +47,7 @@ const CreateStore = () => {
 
       try {
           //  CHANGED: Upload images to Firebase
-          const uploadPromises = images.map(async (file) => {
+          const uploadPromises = heroImages.map(async (file) => {
               const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`); //  ADDED
               await uploadBytes(imageRef, file); //  ADDED
               return getDownloadURL(imageRef); //  ADDED
@@ -91,9 +91,11 @@ const CreateStore = () => {
 
         if (subscriptionResponse.ok) {
           alert('Store created successfully! Your monthly subscription (LKR 1,000) is now active.');
+          await refreshUser();
           navigate('/dashboard');
         } else {
           alert('Store created but subscription setup failed. Please contact support.');
+          await refreshUser();
           navigate('/dashboard');
         }
       } else {

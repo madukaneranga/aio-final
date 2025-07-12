@@ -75,7 +75,7 @@ const Profile = () => {
 
     try {
       //  CHANGED: Upload images to Firebase
-      const uploadPromises = images.map(async (file) => {
+      const uploadPromises = profileImage.map(async (file) => {
         const imageRef = ref(storage, `products/${Date.now()}_${file.name}`); //  ADDED
         await uploadBytes(imageRef, file); //  ADDED
         return getDownloadURL(imageRef); //  ADDED

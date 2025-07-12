@@ -130,6 +130,32 @@ export const AuthProvider = ({ children }) => {
     }
 };
 
+const refreshUser = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+        } else {
+            localStorage.removeItem("token");
+            setUser(null);
+        }
+    } catch (error) {
+        console.error("Error refreshing user:", error);
+        localStorage.removeItem("token");
+        setUser(null);
+    }
+};
+
+
     const logout = () => {
         localStorage.removeItem("token");
         setUser(null);
@@ -141,6 +167,7 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
+        refreshUser,
         loading,
     };
 
