@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import ImageUpload from '../components/ImageUpload';
-import { User, Mail, Phone, MapPin, Camera } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import ImageUpload from "../components/ImageUpload";
+import { User, Mail, Phone, MapPin, Camera } from "lucide-react";
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
-
 
 const Profile = () => {
   const { user } = useAuth();
@@ -13,19 +12,19 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
+    name: "",
+    email: "",
+    phone: "",
     address: {
-      street: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: ''
-    }
+      street: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "",
+    },
   });
 
   useEffect(() => {
@@ -36,30 +35,33 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/profile`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/profile`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-      });
-      
+      );
+
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
         setFormData({
-          name: data.name || '',
-          email: data.email || '',
-          phone: data.phone || '',
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
           address: data.address || {
-            street: '',
-            city: '',
-            state: '',
-            zipCode: '',
-            country: ''
-          }
+            street: "",
+            city: "",
+            state: "",
+            zipCode: "",
+            country: "",
+          },
         });
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error("Error fetching profile:", error);
     } finally {
       setLoading(false);
     }
@@ -68,54 +70,53 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
-      try {
-
-          try {
-              //  CHANGED: Upload images to Firebase
-              const uploadPromises = images.map(async (file) => {
-                  const imageRef = ref(storage, `users/${Date.now()}_${file.name}`); //  ADDED
-                  await uploadBytes(imageRef, file); //  ADDED
-                  return getDownloadURL(imageRef); //  ADDED
-              });
-
-              const imageUrls = await Promise.all(uploadPromises); //  ADDED
-
-
-              const payload = {
-                  name: formData.name,
-                  email: formData.email,
-                  phone: formData.phone,
-                  address: formData.address, // assuming address is already an object
-                  profileImage: imageUrls
-              };
-      
-
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/profile`, {
-        method: 'PUT',
-          headers: {
-              "Content-Type": "application/json",
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(payload);
+    try {
+      //  CHANGED: Upload images to Firebase
+      const uploadPromises = images.map(async (file) => {
+        const imageRef = ref(storage, `products/${Date.now()}_${file.name}`); //  ADDED
+        await uploadBytes(imageRef, file); //  ADDED
+        return getDownloadURL(imageRef); //  ADDED
       });
+
+      const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address, // assuming it's already an object
+        profileImage: imageUrls,
+      };
+
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/profile`,
+        {
+          method: "PUT",
+          headers: {
+                        "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (response.ok) {
         const updatedProfile = await response.json();
         setProfile(updatedProfile);
         setEditing(false);
         setProfileImage(null);
-        setSuccess('Profile updated successfully!');
+        setSuccess("Profile updated successfully!");
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'Failed to update profile');
+        setError(errorData.error || "Failed to update profile");
       }
     } catch (error) {
-      console.error('Error updating profile:', error);
-      setError('Network error. Please try again.');
+      console.error("Error updating profile:", error);
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -123,19 +124,19 @@ const Profile = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name.startsWith('address.')) {
-      const field = name.split('.')[1];
-      setFormData(prev => ({
+    if (name.startsWith("address.")) {
+      const field = name.split(".")[1];
+      setFormData((prev) => ({
         ...prev,
         address: {
           ...prev.address,
-          [field]: value
-        }
+          [field]: value,
+        },
       }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [name]: value
+        [name]: value,
       }));
     }
   };
@@ -144,7 +145,9 @@ const Profile = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Please log in to view your profile</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Please log in to view your profile
+          </h2>
         </div>
       </div>
     );
@@ -169,7 +172,13 @@ const Profile = () => {
                 <div className="w-24 h-24 bg-gray-600 rounded-full flex items-center justify-center">
                   {profile?.profileImage ? (
                     <img
-                      src={profile.profileImage.startsWith('http') ? profile.profileImage : `${import.meta.env.VITE_API_URL}${profile.profileImage}`}
+                      src={
+                        profile.profileImage.startsWith("http")
+                          ? profile.profileImage
+                          : `${import.meta.env.VITE_API_URL}${
+                              profile.profileImage
+                            }`
+                      }
                       alt="Profile"
                       className="w-24 h-24 rounded-full object-cover"
                     />
@@ -190,8 +199,12 @@ const Profile = () => {
                 )}
               </div>
               <div>
-                <h1 className="text-3xl font-bold">{profile?.name || 'User'}</h1>
-                <p className="text-gray-300 capitalize">{profile?.role || 'Customer'}</p>
+                <h1 className="text-3xl font-bold">
+                  {profile?.name || "User"}
+                </h1>
+                <p className="text-gray-300 capitalize">
+                  {profile?.role || "Customer"}
+                </p>
                 <p className="text-gray-300">{profile?.email}</p>
               </div>
             </div>
@@ -204,7 +217,7 @@ const Profile = () => {
                 {error}
               </div>
             )}
-            
+
             {success && (
               <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
                 {success}
@@ -212,12 +225,14 @@ const Profile = () => {
             )}
 
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Profile Information</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Profile Information
+              </h2>
               <button
                 onClick={() => setEditing(!editing)}
                 className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                {editing ? 'Cancel' : 'Edit Profile'}
+                {editing ? "Cancel" : "Edit Profile"}
               </button>
             </div>
 
@@ -288,7 +303,9 @@ const Profile = () => {
 
                 {/* Address */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Address</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Address
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -366,7 +383,7 @@ const Profile = () => {
                     disabled={loading}
                     className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
                   >
-                    {loading ? 'Saving...' : 'Save Changes'}
+                    {loading ? "Saving..." : "Save Changes"}
                   </button>
                 </div>
               </form>
@@ -378,21 +395,27 @@ const Profile = () => {
                     <User className="w-5 h-5 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-500">Full Name</p>
-                      <p className="font-medium">{profile?.name || 'Not provided'}</p>
+                      <p className="font-medium">
+                        {profile?.name || "Not provided"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     <Mail className="w-5 h-5 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-500">Email</p>
-                      <p className="font-medium">{profile?.email || 'Not provided'}</p>
+                      <p className="font-medium">
+                        {profile?.email || "Not provided"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     <Phone className="w-5 h-5 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-500">Phone</p>
-                      <p className="font-medium">{profile?.phone || 'Not provided'}</p>
+                      <p className="font-medium">
+                        {profile?.phone || "Not provided"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -402,14 +425,25 @@ const Profile = () => {
                       <p className="font-medium">
                         {profile?.address ? (
                           <>
-                            {profile.address.street && <>{profile.address.street}<br /></>}
-                            {profile.address.city && profile.address.state && 
+                            {profile.address.street && (
+                              <>
+                                {profile.address.street}
+                                <br />
+                              </>
+                            )}
+                            {profile.address.city &&
+                              profile.address.state &&
                               `${profile.address.city}, ${profile.address.state} `}
                             {profile.address.zipCode}
-                            {profile.address.country && <><br />{profile.address.country}</>}
+                            {profile.address.country && (
+                              <>
+                                <br />
+                                {profile.address.country}
+                              </>
+                            )}
                           </>
                         ) : (
-                          'Not provided'
+                          "Not provided"
                         )}
                       </p>
                     </div>
