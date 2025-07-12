@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import User from '../models/User.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +31,29 @@ const upload = multer({
   }
 });
 
+// Get all users with optional filters
+router.get('/', async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = {};
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(query)
+      .sort({ createdAt: -1 });      // sort by newest first (optional)
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // Get user profile
 router.get('/profile', authenticate, async (req, res) => {
   try {
@@ -42,10 +65,13 @@ router.get('/profile', authenticate, async (req, res) => {
 });
 
 // Update user profile
-router.put('/profile', authenticate,  async (req, res) => {
+router.put('/profile', authenticate, upload.single('profileImage'), async (req, res) => {
   try {
     const updates = req.body;
     
+    if (req.file) {
+      updates.profileImage = `/uploads/users/${req.file.filename}`;
+    }
 
     if (updates.address) {
       try {
