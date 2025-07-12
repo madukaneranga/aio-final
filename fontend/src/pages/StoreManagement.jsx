@@ -139,18 +139,14 @@ const StoreManagement = () => {
 
     try {
 
-        //  CHANGED: Upload images to Firebase
-        const uploadPromises = profileImage.map(async (file) => {
-            const imageRef = ref(storage, `users/${Date.now()}_${file.name}`); //  ADDED
-            await uploadBytes(imageRef, file); //  ADDED
-            return getDownloadURL(imageRef); //  ADDED
-        });
+        // Upload a single image to Firebase
+    const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
+    await uploadBytes(imageRef, profileImage);
+    const imageUrl = await getDownloadURL(imageRef);
 
-        const imageUrls = await Promise.all(uploadPromises); //  ADDED
-
-        const payload = {
-            profileImage: imageUrls
-        };
+    const payload = {
+      profileImage: imageUrl, // use imageUrl directly, not array
+    };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${store._id}/profile-image`, {
         method: 'PUT',
