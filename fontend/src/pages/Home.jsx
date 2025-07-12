@@ -76,9 +76,9 @@ const Home = () => {
       {/* Hero Section */}
       <HeroSection
         images={[
-          'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=400&fit=crop',
-          'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=400&fit=crop',
-          'https://images.unsplash.com/photo-1560472354-b43ff0c44a43?w=1200&h=400&fit=crop'
+          'https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Fordinary-life-scene-from-mall-america%20(1).jpg?alt=media&token=fdb88ecc-68c6-49fb-8258-a5a3410393ee',
+          'https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Ftwo-happy-girls-sweaters-having-fun-with-shopping-trolley-megaphone-white-wall.jpg?alt=media&token=886c6960-8622-4770-9afd-fc8dbcce99e7',
+          'https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Felderly-woman-shopping-customer-day.jpg?alt=media&token=db76d51e-5d2b-44b3-b52a-21ee1b0533c0'
         ]}
         title="All In One Marketplace"
         subtitle="Discover premium products and professional services from verified local businesses"
