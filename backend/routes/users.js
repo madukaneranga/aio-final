@@ -73,14 +73,7 @@ router.put('/profile', authenticate, upload.single('profileImage'), async (req, 
       updates.profileImage = `/uploads/users/${req.file.filename}`;
     }
 
-    if (updates.address) {
-      try {
-        updates.address = JSON.parse(updates.address);
-      } catch (error) {
-        return res.status(400).json({ error: 'Invalid address format' });
-      }
-    }
-
+    
     // Validate email format
     if (updates.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email)) {
       return res.status(400).json({ error: 'Invalid email format' });

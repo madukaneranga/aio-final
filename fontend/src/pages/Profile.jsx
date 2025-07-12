@@ -74,21 +74,17 @@ const Profile = () => {
     setSuccess("");
 
     try {
-      //  CHANGED: Upload images to Firebase
-      const uploadPromises = profileImage.map(async (file) => {
-        const imageRef = ref(storage, `products/${Date.now()}_${file.name}`); //  ADDED
-        await uploadBytes(imageRef, file); //  ADDED
-        return getDownloadURL(imageRef); //  ADDED
-      });
-
-      const imageUrls = await Promise.all(uploadPromises); //  ADDED
+      // Upload a single image to Firebase
+          const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
+          await uploadBytes(imageRef, profileImage);
+          const imageUrl = await getDownloadURL(imageRef);
 
       const payload = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         address: formData.address, // assuming it's already an object
-        profileImage: imageUrls,
+        profileImage: imageUrl,
       };
 
       const response = await fetch(

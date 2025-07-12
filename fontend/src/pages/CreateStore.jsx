@@ -47,7 +47,7 @@ const CreateStore = () => {
 
       try {
           //  CHANGED: Upload images to Firebase
-          const uploadPromises = images.map(async (file) => {
+          const uploadPromises = heroImages.map(async (file) => {
               const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`); //  ADDED
               await uploadBytes(imageRef, file); //  ADDED
               return getDownloadURL(imageRef); //  ADDED
