@@ -66,9 +66,6 @@ const CreateStore = () => {
           };
 
       
-      heroImages.forEach((file) => {
-        formDataToSend.append('heroImages', file);
-      });
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores`, {
         method: 'POST',
