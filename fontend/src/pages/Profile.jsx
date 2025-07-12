@@ -91,13 +91,12 @@ const Profile = () => {
         profileImage: imageUrls,
       };
 
-
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/users/profile`,
         {
           method: "PUT",
           headers: {
-                        "Content-Type": "application/json",
+            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
