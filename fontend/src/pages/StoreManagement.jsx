@@ -158,7 +158,7 @@ const StoreManagement = () => {
               "Content-Type": "application/json",
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
-          body: JSON.stringify(payload);
+          body: JSON.stringify(payload)
       });
 
       if (response.ok) {
