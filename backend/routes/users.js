@@ -42,13 +42,10 @@ router.get('/profile', authenticate, async (req, res) => {
 });
 
 // Update user profile
-router.put('/profile', authenticate, upload.single('profileImage'), async (req, res) => {
+router.put('/profile', authenticate,  async (req, res) => {
   try {
     const updates = req.body;
     
-    if (req.file) {
-      updates.profileImage = `/uploads/users/${req.file.filename}`;
-    }
 
     if (updates.address) {
       try {

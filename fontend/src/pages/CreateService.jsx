@@ -4,6 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Plus, Trash2, Calendar, Clock, ArrowLeft } from 'lucide-react';
+//  ADDED: Firebase storage imports
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+
 
 const CreateService = () => {
   const [formData, setFormData] = useState({
@@ -66,28 +70,36 @@ const CreateService = () => {
     setLoading(true);
     setError('');
 
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('description', formData.description);
-      formDataToSend.append('price', formData.price);
-      formDataToSend.append('priceType', formData.priceType);
-      formDataToSend.append('category', formData.category);
-      formDataToSend.append('duration', formData.duration);
-      
-      // Add time slots directly
-      formDataToSend.append('timeSlots', JSON.stringify(timeSlots));
-      
-      images.forEach((file) => {
-        formDataToSend.append('images', file);
-      });
+      try {
+
+          //  CHANGED: Upload images to Firebase
+          const uploadPromises = images.map(async (file) => {
+              const imageRef = ref(storage, `services/${Date.now()}_${file.name}`); //  ADDED
+              await uploadBytes(imageRef, file); //  ADDED
+              return getDownloadURL(imageRef); //  ADDED
+          });
+
+          const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+
+          const payload = {
+              title: formData.title,
+              description: formData.description,
+              price: formData.price,
+              priceType: formData.priceType,
+              category: formData.category,
+              duration: formData.duration,
+              timeSlots: timeSlots,  // Already an array or object
+              images: imageUrls
+          };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          headers: {
+              "Content-Type": "application/json",
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
-        body: formDataToSend
+          body: JSON.stringify(payload)
       });
 
       if (response.ok) {

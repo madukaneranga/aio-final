@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import LoadingSpinner from '../components/LoadingSpinner';
+//  ADDED: Firebase storage imports
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+
 
 const CreateProduct = () => {
   const [formData, setFormData] = useState({
@@ -35,25 +39,38 @@ const CreateProduct = () => {
     setLoading(true);
     setError('');
 
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('description', formData.description);
-      formDataToSend.append('price', formData.price);
-      formDataToSend.append('category', formData.category);
-      formDataToSend.append('stock', formData.stock);
-      
-      images.forEach((file) => {
-        formDataToSend.append('images', file);
-      });
+      try {
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formDataToSend
-      });
+          //  CHANGED: Upload images to Firebase
+          const uploadPromises = images.map(async (file) => {
+              const imageRef = ref(storage, `products/${Date.now()}_${file.name}`); //  ADDED
+              await uploadBytes(imageRef, file); //  ADDED
+              return getDownloadURL(imageRef); //  ADDED
+          });
+
+          const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+          // Prepare JSON payload instead of FormData
+          const payload = {
+              title: formData.title,
+              description: formData.description,
+              price: formData.price,
+              category: formData.category,
+              stock: formData.stock,
+              images: imageUrls, // <-- send URLs here
+          };
+
+          const response = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/products`,
+              {
+                  method: "POST",
+                  headers: {
+                      "Content-Type": "application/json", // <-- IMPORTANT
+                      Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  },
+                  body: JSON.stringify(payload), // <-- send JSON string
+              }
+          );
 
       if (response.ok) {
         navigate('/dashboard');

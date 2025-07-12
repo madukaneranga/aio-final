@@ -79,9 +79,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create product
-router.post('/', authenticate, authorize('store_owner'), upload.array('images', 10), async (req, res) => {
+router.post('/', authenticate, authorize('store_owner'), async (req, res) => {
   try {
-    const { title, description, price, category, stock } = req.body;
+    const { title, description, price, category, stock, images } = req.body;
     
     // Verify store ownership
     const store = await Store.findOne({ ownerId: req.user._id, type: 'product' });
@@ -89,8 +89,6 @@ router.post('/', authenticate, authorize('store_owner'), upload.array('images', 
       return res.status(403).json({ error: 'Product store not found. You need a product store to create products.' });
     }
 
-
-    const images = req.files ? req.files.map(file => `/uploads/products/${file.filename}`) : [];
 
     const product = new Product({
       title,
@@ -110,7 +108,7 @@ router.post('/', authenticate, authorize('store_owner'), upload.array('images', 
 });
 
 // Update product
-router.put('/:id', authenticate, authorize('store_owner'), upload.array('images', 10), async (req, res) => {
+router.put('/:id', authenticate, authorize('store_owner'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id).populate('storeId');
     
@@ -122,10 +120,7 @@ router.put('/:id', authenticate, authorize('store_owner'), upload.array('images'
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const updates = req.body;
-    if (req.files && req.files.length > 0) {
-      updates.images = req.files.map(file => `/uploads/products/${file.filename}`);
-    }
+      const updates = req.body;
 
     if (updates.price) updates.price = parseFloat(updates.price);
     if (updates.stock) updates.stock = parseInt(updates.stock);
