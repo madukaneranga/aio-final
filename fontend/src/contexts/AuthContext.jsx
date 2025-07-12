@@ -55,76 +55,80 @@ export const AuthProvider = ({ children }) => {
     };
 
     const login = async (email, password) => {
-        try {
-            const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/api/auth/login`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ email, password }),
-                }
-            );
-
-            const data = await response.json();
-
-            if (response.ok) {
-                localStorage.setItem("token", data.token);
-                setUser(data.user);
-
-                // ✅ ALSO sign in to Firebase
-                await signInWithEmailAndPassword(firebaseAuth, email, password);
-
-                return { success: true };
-            } else {
-                return { success: false, error: data.error };
+    try {
+        const response = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/auth/login`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ email, password }),
             }
-        } catch (error) {
-            return { success: false, error: "Network error" };
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return { success: false, error: data.error };
         }
-    };
+
+        // ✅ First try Firebase sign-in
+        try {
+            await signInWithEmailAndPassword(firebaseAuth, email, password);
+        } catch (firebaseError) {
+            return { success: false, error: "Firebase login failed" };
+        }
+
+        // ✅ Then proceed only if Firebase login succeeds
+        localStorage.setItem("token", data.token);
+        setUser(data.user);
+        return { success: true };
+
+    } catch (error) {
+        return { success: false, error: "Network error" };
+    }
+};
+
 
     const register = async (userData) => {
-        try {
-            const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/api/auth/register`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(userData),
-                }
-            );
+    try {
+        // ✅ First create user in Firebase
+        await createUserWithEmailAndPassword(firebaseAuth, userData.email, userData.password);
 
-            const data = await response.json();
+        // ✅ Optionally sign in to Firebase (not strictly necessary if already signed in)
+        await signInWithEmailAndPassword(firebaseAuth, userData.email, userData.password);
 
-            if (response.ok) {
-                localStorage.setItem("token", data.token);
-                setUser(data.user);
-
-                // ✅ Register user in Firebase Auth
-                await createUserWithEmailAndPassword(
-                    firebaseAuth,
-                    userData.email,
-                    userData.password
-                );
-                // ✅ Sign them in to Firebase Auth
-                await signInWithEmailAndPassword(
-                    firebaseAuth,
-                    userData.email,
-                    userData.password
-                );
-
-                return { success: true };
-            } else {
-                return { success: false, error: data.error };
+        // ✅ Then register user in your backend
+        const response = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/auth/register`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(userData),
             }
-        } catch (error) {
-            return { success: false, error: "Network error" };
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem("token", data.token);
+            setUser(data.user);
+            return { success: true };
+        } else {
+            // Optionally clean up Firebase user if backend registration fails
+            const currentUser = firebaseAuth.currentUser;
+            if (currentUser) {
+                await currentUser.delete();
+            }
+            return { success: false, error: data.error };
         }
-    };
+    } catch (error) {
+        return { success: false, error: "Registration failed: " + error.message };
+    }
+};
 
     const logout = () => {
         localStorage.removeItem("token");
