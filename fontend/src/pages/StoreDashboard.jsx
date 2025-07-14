@@ -227,6 +227,37 @@ const StoreDashboard = () => {
     }
   };
 
+  const createSubscription = async () => {
+    try {
+      // Create initial subscription
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/create`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ storeId: storeData._id }),
+        }
+      );
+
+      if (response.ok) {
+        alert("Your monthly subscription (LKR 1,000) is now active.");
+        fetchDashboardData(); // ✅ Refresh UI immediately
+      } else {
+        const errorData = await response.json();
+        alert(
+          "Subscription setup failed. Please contact support: " +
+            errorData?.error || "Unknown error"
+        );
+      }
+    } catch (error) {
+      console.error("Cancel error:", error);
+      alert("Error cancelling subscription");
+    }
+  };
+
   const handleEdit = (item) => {
     setEditingItem({
       ...item,
@@ -504,7 +535,7 @@ const StoreDashboard = () => {
                   onClick={renewSubscription}
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
                 >
-                  Renew Subscription
+                {subscription.status === "cancelled"? ("Re-Subscribe") : ("Renew Subscription")}
                 </button>
 
                 {subscription.status !== "cancelled" && (

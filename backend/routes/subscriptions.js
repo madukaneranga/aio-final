@@ -95,6 +95,7 @@ router.post(
   }
 );
 
+
 // PayHere IPN handler
 router.post(
   "/ipn",
@@ -110,8 +111,10 @@ router.post(
         md5sig,
         payment_id,
         payment_method,
+        recurrence_id // ✅ NEW
       } = req.body;
 
+      // Validate MD5 signature
       const localMd5 = crypto
         .createHash("md5")
         .update(
@@ -136,6 +139,12 @@ router.post(
       if (status_code === "2") {
         subscription.status = "active";
         subscription.localPaymentId = payment_id;
+
+        // ✅ Store recurrenceId
+        if (recurrence_id) {
+          subscription.recurrenceId = recurrence_id;
+        }
+
         subscription.paymentHistory.push({
           amount: parseFloat(payhere_amount),
           currency: payhere_currency,
@@ -144,6 +153,7 @@ router.post(
           status: "paid",
           paymentMethod: payment_method,
         });
+
         await subscription.save();
 
         await User.findByIdAndUpdate(subscription.userId, {
@@ -215,7 +225,7 @@ router.post(
   async (req, res) => {
     try {
       const { subscriptionId } = req.body;
-      console.log("subscription.id", subscriptionId);
+
       const subscription = await Subscription.findOne({
         _id: subscriptionId,
         userId: req.user._id,
@@ -226,12 +236,36 @@ router.post(
         return res.status(404).json({ error: "Active subscription not found" });
       }
 
+      // ✅ Cancel from PayHere if recurrenceId exists
+      if (subscription.recurrenceId) {
+        const body = new URLSearchParams({
+          merchant_id: PAYHERE_MERCHANT_ID,
+          recurrence_id: subscription.recurrenceId,
+        });
+
+        const response = await fetch("https://sandbox.payhere.lk/merchant/v1/subscription/cancel", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body,
+        });
+
+        const data = await response.json();
+
+        if (data.status !== 1) {
+          return res.status(500).json({ error: "PayHere cancellation failed", details: data });
+        }
+      }
+
+      // ✅ Update local DB
       subscription.status = "cancelled";
       subscription.endDate = new Date();
       await subscription.save();
 
-      res.json({ message: "Subscription cancelled successfully" });
+      res.json({ message: "Subscription cancelled from both system and PayHere" });
     } catch (error) {
+      console.error("Cancel Error:", error);
       res.status(500).json({ error: error.message });
     }
   }
