@@ -152,6 +152,133 @@ router.post('/create-booking-intent', authenticate, async (req, res) => {
   }
 });
 
+router.post('/create-combined-intent', authenticate, async (req, res) => {
+  try {
+    const {
+      cartItems = [],
+      bookingItems = [],
+      shippingAddress,
+      paymentMethod,
+    } = req.body;
+
+    let totalAmount = 0;
+    const orderItems = [];
+    const createdEntities = {
+      order: null,
+      bookings: [],
+    };
+
+    // --- Handle Order Creation ---
+    if (cartItems.length > 0) {
+      let orderStoreId = null;
+
+      for (const item of cartItems) {
+        const product = await Product.findById(item.productId);
+        if (!product) {
+          return res.status(404).json({ error: `Product ${item.productId} not found` });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).json({ error: `Insufficient stock for ${product.title}` });
+        }
+
+        if (!orderStoreId) {
+          orderStoreId = typeof item.storeId === 'object' ? item.storeId._id : item.storeId;
+        }
+
+        const itemTotal = product.price * item.quantity;
+        totalAmount += itemTotal;
+
+        orderItems.push({
+          productId: product._id,
+          quantity: item.quantity,
+          price: product.price,
+        });
+      }
+
+      const commissionRate = 0.07;
+      const commissionAmount = totalAmount * commissionRate;
+      const storeAmount = totalAmount - commissionAmount;
+
+      const order = new Order({
+        customerId: req.user._id,
+        storeId: orderStoreId,
+        items: orderItems,
+        totalAmount,
+        platformFee: commissionAmount,
+        storeAmount,
+        shippingAddress,
+        status: 'pending',
+      });
+
+      await order.save();
+      createdEntities.order = order;
+    }
+
+    // --- Handle Booking Creation ---
+    for (const item of bookingItems) {
+      const service = await Service.findById(item.serviceId);
+      if (!service) {
+        return res.status(404).json({ error: `Service ${item.serviceId} not found` });
+      }
+
+      const serviceAmount = service.price;
+      totalAmount += serviceAmount;
+
+      const commissionRate = 0.07;
+      const commissionAmount = serviceAmount * commissionRate;
+      const storeAmount = serviceAmount - commissionAmount;
+
+      const booking = new Booking({
+        customerId: req.user._id,
+        storeId: service.storeId,
+        serviceId: service._id,
+        bookingDate: item.bookingDate,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        notes: item.notes,
+        totalAmount: serviceAmount,
+        platformFee: commissionAmount,
+        storeAmount,
+        status: 'pending',
+      });
+
+      await booking.save();
+      createdEntities.bookings.push(booking);
+    }
+
+    // --- Combine Order ID and Booking IDs for unified payment reference ---
+    const combinedId = `CMB_${Date.now()}_${req.user._id}`;
+    const combinedItemLabel = `OrderAndBooking_${combinedId}`;
+
+    // --- Save these IDs for tracking in your DB (if needed) ---
+
+    // --- Prepare PayHere Payment Params ---
+    const paymentParams = {
+      merchant_id: PAYHERE_MERCHANT_ID,
+      return_url: 'https://www.aiocart.lk',
+      cancel_url: 'https://www.aiocart.lk/checkout',
+      notify_url: 'https://api.aiocart.lk/api/payments/payhere/ipn', // IPN handles splitting
+      order_id: combinedId, // Use this in IPN to match order + bookings
+      items: combinedItemLabel,
+      currency: 'LKR',
+      amount: totalAmount.toFixed(2),
+      first_name: req.user.firstName || '',
+      last_name: req.user.lastName || '',
+      email: req.user.email || '',
+      phone: req.user.phone || '',
+      address: shippingAddress?.street || '',
+      city: shippingAddress?.city || '',
+    };
+
+    res.json({ success: true, paymentParams, combinedId });
+  } catch (error) {
+    console.error('Combined payment intent error:', error);
+    res.status(500).json({ error: 'Failed to create payment intent' });
+  }
+});
+
+
 // Handle PayHere IPN (payment notifications)
 router.post('/payhere/ipn', express.urlencoded({ extended: true }), async (req, res) => {
   const data = req.body;
