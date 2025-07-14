@@ -40,74 +40,89 @@ const CreateStore = () => {
     }
   }, [user, navigate]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-      try {
-          //  CHANGED: Upload images to Firebase
-          const uploadPromises = heroImages.map(async (file) => {
-              const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`); //  ADDED
-              await uploadBytes(imageRef, file); //  ADDED
-              return getDownloadURL(imageRef); //  ADDED
-          });
+  try {
+    // Upload images to Firebase
+    const uploadPromises = heroImages.map(async (file) => {
+      const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
+      await uploadBytes(imageRef, file);
+      return getDownloadURL(imageRef);
+    });
 
-          const imageUrls = await Promise.all(uploadPromises); //  ADDED
+    const imageUrls = await Promise.all(uploadPromises);
 
-          const payload = {
-              name: formData.name,
-              type: formData.type,
-              description: formData.description,
-              themeColor: formData.themeColor,
-              contactInfo: formData.contactInfo, // assuming it's already an object
-              timeSlots: timeSlots,              // assuming it's already an array or object
-              heroImages: imageUrls
-          };
+    const payload = {
+      name: formData.name,
+      type: formData.type,
+      description: formData.description,
+      themeColor: formData.themeColor,
+      contactInfo: formData.contactInfo, // assuming it's already an object
+      timeSlots: timeSlots,              // assuming it's already an array or object
+      heroImages: imageUrls
+    };
 
-      
+    // Create the store
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores`, {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores`, {
+    if (response.ok) {
+      const storeData = await response.json();
+
+      // Create initial subscription
+      const subscriptionResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/create`, {
         method: 'POST',
-          headers: {
-              "Content-Type": "application/json",
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ storeId: storeData._id })
       });
 
-      if (response.ok) {
-        const storeData = await response.json();
-        
-        // Create initial subscription
-        const subscriptionResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/create`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ storeId: storeData._id })
+      if (subscriptionResponse.ok) {
+        const { payHereURL, data } = await subscriptionResponse.json();
+
+        // Create and submit form to PayHere checkout
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = payHereURL;
+
+        Object.entries(data).forEach(([key, value]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
         });
 
-        if (subscriptionResponse.ok) {
-          alert('Store created successfully! Your monthly subscription (LKR 1,000) is now active.');
-          await refreshUser();
-          navigate('/dashboard');
-        } else {
-          alert('Store created but subscription setup failed. Please contact support.');
-          await refreshUser();
-          navigate('/dashboard');
-        }
+        document.body.appendChild(form);
+        form.submit();
+
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to create store');
+        alert('Store created but subscription setup failed. Please contact support.');
+        await refreshUser();
+        navigate('/dashboard');
       }
-    } catch (error) {
-      setError('Network error. Please try again.');
-    } finally {
-      setLoading(false);
+    } else {
+      const data = await response.json();
+      setError(data.error || 'Failed to create store');
     }
-  };
+  } catch (error) {
+    setError('Network error. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
