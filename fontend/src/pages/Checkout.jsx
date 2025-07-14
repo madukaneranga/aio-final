@@ -96,77 +96,173 @@ const Checkout = () => {
   };
 
   const handleCheckout = async () => {
-  if (!user) {
-    alert("Please log in to continue");
-    navigate("/login");
-    return;
-  }
+    if (!user) {
+      alert("Please log in to continue");
+      navigate("/login");
+      return;
+    }
 
-  if (user.role !== "customer") {
-    alert("Only customers can place orders");
-    return;
-  }
+    if (user.role !== "customer") {
+      alert("Only customers can place orders");
+      return;
+    }
 
-  if (
-    cartItems.length > 0 &&
-    (!shippingAddress.street ||
-      !shippingAddress.city ||
-      !shippingAddress.state ||
-      !shippingAddress.zipCode)
-  ) {
-    alert("Please fill in all shipping address fields");
-    return;
-  }
+    if (
+      cartItems.length > 0 &&
+      (!shippingAddress.street ||
+        !shippingAddress.city ||
+        !shippingAddress.state ||
+        !shippingAddress.zipCode)
+    ) {
+      alert("Please fill in all shipping address fields");
+      return;
+    }
 
-  setLoading(true);
+    setLoading(true);
 
-  if (selectedPaymentMethod === "payhere") {
-    const tempOrderId = `ORDER_${Date.now()}`;
+    try {
+      // 1. Handle cart orders
+      if (cartItems.length > 0) {
+        const itemsByStore = cartItems.reduce((acc, item) => {
+          const storeId =
+            typeof item.storeId === "object"
+              ? item.storeId._id
+              : item.storeId || "unknown";
+          if (!acc[storeId]) acc[storeId] = [];
+          acc[storeId].push({
+            productId: item.id,
+            quantity: item.quantity,
+          });
+          return acc;
+        }, {});
 
-    const paymentObject = {
-      sandbox: true, // set to false in production
-      merchant_id: "1231188", // no trailing space
-      return_url: "http://www.aiocart.lk/checkout",
-      cancel_url: "http://www.aiocar.lk/checkout",
-      notify_url: `${import.meta.env.VITE_API_URL}/api/payments/payhere-notify`,
-      order_id: tempOrderId,
-      items: "Products and Services",
-      amount: grandTotal.toFixed(2),
-      currency: "LKR",
-      first_name: user.firstName,
-      last_name: user.lastName || "",
-      email: user.email,
-      phone: user.phone,
-      address: shippingAddress.street,
-      city: shippingAddress.city,
-      country: shippingAddress.country,
-    };
+        // For each store order, create order intent & launch PayHere payment
+        for (const [storeId, items] of Object.entries(itemsByStore)) {
+          const orderResponse = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/payments/create-order-intent`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+              body: JSON.stringify({
+                items,
+                storeId,
+                shippingAddress,
+                paymentMethod: selectedPaymentMethod,
+              }),
+            }
+          );
 
-    console.log("PayHere payment object:", paymentObject);
+          if (!orderResponse.ok) {
+            const errorData = await orderResponse.json();
+            alert(`Order failed: ${errorData.error}`);
+            setLoading(false);
+            return;
+          }
 
-    window.payhere.onCompleted = function (orderId) {
-      console.log("Payment completed. OrderID:", orderId);
-      finalizeOrderAfterPayhere();
-    };
+          const { paymentParams } = await orderResponse.json();
 
-    window.payhere.onDismissed = function () {
-      alert("Payment was cancelled.");
+          // Call PayHere payment
+          await startPayHerePayment(paymentParams);
+        }
+      }
+
+      // 2. Handle bookings similarly
+      for (const booking of bookingItems) {
+        const bookingResponse = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/payments/create-booking-intent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: JSON.stringify({
+              serviceId: booking.id,
+              bookingDate: booking.date,
+              startTime: booking.time,
+              endTime:
+                booking.endTime ||
+                (booking.time
+                  ? booking.time
+                      .split(":")
+                      .map((t, i) =>
+                        i === 0 ? String(parseInt(t) + 1).padStart(2, "0") : t
+                      )
+                      .join(":")
+                  : ""),
+              notes: booking.notes,
+              paymentMethod: selectedPaymentMethod,
+            }),
+          }
+        );
+
+        if (!bookingResponse.ok) {
+          const errorData = await bookingResponse.json();
+          alert(`Booking failed: ${errorData.error}`);
+          setLoading(false);
+          return;
+        }
+
+        const { paymentParams } = await bookingResponse.json();
+
+        // Call PayHere payment
+        await startPayHerePayment(paymentParams);
+      }
+
+      // If everything paid successfully, clear and navigate
+      clearCart();
+      clearBookings();
+      alert("Payment successful!");
+
+      if (cartItems.length > 0 && bookingItems.length > 0) {
+        navigate("/orders"); // Both orders and bookings
+      } else if (cartItems.length > 0) {
+        navigate("/orders"); // Only cart
+      } else if (bookingItems.length > 0) {
+        navigate("/bookings"); // Only bookings
+      } else {
+        navigate("/"); // fallback
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+      alert("Checkout failed. Please try again.");
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    window.payhere.onError = function (error) {
-      alert("Payment failed: " + error);
-      setLoading(false);
-    };
+  // PayHere payment popup wrapper
+  const startPayHerePayment = (paymentParams) => {
+    return new Promise((resolve, reject) => {
+      if (!window.payhere) {
+        alert("Payment gateway not loaded, please try again later.");
+        return reject(new Error("PayHere script not loaded"));
+      }
 
-    window.payhere.startPayment(paymentObject);
-    return;
-  }
+      window.payhere.startPayment(paymentParams);
 
-  // If not PayHere, finalize order immediately
-  await finalizeOrderAfterPayhere();
-};
+      // Payment completed callback
+      window.payhere.onCompleted = function onCompleted(orderId) {
+        console.log("Payment completed. OrderID:", orderId);
+        resolve();
+      };
 
+      // Payment dismissed callback
+      window.payhere.onDismissed = function onDismissed() {
+        alert("Payment was cancelled.");
+        reject(new Error("Payment cancelled"));
+      };
+
+      // Payment error callback
+      window.payhere.onError = function onError(error) {
+        alert("Payment failed. Please try again.");
+        reject(new Error("Payment error: " + error));
+      };
+    });
+  };
 
   const finalizeOrderAfterPayhere = async () => {
     try {
