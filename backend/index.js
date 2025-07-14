@@ -33,7 +33,7 @@ const PORT = process.env.PORT || 5000;
 
 
 app.use(cors({
-  origin: ['https://aiocart.lk'],
+  origin: 'https://www.aiocart.lk',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
   credentials: true 
 }));
