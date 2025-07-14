@@ -247,10 +247,7 @@ const StoreDashboard = () => {
         fetchDashboardData(); // ✅ Refresh UI immediately
       } else {
         const errorData = await response.json();
-        alert(
-          "Subscription setup failed. Please contact support: " +
-            errorData?.error || "Unknown error"
-        );
+        alert("Subscription setup failed. Please contact support: " + errorData?.error || "Unknown error");
       }
     } catch (error) {
       console.error("Cancel error:", error);
@@ -531,12 +528,21 @@ const StoreDashboard = () => {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-                <button
-                  onClick={renewSubscription}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
-                >
-                {subscription.status === "cancelled"? ("Re-Subscribe") : ("Renew Subscription")}
-                </button>
+                {subscription ? (
+                  <button
+                    onClick={renewSubscription}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
+                  >
+                    Renew Subscription
+                  </button>
+                ) : (
+                  <button
+                    onClick={createSubscription}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
+                  >
+                    Subscribe
+                  </button>
+                )}
 
                 {subscription.status !== "cancelled" && (
                   <button
