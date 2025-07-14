@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import Product from '../models/Product.js';
 import Store from '../models/Store.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { Console } from 'console';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,6 +110,8 @@ router.post('/', authenticate, authorize('store_owner'), async (req, res) => {
 
 // Update product
 router.put('/:id', authenticate, authorize('store_owner'), async (req, res) => {
+  console.log('Received update request for product:', req.params.id);
+  console.log('Request body:', req.body);
   try {
     const product = await Product.findById(req.params.id).populate('storeId');
     
@@ -120,15 +123,14 @@ router.put('/:id', authenticate, authorize('store_owner'), async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-      const updates = req.body;
+    const updates = req.body;
 
-    if (updates.price) updates.price = parseFloat(updates.price);
-    if (updates.stock) updates.stock = parseInt(updates.stock);
+
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
       updates,
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     res.json(updatedProduct);
@@ -136,6 +138,7 @@ router.put('/:id', authenticate, authorize('store_owner'), async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // Delete product
 router.delete('/:id', authenticate, authorize('store_owner'), async (req, res) => {

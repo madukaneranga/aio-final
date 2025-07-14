@@ -1,114 +1,204 @@
-import React, { useState, useEffect } from 'react';
-import { useCart } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { CreditCard, Smartphone, Building2, Banknote, Lock, ShoppingBag } from 'lucide-react';
-import { formatLKR } from '../utils/currency';
+import React, { useState, useEffect } from "react";
+import { useCart } from "../contexts/CartContext";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import {
+  CreditCard,
+  Smartphone,
+  Building2,
+  Banknote,
+  Lock,
+  ShoppingBag,
+} from "lucide-react";
+import { formatLKR } from "../utils/currency";
 
 const Checkout = () => {
-  const { cartItems, bookingItems, cartTotal, bookingTotal, clearCart, clearBookings } = useCart();
+  const {
+    cartItems,
+    bookingItems,
+    cartTotal,
+    bookingTotal,
+    clearCart,
+    clearBookings,
+  } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('bank_transfer');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("payhere");
   const [shippingAddress, setShippingAddress] = useState({
-    street: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: 'Sri Lanka'
+    street: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "Sri Lanka",
   });
 
-  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0) + bookingItems.length;
+  const totalItems =
+    cartItems.reduce((sum, item) => sum + item.quantity, 0) +
+    bookingItems.length;
   const subtotal = cartTotal + bookingTotal;
   const platformFee = subtotal * 0.07;
   const grandTotal = subtotal + platformFee;
 
   useEffect(() => {
-    fetchPaymentMethods();
-  }, []);
+    if (cartItems) {
+      fetchPaymentMethods();
+    }
+
+    // Load PayHere script
+    if (!window.payhere) {
+      const script = document.createElement("script");
+      script.src = "https://www.payhere.lk/lib/payhere.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, [cartItems]);
 
   const fetchPaymentMethods = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/payment-methods`);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/payments/payment-methods`
+      );
       if (response.ok) {
         const methods = await response.json();
-        setPaymentMethods(methods);
+        const filtered =
+          cartItems.length > 0
+            ? methods.filter((method) => method.id === "payhere")
+            : methods; // all methods allowed for services
+        setPaymentMethods(filtered);
       }
     } catch (error) {
-      console.error('Error fetching payment methods:', error);
+      console.error("Error fetching payment methods:", error);
     }
   };
 
   const getPaymentIcon = (iconName) => {
     switch (iconName) {
-      case 'building-2': return <Building2 className="w-6 h-6" />;
-      case 'smartphone': return <Smartphone className="w-6 h-6" />;
-      case 'banknote': return <Banknote className="w-6 h-6" />;
-      case 'credit-card': return <CreditCard className="w-6 h-6" />;
-      default: return <CreditCard className="w-6 h-6" />;
+      case "building-2":
+        return <Building2 className="w-6 h-6" />;
+      case "smartphone":
+        return <Smartphone className="w-6 h-6" />;
+      case "banknote":
+        return <Banknote className="w-6 h-6" />;
+      case "credit-card":
+        return <CreditCard className="w-6 h-6" />;
+      default:
+        return <CreditCard className="w-6 h-6" />;
     }
   };
 
   const handleAddressChange = (e) => {
     setShippingAddress({
       ...shippingAddress,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleCheckout = async () => {
     if (!user) {
-      alert('Please log in to continue');
-      navigate('/login');
+      alert("Please log in to continue");
+      navigate("/login");
       return;
     }
 
-    if (user.role !== 'customer') {
-      alert('Only customers can place orders');
+    if (user.role !== "customer") {
+      alert("Only customers can place orders");
+      return;
+    }
+
+    if (
+      cartItems.length > 0 &&
+      (!shippingAddress.street ||
+        !shippingAddress.city ||
+        !shippingAddress.state ||
+        !shippingAddress.zipCode)
+    ) {
+      alert("Please fill in all shipping address fields");
       return;
     }
 
     setLoading(true);
 
-    try {
-      // Process orders for products
-      if (cartItems.length > 0) {
-        if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode) {
-          alert('Please fill in all shipping address fields');
-          setLoading(false);
-          return;
-        }
+    if (selectedPaymentMethod === "payhere") {
+      const tempOrderId = `ORDER_${Date.now()}`;
 
-        // Group items by store
+      const paymentObject = {
+        sandbox: true,
+        merchant_id: "1231188 ",
+        return_url: "http://localhost:5173/checkout",
+        cancel_url: "http://localhost:5173/checkout",
+        notify_url: `${
+          import.meta.env.VITE_API_URL
+        }/api/payments/payhere-notify`,
+        order_id: tempOrderId,
+        items: "Products and Services",
+        amount: grandTotal.toFixed(2),
+        currency: "LKR",
+        first_name: user.firstName,
+        last_name: user.lastName || "",
+        email: user.email,
+        phone: user.phone,
+        address: shippingAddress.street,
+        city: shippingAddress.city,
+        country: shippingAddress.country,
+      };
+
+      window.payhere.onCompleted = function (orderId) {
+        finalizeOrderAfterPayhere();
+      };
+
+      window.payhere.onDismissed = function () {
+        alert("Payment was cancelled.");
+        setLoading(false);
+      };
+
+      window.payhere.onError = function (error) {
+        alert("Payment failed: " + error);
+        setLoading(false);
+      };
+
+      window.payhere.startPayment(paymentObject);
+      return;
+    }
+
+    await finalizeOrderAfterPayhere();
+  };
+
+  const finalizeOrderAfterPayhere = async () => {
+    try {
+      // Group items by store
+      if (cartItems.length > 0) {
         const itemsByStore = cartItems.reduce((acc, item) => {
-          const storeId = typeof item.storeId === 'object' ? item.storeId._id : (item.storeId || 'unknown');
-          if (!acc[storeId]) {
-            acc[storeId] = [];
-          }
+          const storeId =
+            typeof item.storeId === "object"
+              ? item.storeId._id
+              : item.storeId || "unknown";
+          if (!acc[storeId]) acc[storeId] = [];
           acc[storeId].push({
             productId: item.id,
-            quantity: item.quantity
+            quantity: item.quantity,
           });
           return acc;
         }, {});
 
-        // Create separate orders for each store
         for (const [storeId, items] of Object.entries(itemsByStore)) {
-          const orderResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/create-order-intent`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-              items,
-              storeId: storeId,
-              shippingAddress,
-              paymentMethod: selectedPaymentMethod
-            })
-          });
+          const orderResponse = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/payments/create-order-intent`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+              body: JSON.stringify({
+                items,
+                storeId,
+                shippingAddress,
+                paymentMethod: selectedPaymentMethod,
+              }),
+            }
+          );
 
           if (!orderResponse.ok) {
             const errorData = await orderResponse.json();
@@ -119,23 +209,35 @@ const Checkout = () => {
         }
       }
 
-      // Process bookings for services
+      // Bookings
       for (const booking of bookingItems) {
-        const bookingResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/create-booking-intent`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({
-            serviceId: booking.id,
-            bookingDate: booking.date,
-            startTime: booking.time,
-            endTime: booking.endTime || (booking.time ? booking.time.split(':').map((t, i) => i === 0 ? String(parseInt(t) + 1).padStart(2, '0') : t).join(':') : ''),
-            notes: booking.notes,
-            paymentMethod: selectedPaymentMethod
-          })
-        });
+        const bookingResponse = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/payments/create-booking-intent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: JSON.stringify({
+              serviceId: booking.id,
+              bookingDate: booking.date,
+              startTime: booking.time,
+              endTime:
+                booking.endTime ||
+                (booking.time
+                  ? booking.time
+                      .split(":")
+                      .map((t, i) =>
+                        i === 0 ? String(parseInt(t) + 1).padStart(2, "0") : t
+                      )
+                      .join(":")
+                  : ""),
+              notes: booking.notes,
+              paymentMethod: selectedPaymentMethod,
+            }),
+          }
+        );
 
         if (!bookingResponse.ok) {
           const errorData = await bookingResponse.json();
@@ -145,15 +247,22 @@ const Checkout = () => {
         }
       }
 
-      // Clear cart and bookings after successful checkout
       clearCart();
       clearBookings();
-      
-      alert('Payment successful! Your orders and bookings have been confirmed.');
-      navigate('/orders');
+      alert("Payment successful!");
+
+      if (cartItems.length > 0 && bookingItems.length > 0) {
+        navigate("/orders"); // Both orders and bookings
+      } else if (cartItems.length > 0) {
+        navigate("/orders"); // Only cart
+      } else if (bookingItems.length > 0) {
+        navigate("/bookings"); // Only bookings
+      } else {
+        navigate("/"); // fallback
+      }
     } catch (error) {
-      console.error('Checkout error:', error);
-      alert('Checkout failed. Please try again.');
+      console.error("Checkout error:", error);
+      alert("Checkout failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -164,8 +273,12 @@ const Checkout = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center bg-white p-8 rounded-2xl shadow-xl max-w-md">
           <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
-          <p className="text-gray-600 mb-8">Add some items to proceed with checkout</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Your cart is empty
+          </h2>
+          <p className="text-gray-600 mb-8">
+            Add some items to proceed with checkout
+          </p>
         </div>
       </div>
     );
@@ -185,7 +298,9 @@ const Checkout = () => {
             {/* Shipping Address */}
             {cartItems.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Shipping Address</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  Shipping Address
+                </h2>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -271,15 +386,17 @@ const Checkout = () => {
 
             {/* Payment Method */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Method</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Payment Method
+              </h2>
               <div className="space-y-3">
                 {paymentMethods.map((method) => (
                   <label
                     key={method.id}
                     className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
                       selectedPaymentMethod === method.id
-                        ? 'border-black bg-black text-white'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? "border-black bg-black text-white"
+                        : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
                     <input
@@ -290,25 +407,44 @@ const Checkout = () => {
                       onChange={(e) => setSelectedPaymentMethod(e.target.value)}
                       className="sr-only"
                     />
-                    <div className={`mr-3 ${selectedPaymentMethod === method.id ? 'text-white' : 'text-gray-400'}`}>
+                    <div
+                      className={`mr-3 ${
+                        selectedPaymentMethod === method.id
+                          ? "text-white"
+                          : "text-gray-400"
+                      }`}
+                    >
                       {getPaymentIcon(method.icon)}
                     </div>
                     <div className="flex-1">
-                      <div className={`font-medium ${selectedPaymentMethod === method.id ? 'text-white' : 'text-gray-900'}`}>
+                      <div
+                        className={`font-medium ${
+                          selectedPaymentMethod === method.id
+                            ? "text-white"
+                            : "text-gray-900"
+                        }`}
+                      >
                         {method.name}
                       </div>
-                      <div className={`text-sm ${selectedPaymentMethod === method.id ? 'text-gray-200' : 'text-gray-500'}`}>
+                      <div
+                        className={`text-sm ${
+                          selectedPaymentMethod === method.id
+                            ? "text-gray-200"
+                            : "text-gray-500"
+                        }`}
+                      >
                         {method.description}
                       </div>
                     </div>
                   </label>
                 ))}
-                
+
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                   <div className="flex items-center space-x-2">
                     <Lock className="w-5 h-5 text-blue-600" />
                     <p className="text-sm text-blue-800">
-                      Your payment information is secure and processed locally in Sri Lanka
+                      Your payment information is secure and processed locally
+                      in Sri Lanka
                     </p>
                   </div>
                 </div>
@@ -318,8 +454,10 @@ const Checkout = () => {
 
           {/* Order Summary */}
           <div className="bg-white rounded-2xl shadow-sm p-6 h-fit">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
-            
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Order Summary
+            </h2>
+
             {/* Cart Items */}
             {cartItems.length > 0 && (
               <div className="mb-6">
@@ -328,16 +466,23 @@ const Checkout = () => {
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex items-center space-x-3">
                       <img
-                        src={item.image ? 
-                          (item.image.startsWith('http') ? item.image : `${import.meta.env.VITE_API_URL}${item.image}`) : 
-                          'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
+                        src={
+                          item.image
+                            ? item.image.startsWith("http")
+                              ? item.image
+                              : `${import.meta.env.VITE_API_URL}${item.image}`
+                            : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
                         }
                         alt={item.title}
                         className="w-12 h-12 object-cover rounded"
                       />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                        <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {item.title}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Qty: {item.quantity}
+                        </p>
                       </div>
                       <p className="text-sm font-medium text-gray-900">
                         {formatLKR(item.price * item.quantity)}
@@ -351,23 +496,37 @@ const Checkout = () => {
             {/* Booking Items */}
             {bookingItems.length > 0 && (
               <div className="mb-6">
-                <h3 className="font-medium text-gray-900 mb-3">Service Bookings</h3>
+                <h3 className="font-medium text-gray-900 mb-3">
+                  Service Bookings
+                </h3>
                 <div className="space-y-3">
                   {bookingItems.map((item, index) => (
-                    <div key={`${item.id}-${index}`} className="flex items-center space-x-3">
+                    <div
+                      key={`${item.id}-${index}`}
+                      className="flex items-center space-x-3"
+                    >
                       <img
-                        src={item.image ? 
-                          (item.image.startsWith('http') ? item.image : `${import.meta.env.VITE_API_URL}${item.image}`) : 
-                          'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop'
+                        src={
+                          item.image
+                            ? item.image.startsWith("http")
+                              ? item.image
+                              : `${import.meta.env.VITE_API_URL}${item.image}`
+                            : "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop"
                         }
                         alt={item.title}
                         className="w-12 h-12 object-cover rounded"
                       />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                        <p className="text-sm text-gray-500">{item.date} at {item.time}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {item.title}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {item.date} at {item.time}
+                        </p>
                       </div>
-                      <p className="text-sm font-medium text-gray-900">{formatLKR(item.price)}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {formatLKR(item.price)}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -395,7 +554,7 @@ const Checkout = () => {
               disabled={loading}
               className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : `Pay ${formatLKR(grandTotal)}`}
+              {loading ? "Processing..." : `Pay ${formatLKR(grandTotal)}`}
             </button>
           </div>
         </div>

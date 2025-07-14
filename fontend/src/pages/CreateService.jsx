@@ -1,47 +1,48 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import ImageUpload from '../components/ImageUpload';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { Plus, Trash2, Calendar, Clock, ArrowLeft } from 'lucide-react';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import ImageUpload from "../components/ImageUpload";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { Plus, Trash2, Calendar, Clock, ArrowLeft } from "lucide-react";
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
 
-
 const CreateService = () => {
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    priceType: 'fixed',
-    category: '',
-    duration: '60'
+    title: "",
+    description: "",
+    price: "",
+    priceType: "fixed",
+    category: "",
+    duration: "60",
   });
   const [images, setImages] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
+  const [error, setError] = useState("");
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const categories = [
-    'Tutoring',
-    'Home Services',
-    'Beauty & Wellness',
-    'Consulting',
-    'Fitness',
-    'Technology',
-    'Creative Services',
-    'Professional Services'
+    "Tutoring",
+    "Home Services",
+    "Beauty & Wellness",
+    "Consulting",
+    "Fitness",
+    "Technology",
+    "Creative Services",
+    "Professional Services",
   ];
 
   const generateTimeOptions = () => {
     const options = [];
     for (let hour = 6; hour < 22; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
-        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const time = `${hour.toString().padStart(2, "0")}:${minute
+          .toString()
+          .padStart(2, "0")}`;
         options.push(time);
       }
     }
@@ -51,11 +52,11 @@ const CreateService = () => {
   const timeOptions = generateTimeOptions();
 
   const addTimeSlot = () => {
-    setTimeSlots([...timeSlots, { startTime: '09:00', endTime: '17:00' }]);
+    setTimeSlots([...timeSlots, { startTime: "09:00", endTime: "17:00" }]);
   };
 
   const updateTimeSlot = (index, field, value) => {
-    const updatedSlots = timeSlots.map((slot, i) => 
+    const updatedSlots = timeSlots.map((slot, i) =>
       i === index ? { ...slot, [field]: value } : slot
     );
     setTimeSlots(updatedSlots);
@@ -65,51 +66,77 @@ const CreateService = () => {
     setTimeSlots(timeSlots.filter((_, i) => i !== index));
   };
 
+  const timeToMinutes = (timeStr) => {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const hasOverlappingTimeSlots = () => {
+    const slots = timeSlots
+      .map((slot) => ({
+        start: timeToMinutes(slot.startTime),
+        end: timeToMinutes(slot.endTime),
+      }))
+      .sort((a, b) => a.start - b.start);
+
+    for (let i = 0; i < slots.length - 1; i++) {
+      if (slots[i].end > slots[i + 1].start) {
+        return true;
+      }
+    }
+    return false;
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
-      try {
-
-          //  CHANGED: Upload images to Firebase
-          const uploadPromises = images.map(async (file) => {
-              const imageRef = ref(storage, `services/${Date.now()}_${file.name}`); //  ADDED
-              await uploadBytes(imageRef, file); //  ADDED
-              return getDownloadURL(imageRef); //  ADDED
-          });
-
-          const imageUrls = await Promise.all(uploadPromises); //  ADDED
-
-
-          const payload = {
-              title: formData.title,
-              description: formData.description,
-              price: formData.price,
-              priceType: formData.priceType,
-              category: formData.category,
-              duration: formData.duration,
-              timeSlots: timeSlots,  // Already an array or object
-              images: imageUrls
-          };
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services`, {
-        method: 'POST',
-          headers: {
-              "Content-Type": "application/json",
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-          body: JSON.stringify(payload)
+    if (hasOverlappingTimeSlots()) {
+      setError("Overlapping time slots detected. Please fix them.");
+      setLoading(false);
+      return;
+    }
+    try {
+      //  CHANGED: Upload images to Firebase
+      const uploadPromises = images.map(async (file) => {
+        const imageRef = ref(storage, `services/${Date.now()}_${file.name}`); //  ADDED
+        await uploadBytes(imageRef, file); //  ADDED
+        return getDownloadURL(imageRef); //  ADDED
       });
 
+      const imageUrls = await Promise.all(uploadPromises); //  ADDED
+
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        price: formData.price,
+        priceType: formData.priceType,
+        category: formData.category,
+        duration: formData.duration,
+        timeSlots: timeSlots, // Already an array or object
+        images: imageUrls,
+      };
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/services`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
       if (response.ok) {
-        navigate('/dashboard');
+        navigate("/dashboard");
       } else {
         const data = await response.json();
-        setError(data.error || 'Failed to create service');
+        setError(data.error || "Failed to create service");
       }
     } catch (error) {
-      setError('Network error. Please try again.');
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -118,16 +145,20 @@ const CreateService = () => {
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
-  if (!user || user.role !== 'store_owner') {
+  if (!user || user.role !== "store_owner") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
-          <p className="text-gray-600">You need to be a store owner to create services</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Access Denied
+          </h2>
+          <p className="text-gray-600">
+            You need to be a store owner to create services
+          </p>
         </div>
       </div>
     );
@@ -139,14 +170,18 @@ const CreateService = () => {
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="mb-8">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate("/dashboard")}
               className="flex items-center space-x-2 text-gray-600 hover:text-black transition-colors mb-4"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Dashboard</span>
             </button>
-            <h1 className="text-3xl font-bold text-gray-900">Create New Service</h1>
-            <p className="text-gray-600 mt-2">Add a new service to your store</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Create New Service
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Add a new service to your store
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
@@ -158,8 +193,10 @@ const CreateService = () => {
 
             {/* Basic Information */}
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
-              
+              <h3 className="text-lg font-semibold text-gray-900">
+                Basic Information
+              </h3>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Service Title *
@@ -281,8 +318,9 @@ const CreateService = () => {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Customers can book your service on any date, but only during the time slots you specify here. 
-                  Add multiple time slots to give customers more booking options.
+                  <strong>Note:</strong> Customers can book your service on any
+                  date, but only during the time slots you specify here. Add
+                  multiple time slots to give customers more booking options.
                 </p>
               </div>
 
@@ -290,7 +328,9 @@ const CreateService = () => {
                 <div className="text-center py-8 bg-gray-50 rounded-lg">
                   <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">No time slots added yet</p>
-                  <p className="text-sm text-gray-500">Add time slots to specify when your service is available</p>
+                  <p className="text-sm text-gray-500">
+                    Add time slots to specify when your service is available
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -303,36 +343,45 @@ const CreateService = () => {
                           </label>
                           <select
                             value={slot.startTime}
-                            onChange={(e) => updateTimeSlot(index, 'startTime', e.target.value)}
+                            onChange={(e) =>
+                              updateTimeSlot(index, "startTime", e.target.value)
+                            }
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                           >
-                            {timeOptions.map(time => (
-                              <option key={time} value={time}>{time}</option>
+                            {timeOptions.map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
                             ))}
                           </select>
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             End Time
                           </label>
                           <select
                             value={slot.endTime}
-                            onChange={(e) => updateTimeSlot(index, 'endTime', e.target.value)}
+                            onChange={(e) =>
+                              updateTimeSlot(index, "endTime", e.target.value)
+                            }
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                           >
-                            {timeOptions.map(time => (
-                              <option key={time} value={time}>{time}</option>
+                            {timeOptions.map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
                             ))}
                           </select>
                         </div>
-                        
+
                         <button
                           type="button"
                           onClick={() => removeTimeSlot(index)}
-                          className="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors"
+                          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
                         >
                           <Trash2 className="w-4 h-4" />
+                          <span>Remove Time Slot</span>
                         </button>
                       </div>
                     </div>
@@ -357,7 +406,7 @@ const CreateService = () => {
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate("/dashboard")}
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -369,7 +418,7 @@ const CreateService = () => {
               >
                 <div className="flex items-center space-x-2">
                   {loading && <LoadingSpinner size="sm" />}
-                  <span>{loading ? 'Creating...' : 'Create Service'}</span>
+                  <span>{loading ? "Creating..." : "Create Service"}</span>
                 </div>
               </button>
             </div>
