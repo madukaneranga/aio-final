@@ -79,39 +79,42 @@ const ManageServices = () => {
     setShowEditModal(true);
   };
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    
-    try {
-      const formData = new FormData();
-      formData.append('title', editingService.title);
-      formData.append('description', editingService.description);
-      formData.append('price', editingService.price);
-      formData.append('priceType', editingService.priceType);
-      formData.append('category', editingService.category);
-      formData.append('duration', editingService.duration);
+ const handleUpdate = async (e) => {
+  e.preventDefault();
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services/${editingService._id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
-      });
+  try {
+    const updates = {
+      title: editingService.title,
+      description: editingService.description,
+      price: editingService.price,
+      priceType: editingService.priceType,
+      category: editingService.category,
+      duration: editingService.duration
+    };
 
-      if (response.ok) {
-        fetchServices();
-        setShowEditModal(false);
-        setEditingService(null);
-        alert('Service updated successfully!');
-      } else {
-        alert('Failed to update service');
-      }
-    } catch (error) {
-      console.error('Error updating service:', error);
-      alert('Error updating service');
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services/${editingService._id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(updates)
+    });
+
+    if (response.ok) {
+      fetchServices();
+      setShowEditModal(false);
+      setEditingService(null);
+      alert('Service updated successfully!');
+    } else {
+      alert('Failed to update service');
     }
-  };
+  } catch (error) {
+    console.error('Error updating service:', error);
+    alert('Error updating service');
+  }
+};
+
 
   if (!user || user.role !== 'store_owner') {
     return (

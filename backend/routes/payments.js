@@ -137,11 +137,11 @@ router.post('/create-booking-intent', authenticate, async (req, res) => {
       platformFee: commissionAmount,
       storeAmount,
       notes,
-      status: 'confirmed', // Set to confirmed immediately for local payment
+      status: 'pending', 
       paymentDetails: {
         paymentStatus: 'paid',
         paidAt: new Date(),
-        paymentMethod: 'local_payment',
+        paymentMethod: 'payhere',
         localPaymentId: `PAY_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       }
     });
@@ -208,33 +208,20 @@ router.post('/process-local-payment', authenticate, async (req, res) => {
 router.get('/payment-methods', (req, res) => {
   const paymentMethods = [
     {
-      id: 'bank_transfer',
-      name: 'Bank Transfer',
-      description: 'Direct bank transfer to merchant account',
-      icon: 'building-2',
-      available: true
-    },
-    {
-      id: 'mobile_payment',
-      name: 'Mobile Payment',
-      description: 'Pay using mobile wallet (Dialog eZ Cash, Mobitel mCash)',
+      id: 'payhere',
+      name: 'PayHere',
+      description: 'Pay using PayHere',
       icon: 'smartphone',
       available: true
     },
     {
-      id: 'cash_on_delivery',
-      name: 'Cash on Delivery',
-      description: 'Pay when you receive your order',
-      icon: 'banknote',
-      available: true
-    },
-    {
-      id: 'card_payment',
-      name: 'Debit/Credit Card',
-      description: 'Local bank cards accepted',
-      icon: 'credit-card',
+      id: 'bank_transfer',
+      name: 'Bank Transfer',
+      description: 'Transfer amount through bank account',
+      icon: 'bank',
       available: true
     }
+    
   ];
 
   res.json(paymentMethods);

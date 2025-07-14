@@ -36,31 +36,16 @@ const ServiceDetail = () => {
   };
 
   const getAvailableTimeSlots = () => {
-    if (!service?.timeSlots || service.timeSlots.length === 0) {
-      // Default time slots if none specified
-      return [
-        '09:00', '10:00', '11:00', '12:00',
-        '13:00', '14:00', '15:00', '16:00', '17:00'
-      ];
-    }
+  if (!service?.timeSlots || service.timeSlots.length === 0) {
+    return [
+      '09:00', '10:00', '11:00', '12:00',
+      '13:00', '14:00', '15:00', '16:00', '17:00'
+    ];
+  }
 
-    // Generate time slots from service time slots
-    const slots = [];
-    service.timeSlots.forEach(slot => {
-      const start = slot.startTime;
-      const end = slot.endTime;
-      
-      // Generate 1-hour slots between start and end time
-      const startHour = parseInt(start.split(':')[0]);
-      const endHour = parseInt(end.split(':')[0]);
-      
-      for (let hour = startHour; hour < endHour; hour++) {
-        slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      }
-    });
+  return service.timeSlots.map(slot => slot.startTime);
+};
 
-    return [...new Set(slots)].sort(); // Remove duplicates and sort
-  };
 
   const handleBookNow = () => {
     if (!user) {

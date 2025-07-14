@@ -27,7 +27,7 @@ const subscriptionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'inactive', 'cancelled', 'expired'],
+    enum: ['pending','active', 'inactive', 'cancelled', 'expired'],
     default: 'active'
   },
   startDate: {
@@ -54,11 +54,16 @@ const subscriptionSchema = new mongoose.Schema({
 });
 
 // Auto-set end date to 30 days from start date
-subscriptionSchema.pre('save', function(next) {
-  if (this.isNew && !this.endDate) {
-    this.endDate = new Date(this.startDate.getTime() + (30 * 24 * 60 * 60 * 1000));
+subscriptionSchema.pre('save', function (next) {
+  if (!this.endDate) {
+    const baseDate = this.startDate || new Date();
+    const newEndDate = new Date(baseDate);
+    newEndDate.setMonth(newEndDate.getMonth() + 1);  // ✅ Correctly add 1 month
+    this.endDate = newEndDate;
   }
   next();
 });
+
+
 
 export default mongoose.model('Subscription', subscriptionSchema);

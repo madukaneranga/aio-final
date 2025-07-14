@@ -313,9 +313,9 @@ const Bookings = () => {
                   <p><strong>Status:</strong> {selectedBooking.status}</p>
                   <p><strong>Date:</strong> {new Date(selectedBooking.bookingDate).toLocaleDateString()}</p>
                   <p><strong>Time:</strong> {selectedBooking.startTime} - {selectedBooking.endTime}</p>
-                  <p><strong>Total:</strong> ${selectedBooking.totalAmount}</p>
-                  <p><strong>Platform Fee:</strong> ${selectedBooking.platformFee}</p>
-                  <p><strong>Store Amount:</strong> ${selectedBooking.storeAmount}</p>
+                  <p><strong>Total:</strong> {selectedBooking.totalAmount} LKR</p>
+                  <p><strong>Platform Fee:</strong> {selectedBooking.platformFee} LKR</p>
+                  <p><strong>Store Amount:</strong> {selectedBooking.storeAmount} LKR</p>
                 </div>
                 
                 {selectedBooking.notes && (

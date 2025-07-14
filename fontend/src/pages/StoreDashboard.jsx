@@ -38,11 +38,11 @@ const StoreDashboard = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(null);
 
-  useEffect(() => {
+  /*useEffect(() => {
     if (user?.role === "store_owner") {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user]);*/
 
   useEffect(() => {
     if (user?.role === "store_owner" && user?.storeId) {
@@ -174,15 +174,56 @@ const StoreDashboard = () => {
         }
       );
 
-      if (response.ok) {
-        alert("Subscription renewed successfully!");
-        fetchDashboardData();
-      } else {
-        alert("Failed to renew subscription");
-      }
+      if (!response.ok) throw new Error("Failed to renew");
+
+      const { payHereURL, data } = await response.json();
+
+      // Create and submit PayHere payment form
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = payHereURL;
+
+      Object.entries(data).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit(); // Redirect to PayHere
+
+      // 🔄 If PayHere handles IPN and redirects back, you can refresh the UI after redirection
+      // If needed, add fetchDashboardData() on the return page
     } catch (error) {
       console.error("Error renewing subscription:", error);
       alert("Error renewing subscription");
+    }
+  };
+
+  const cancelSubscription = async () => {
+    console.log("cancelSubscription called");
+    try {
+      const response = await fetch("/api/subscriptions/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ subscriptionId: subscription._id }),
+      });
+
+      if (response.ok) {
+        alert("Subscription cancelled successfully");
+        fetchDashboardData(); // ✅ Refresh UI immediately
+      } else {
+        const errorData = await response.json();
+        alert("Cancel failed: " + errorData?.error || "Unknown error");
+      }
+    } catch (error) {
+      console.error("Cancel error:", error);
+      alert("Error cancelling subscription");
     }
   };
 
@@ -200,28 +241,32 @@ const StoreDashboard = () => {
     e.preventDefault();
 
     try {
-      const formData = new FormData();
-      formData.append("title", editingItem.title);
-      formData.append("description", editingItem.description);
-      formData.append("price", editingItem.price);
-      formData.append("category", editingItem.category);
+      // Prepare the JSON payload
+      const updates = {
+        title: editingItem.title,
+        description: editingItem.description,
+        price: editingItem.price,
+        category: editingItem.category,
+      };
 
       if (store?.type === "product") {
-        formData.append("stock", editingItem.stock);
+        updates.stock = editingItem.stock;
       } else {
-        formData.append("duration", editingItem.duration);
-        formData.append("priceType", editingItem.priceType || "fixed");
+        updates.duration = editingItem.duration;
+        updates.priceType = editingItem.priceType || "fixed";
       }
 
       const endpoint = store?.type === "product" ? "products" : "services";
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/${endpoint}/${editingItem._id}`,
         {
           method: "PUT",
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: formData,
+          body: JSON.stringify(updates),
         }
       );
 
@@ -430,7 +475,7 @@ const StoreDashboard = () => {
         {/* Subscription Status */}
         {subscription && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   Subscription Status
@@ -454,13 +499,22 @@ const StoreDashboard = () => {
                   Monthly Fee: {formatLKR(subscription.amount)}
                 </p>
               </div>
-              <div>
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
                 <button
                   onClick={renewSubscription}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
                 >
                   Renew Subscription
                 </button>
+
+                {subscription.status !== "cancelled" && (
+                  <button
+                    onClick={cancelSubscription}
+                    className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors w-full sm:w-auto"
+                  >
+                    Cancel Subscription
+                  </button>
+                )}
               </div>
             </div>
           </div>

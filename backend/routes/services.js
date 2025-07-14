@@ -93,14 +93,8 @@ router.post('/', authenticate, authorize('store_owner'), async (req, res) => {
    
 
     // Parse timeSlots if provided
-    let timeSlots = [];
-    if (req.body.timeSlots) {
-      try {
-        timeSlots = JSON.parse(req.body.timeSlots);
-      } catch (error) {
-        console.error('Error parsing timeSlots:', error);
-      }
-    }
+    const timeSlots = Array.isArray(req.body.timeSlots) ? req.body.timeSlots : [];
+
 
     const service = new Service({
       title,
@@ -136,24 +130,18 @@ router.put('/:id', authenticate, authorize('store_owner'), async (req, res) => {
 
     const updates = req.body;
 
-    if (updates.price) updates.price = parseFloat(updates.price);
-    if (updates.duration) updates.duration = parseInt(updates.duration);
-    if (updates.timeSlots) {
-      try {
-        updates.timeSlots = JSON.parse(updates.timeSlots);
-      } catch (error) {
-        console.error('Error parsing timeSlots:', error);
-      }
-    }
+    if (updates.price !== undefined) updates.price = parseFloat(updates.price);
+    if (updates.duration !== undefined) updates.duration = parseInt(updates.duration);
 
     const updatedService = await Service.findByIdAndUpdate(
       req.params.id,
-      updates,
-      { new: true }
+      { $set: updates },
+      { new: true, runValidators: true }
     );
 
     res.json(updatedService);
   } catch (error) {
+    console.error('Error updating service:', error);
     res.status(500).json({ error: error.message });
   }
 });
