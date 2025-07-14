@@ -45,6 +45,7 @@ const Checkout = () => {
     zipCode: "",
     country: "Sri Lanka",
   });
+  const [payhereReady, setPayhereReady] = useState(false);
 
   const totalItems =
     cartItems.reduce((sum, item) => sum + item.quantity, 0) +
@@ -53,6 +54,7 @@ const Checkout = () => {
   const platformFee = subtotal * 0.07;
   const grandTotal = subtotal + platformFee;
 
+  // Load PayHere script and detect when ready
   useEffect(() => {
     if (cartItems.length || bookingItems.length) {
       fetchPaymentMethods();
@@ -62,7 +64,16 @@ const Checkout = () => {
       const script = document.createElement("script");
       script.src = "https://www.payhere.lk/lib/payhere.js";
       script.async = true;
+      script.onload = () => {
+        setPayhereReady(true);
+        console.log("PayHere script loaded");
+      };
+      script.onerror = () => {
+        alert("Failed to load PayHere payment gateway script");
+      };
       document.body.appendChild(script);
+    } else {
+      setPayhereReady(true);
     }
   }, [cartItems, bookingItems]);
 
@@ -73,11 +84,14 @@ const Checkout = () => {
       );
       if (response.ok) {
         const methods = await response.json();
+        // Always filter to payhere only if cartItems exist, otherwise show all
         const filtered =
           cartItems.length > 0
             ? methods.filter((method) => method.id === "payhere")
             : methods;
-        setPaymentMethods(filtered);
+        setPaymentMethods(filtered.length > 0 ? filtered : methods);
+      } else {
+        console.error("Failed to fetch payment methods:", response.status);
       }
     } catch (error) {
       console.error("Error fetching payment methods:", error);
@@ -100,7 +114,7 @@ const Checkout = () => {
 
       window.payhere.onCompleted = function (orderId) {
         console.log("Payment completed. OrderID:", orderId);
-        resolve();
+        resolve(orderId);
       };
 
       window.payhere.onDismissed = function () {
@@ -109,10 +123,12 @@ const Checkout = () => {
       };
 
       window.payhere.onError = function (error) {
+        console.error("PayHere payment error:", error);
         alert("Payment failed. Please try again.");
         reject(new Error("Payment error: " + error));
       };
 
+      console.log("Starting PayHere payment with params:", paymentParams);
       window.payhere.startPayment(paymentParams);
     });
   };
@@ -138,6 +154,11 @@ const Checkout = () => {
         isNaN(shippingAddress.zipCode))
     ) {
       alert("Please fill in all shipping address fields correctly");
+      return;
+    }
+
+    if (!payhereReady) {
+      alert("Payment gateway is still loading, please wait a moment.");
       return;
     }
 
@@ -185,11 +206,23 @@ const Checkout = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        alert(`Payment intent creation failed: ${data.error}`);
+        alert(`Payment intent creation failed: ${data.error || "Unknown error"}`);
+        setLoading(false);
         return;
       }
 
       const { paymentParams } = await response.json();
+
+      if (!paymentParams) {
+        alert("Payment parameters missing in response.");
+        setLoading(false);
+        return;
+      }
+
+      // Log payment params to console for debugging
+      console.log("Received paymentParams:", paymentParams);
+
+      // Start PayHere payment
       await startPayHerePayment(paymentParams);
 
       clearCart();
