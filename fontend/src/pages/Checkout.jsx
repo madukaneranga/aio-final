@@ -96,74 +96,77 @@ const Checkout = () => {
   };
 
   const handleCheckout = async () => {
-    if (!user) {
-      alert("Please log in to continue");
-      navigate("/login");
-      return;
-    }
+  if (!user) {
+    alert("Please log in to continue");
+    navigate("/login");
+    return;
+  }
 
-    if (user.role !== "customer") {
-      alert("Only customers can place orders");
-      return;
-    }
+  if (user.role !== "customer") {
+    alert("Only customers can place orders");
+    return;
+  }
 
-    if (
-      cartItems.length > 0 &&
-      (!shippingAddress.street ||
-        !shippingAddress.city ||
-        !shippingAddress.state ||
-        !shippingAddress.zipCode)
-    ) {
-      alert("Please fill in all shipping address fields");
-      return;
-    }
+  if (
+    cartItems.length > 0 &&
+    (!shippingAddress.street ||
+      !shippingAddress.city ||
+      !shippingAddress.state ||
+      !shippingAddress.zipCode)
+  ) {
+    alert("Please fill in all shipping address fields");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    if (selectedPaymentMethod === "payhere") {
-      const tempOrderId = `ORDER_${Date.now()}`;
+  if (selectedPaymentMethod === "payhere") {
+    const tempOrderId = `ORDER_${Date.now()}`;
 
-      const paymentObject = {
-        sandbox: true,
-        merchant_id: "1231188 ",
-        return_url: "http://localhost:5173/checkout",
-        cancel_url: "http://localhost:5173/checkout",
-        notify_url: `${
-          import.meta.env.VITE_API_URL
-        }/api/payments/payhere-notify`,
-        order_id: tempOrderId,
-        items: "Products and Services",
-        amount: grandTotal.toFixed(2),
-        currency: "LKR",
-        first_name: user.firstName,
-        last_name: user.lastName || "",
-        email: user.email,
-        phone: user.phone,
-        address: shippingAddress.street,
-        city: shippingAddress.city,
-        country: shippingAddress.country,
-      };
+    const paymentObject = {
+      sandbox: true, // set to false in production
+      merchant_id: "1231188", // no trailing space
+      return_url: "http://www.aiocart.lk/checkout",
+      cancel_url: "http://www.aiocar.lk/checkout",
+      notify_url: `${import.meta.env.VITE_API_URL}/api/payments/payhere-notify`,
+      order_id: tempOrderId,
+      items: "Products and Services",
+      amount: grandTotal.toFixed(2),
+      currency: "LKR",
+      first_name: user.firstName,
+      last_name: user.lastName || "",
+      email: user.email,
+      phone: user.phone,
+      address: shippingAddress.street,
+      city: shippingAddress.city,
+      country: shippingAddress.country,
+    };
 
-      window.payhere.onCompleted = function (orderId) {
-        finalizeOrderAfterPayhere();
-      };
+    console.log("PayHere payment object:", paymentObject);
 
-      window.payhere.onDismissed = function () {
-        alert("Payment was cancelled.");
-        setLoading(false);
-      };
+    window.payhere.onCompleted = function (orderId) {
+      console.log("Payment completed. OrderID:", orderId);
+      finalizeOrderAfterPayhere();
+    };
 
-      window.payhere.onError = function (error) {
-        alert("Payment failed: " + error);
-        setLoading(false);
-      };
+    window.payhere.onDismissed = function () {
+      alert("Payment was cancelled.");
+      setLoading(false);
+    };
 
-      window.payhere.startPayment(paymentObject);
-      return;
-    }
+    window.payhere.onError = function (error) {
+      alert("Payment failed: " + error);
+      setLoading(false);
+    };
 
-    await finalizeOrderAfterPayhere();
-  };
+    window.payhere.startPayment(paymentObject);
+    return;
+  }
+
+  // If not PayHere, finalize order immediately
+  await finalizeOrderAfterPayhere();
+};
+
 
   const finalizeOrderAfterPayhere = async () => {
     try {

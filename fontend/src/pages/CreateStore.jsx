@@ -315,6 +315,7 @@ const handleSubmit = async (e) => {
                       name="contactInfo.email"
                       value={formData.contactInfo.email}
                       onChange={handleChange}
+                      required
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                       placeholder="store@example.com"
                     />
@@ -329,6 +330,7 @@ const handleSubmit = async (e) => {
                       name="contactInfo.phone"
                       value={formData.contactInfo.phone}
                       onChange={handleChange}
+                      required
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                       placeholder="+94 77 123 4567"
                     />
@@ -342,6 +344,7 @@ const handleSubmit = async (e) => {
                     name="contactInfo.address"
                     value={formData.contactInfo.address}
                     onChange={handleChange}
+                    required
                     rows={3}
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                     placeholder="123 Main Street, Colombo, Sri Lanka"
