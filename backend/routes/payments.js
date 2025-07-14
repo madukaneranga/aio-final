@@ -275,7 +275,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
 
     // --- Prepare PayHere Payment Params ---
     const paymentParams = {
-      merchant_id: process.env.PAYHERE_MERCHANT_ID, // Ensure this env var is set correctly
+      merchant_id: PAYHERE_MERCHANT_ID, // Ensure this env var is set correctly
       return_url: "https://www.aiocart.lk",
       cancel_url: "https://www.aiocart.lk/checkout",
       notify_url: "https://api.aiocart.lk/api/payments/payhere/ipn",
