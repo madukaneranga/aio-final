@@ -12,6 +12,18 @@ import {
 } from "lucide-react";
 import { formatLKR } from "../utils/currency";
 
+const provinces = [
+  "Western",
+  "Central",
+  "Southern",
+  "Northern",
+  "Eastern",
+  "North Western",
+  "North Central",
+  "Uva",
+  "Sabaragamuwa",
+];
+
 const Checkout = () => {
   const {
     cartItems,
@@ -42,18 +54,17 @@ const Checkout = () => {
   const grandTotal = subtotal + platformFee;
 
   useEffect(() => {
-    if (cartItems) {
+    if (cartItems.length || bookingItems.length) {
       fetchPaymentMethods();
     }
 
-    // Load PayHere script
     if (!window.payhere) {
       const script = document.createElement("script");
       script.src = "https://www.payhere.lk/lib/payhere.js";
       script.async = true;
       document.body.appendChild(script);
     }
-  }, [cartItems]);
+  }, [cartItems, bookingItems]);
 
   const fetchPaymentMethods = async () => {
     try {
@@ -65,7 +76,7 @@ const Checkout = () => {
         const filtered =
           cartItems.length > 0
             ? methods.filter((method) => method.id === "payhere")
-            : methods; // all methods allowed for services
+            : methods;
         setPaymentMethods(filtered);
       }
     } catch (error) {
@@ -73,25 +84,36 @@ const Checkout = () => {
     }
   };
 
-  const getPaymentIcon = (iconName) => {
-    switch (iconName) {
-      case "building-2":
-        return <Building2 className="w-6 h-6" />;
-      case "smartphone":
-        return <Smartphone className="w-6 h-6" />;
-      case "banknote":
-        return <Banknote className="w-6 h-6" />;
-      case "credit-card":
-        return <CreditCard className="w-6 h-6" />;
-      default:
-        return <CreditCard className="w-6 h-6" />;
-    }
-  };
-
   const handleAddressChange = (e) => {
     setShippingAddress({
       ...shippingAddress,
       [e.target.name]: e.target.value,
+    });
+  };
+
+  const startPayHerePayment = (paymentParams) => {
+    return new Promise((resolve, reject) => {
+      if (!window.payhere) {
+        alert("Payment gateway not loaded, please try again later.");
+        return reject(new Error("PayHere script not loaded"));
+      }
+
+      window.payhere.onCompleted = function (orderId) {
+        console.log("Payment completed. OrderID:", orderId);
+        resolve();
+      };
+
+      window.payhere.onDismissed = function () {
+        alert("Payment was cancelled.");
+        reject(new Error("Payment cancelled"));
+      };
+
+      window.payhere.onError = function (error) {
+        alert("Payment failed. Please try again.");
+        reject(new Error("Payment error: " + error));
+      };
+
+      window.payhere.startPayment(paymentParams);
     });
   };
 
@@ -112,119 +134,76 @@ const Checkout = () => {
       (!shippingAddress.street ||
         !shippingAddress.city ||
         !shippingAddress.state ||
-        !shippingAddress.zipCode)
+        !shippingAddress.zipCode ||
+        isNaN(shippingAddress.zipCode))
     ) {
-      alert("Please fill in all shipping address fields");
+      alert("Please fill in all shipping address fields correctly");
       return;
     }
 
     setLoading(true);
 
     try {
-      // 1. Handle cart orders
-      if (cartItems.length > 0) {
-        const itemsByStore = cartItems.reduce((acc, item) => {
-          const storeId =
-            typeof item.storeId === "object"
-              ? item.storeId._id
-              : item.storeId || "unknown";
-          if (!acc[storeId]) acc[storeId] = [];
-          acc[storeId].push({
-            productId: item.id,
-            quantity: item.quantity,
-          });
-          return acc;
-        }, {});
-
-        // For each store order, create order intent & launch PayHere payment
-        for (const [storeId, items] of Object.entries(itemsByStore)) {
-          const orderResponse = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/payments/create-order-intent`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-              body: JSON.stringify({
-                items,
-                storeId,
-                shippingAddress,
-                paymentMethod: selectedPaymentMethod,
-              }),
-            }
-          );
-
-          if (!orderResponse.ok) {
-            const errorData = await orderResponse.json();
-            alert(`Order failed: ${errorData.error}`);
-            setLoading(false);
-            return;
-          }
-
-          const { paymentParams } = await orderResponse.json();
-
-          // Call PayHere payment
-          await startPayHerePayment(paymentParams);
-        }
-      }
-
-      // 2. Handle bookings similarly
-      for (const booking of bookingItems) {
-        const bookingResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/payments/create-booking-intent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({
-              serviceId: booking.id,
-              bookingDate: booking.date,
-              startTime: booking.time,
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/payments/create-combined-intent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            cartItems: cartItems.map((item) => ({
+              productId: item.id,
+              quantity: item.quantity,
+              storeId:
+                typeof item.storeId === "object"
+                  ? item.storeId._id
+                  : item.storeId || "unknown",
+            })),
+            bookingItems: bookingItems.map((item) => ({
+              serviceId: item.id,
+              bookingDate: item.date,
+              startTime: item.time,
               endTime:
-                booking.endTime ||
-                (booking.time
-                  ? booking.time
+                item.endTime ||
+                (item.time
+                  ? item.time
                       .split(":")
                       .map((t, i) =>
                         i === 0 ? String(parseInt(t) + 1).padStart(2, "0") : t
                       )
                       .join(":")
                   : ""),
-              notes: booking.notes,
-              paymentMethod: selectedPaymentMethod,
-            }),
-          }
-        );
-
-        if (!bookingResponse.ok) {
-          const errorData = await bookingResponse.json();
-          alert(`Booking failed: ${errorData.error}`);
-          setLoading(false);
-          return;
+              notes: item.notes,
+            })),
+            shippingAddress,
+            paymentMethod: selectedPaymentMethod,
+          }),
         }
+      );
 
-        const { paymentParams } = await bookingResponse.json();
-
-        // Call PayHere payment
-        await startPayHerePayment(paymentParams);
+      if (!response.ok) {
+        const data = await response.json();
+        alert(`Payment intent creation failed: ${data.error}`);
+        return;
       }
 
-      // If everything paid successfully, clear and navigate
+      const { paymentParams } = await response.json();
+      await startPayHerePayment(paymentParams);
+
       clearCart();
       clearBookings();
       alert("Payment successful!");
 
       if (cartItems.length > 0 && bookingItems.length > 0) {
-        navigate("/orders"); // Both orders and bookings
+        navigate("/orders");
       } else if (cartItems.length > 0) {
-        navigate("/orders"); // Only cart
+        navigate("/orders");
       } else if (bookingItems.length > 0) {
-        navigate("/bookings"); // Only bookings
+        navigate("/bookings");
       } else {
-        navigate("/"); // fallback
+        navigate("/");
       }
     } catch (error) {
       console.error("Checkout error:", error);
@@ -234,136 +213,18 @@ const Checkout = () => {
     }
   };
 
-  // PayHere payment popup wrapper
-  const startPayHerePayment = (paymentParams) => {
-    return new Promise((resolve, reject) => {
-      if (!window.payhere) {
-        alert("Payment gateway not loaded, please try again later.");
-        return reject(new Error("PayHere script not loaded"));
-      }
-
-      window.payhere.startPayment(paymentParams);
-
-      // Payment completed callback
-      window.payhere.onCompleted = function onCompleted(orderId) {
-        console.log("Payment completed. OrderID:", orderId);
-        resolve();
-      };
-
-      // Payment dismissed callback
-      window.payhere.onDismissed = function onDismissed() {
-        alert("Payment was cancelled.");
-        reject(new Error("Payment cancelled"));
-      };
-
-      // Payment error callback
-      window.payhere.onError = function onError(error) {
-        alert("Payment failed. Please try again.");
-        reject(new Error("Payment error: " + error));
-      };
-    });
-  };
-
-  const finalizeOrderAfterPayhere = async () => {
-    try {
-      // Group items by store
-      if (cartItems.length > 0) {
-        const itemsByStore = cartItems.reduce((acc, item) => {
-          const storeId =
-            typeof item.storeId === "object"
-              ? item.storeId._id
-              : item.storeId || "unknown";
-          if (!acc[storeId]) acc[storeId] = [];
-          acc[storeId].push({
-            productId: item.id,
-            quantity: item.quantity,
-          });
-          return acc;
-        }, {});
-
-        for (const [storeId, items] of Object.entries(itemsByStore)) {
-          const orderResponse = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/payments/create-order-intent`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-              body: JSON.stringify({
-                items,
-                storeId,
-                shippingAddress,
-                paymentMethod: selectedPaymentMethod,
-              }),
-            }
-          );
-
-          if (!orderResponse.ok) {
-            const errorData = await orderResponse.json();
-            alert(`Order failed: ${errorData.error}`);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
-      // Bookings
-      for (const booking of bookingItems) {
-        const bookingResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/payments/create-booking-intent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({
-              serviceId: booking.id,
-              bookingDate: booking.date,
-              startTime: booking.time,
-              endTime:
-                booking.endTime ||
-                (booking.time
-                  ? booking.time
-                      .split(":")
-                      .map((t, i) =>
-                        i === 0 ? String(parseInt(t) + 1).padStart(2, "0") : t
-                      )
-                      .join(":")
-                  : ""),
-              notes: booking.notes,
-              paymentMethod: selectedPaymentMethod,
-            }),
-          }
-        );
-
-        if (!bookingResponse.ok) {
-          const errorData = await bookingResponse.json();
-          alert(`Booking failed: ${errorData.error}`);
-          setLoading(false);
-          return;
-        }
-      }
-
-      clearCart();
-      clearBookings();
-      alert("Payment successful!");
-
-      if (cartItems.length > 0 && bookingItems.length > 0) {
-        navigate("/orders"); // Both orders and bookings
-      } else if (cartItems.length > 0) {
-        navigate("/orders"); // Only cart
-      } else if (bookingItems.length > 0) {
-        navigate("/bookings"); // Only bookings
-      } else {
-        navigate("/"); // fallback
-      }
-    } catch (error) {
-      console.error("Checkout error:", error);
-      alert("Checkout failed. Please try again.");
-    } finally {
-      setLoading(false);
+  const getPaymentIcon = (iconName) => {
+    switch (iconName) {
+      case "building-2":
+        return <Building2 className="w-6 h-6" />;
+      case "smartphone":
+        return <Smartphone className="w-6 h-6" />;
+      case "banknote":
+        return <Banknote className="w-6 h-6" />;
+      case "credit-card":
+        return <CreditCard className="w-6 h-6" />;
+      default:
+        return <CreditCard className="w-6 h-6" />;
     }
   };
 
