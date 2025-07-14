@@ -31,7 +31,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 
 app.use(cors({
-  origin: 'https://www.aiocart.lk',
+  origin: 'https://aio-frontend.onrender.com',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
   credentials: true 
 }));
