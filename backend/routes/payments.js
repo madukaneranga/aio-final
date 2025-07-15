@@ -26,7 +26,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
     if (!paymentMethod || paymentMethod !== "payhere") {
       return res.status(400).json({ error: "Unsupported payment method" });
     }
-
+    const combinedId = `CMB_${Date.now()}_${req.user._id}`;
     let totalAmount = 0;
     const orderItems = [];
     const createdEntities = {
@@ -86,7 +86,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       await order.save();
       createdEntities.order = order;
     }
-    const combinedId = `CMB_${Date.now()}_${req.user._id}`;
+
     // --- Handle Booking Creation ---
     for (const item of bookingItems) {
       const service = await Service.findById(item.serviceId);
