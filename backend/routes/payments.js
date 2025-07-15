@@ -179,26 +179,25 @@ function generatePayHereHash({
   currency,
   merchantSecret,
 }) {
-  // Sanitize inputs
-  const merchantIdStr = String(merchantId).trim();
-  const orderIdStr = String(orderId).trim();
-  const currencyStr = String(currency).trim();
-  const amountFormatted = parseFloat(amount).toFixed(2); // Ensure 2 decimal places
-  const secretStr = String(merchantSecret).trim();
+  // Coerce merchantSecret to string
+  const secretStr = String(merchantSecret);
 
-  // Generate hashed secret
   const hashedSecret = crypto
     .createHash("md5")
     .update(secretStr)
     .digest("hex")
     .toUpperCase();
 
-  // Create hash string
-  const hashString =
-    merchantIdStr + orderIdStr + amountFormatted + currencyStr + hashedSecret;
-  console.log("Hash Input String:", hashString); // Debug log
+  const amountFormatted = parseFloat(amount).toFixed(2);
 
-  // Generate final hash
+  // Coerce all inputs to string to avoid type issues
+  const hashString =
+    String(merchantId) +
+    String(orderId) +
+    amountFormatted +
+    String(currency) +
+    hashedSecret;
+
   const hash = crypto
     .createHash("md5")
     .update(hashString)
@@ -208,25 +207,23 @@ function generatePayHereHash({
   return hash;
 }
 
+/*
+router.post(
+  "/payhere/ipn",
+  express.urlencoded({ extended: true }),
+  (req, res) => {
+    console.log("✅ PayHere IPN HIT:", req.body);
+    res.send("ok");
+  }
+);
+*/
+
+// Handle PayHere IPN (payment notifications)
 router.post(
   "/payhere/ipn",
   express.urlencoded({ extended: true }),
   async (req, res) => {
     const data = req.body;
-    console.log("Received PayHere IPN Data:", JSON.stringify(data, null, 2));
-
-    // Validate required fields
-    if (
-      !data.merchant_id ||
-      !data.order_id ||
-      !data.payhere_amount ||
-      !data.payhere_currency ||
-      !data.md5sig ||
-      !data.status_code
-    ) {
-      console.error("Missing required IPN fields:", data);
-      return res.status(400).send("Invalid IPN: Missing required fields");
-    }
 
     try {
       const localMd5sig = generatePayHereHash({
@@ -236,33 +233,29 @@ router.post(
         currency: data.payhere_currency,
         merchantSecret: PAYHERE_SECRET,
       });
-      console.log("Generated Local MD5 Hash:", localMd5sig);
-      console.log("Received MD5 Hash:", data.md5sig);
-      console.log("Hash Input Values:", {
-        merchantId: data.merchant_id,
-        orderId: data.order_id,
-        amount: data.payhere_amount,
-        currency: data.payhere_currency,
-      });
 
       if (localMd5sig !== data.md5sig) {
         console.error("Invalid MD5 signature on PayHere IPN");
-        return res.status(400).send("Invalid IPN: Hash mismatch");
+        return res.status(400).send("Invalid IPN");
       }
 
-      // Rest of the IPN handling logic (as in your original code)
       if (data.status_code === "2") {
-        let order = await Order.findOne({ combinedId: data.order_id });
+        // Payment success: update order or booking
+        let order = await Order.findById(data.order_id);
         if (order && order.status !== "paid") {
           order.status = "paid";
+
+          // Update stock
           for (const item of order.items) {
             await Product.findByIdAndUpdate(item.productId, {
               $inc: { stock: -item.quantity },
             });
           }
+          // Update store sales
           await Store.findByIdAndUpdate(order.storeId, {
             $inc: { totalSales: order.storeAmount },
           });
+          // Create commission
           const commission = new Commission({
             orderId: order._id,
             storeId: order.storeId,
@@ -274,20 +267,24 @@ router.post(
             type: "order",
           });
           await commission.save();
+
           order.paymentDetails = {
             paymentStatus: "paid",
             paidAt: new Date(),
             paymentMethod: "payhere",
-            transactionId: data.payment_id, // Use payment_id
+            transactionId: data.payhere_transaction_id,
           };
           await order.save();
         } else {
-          let booking = await Booking.findOne({ combinedId: data.order_id });
+          let booking = await Booking.findById(data.order_id);
           if (booking && booking.status !== "paid") {
             booking.status = "paid";
+
+            // Update store sales
             await Store.findByIdAndUpdate(booking.storeId, {
               $inc: { totalSales: booking.storeAmount },
             });
+            // Create commission
             const commission = new Commission({
               bookingId: booking._id,
               storeId: booking.storeId,
@@ -299,11 +296,12 @@ router.post(
               type: "booking",
             });
             await commission.save();
+
             booking.paymentDetails = {
               paymentStatus: "paid",
               paidAt: new Date(),
               paymentMethod: "payhere",
-              transactionId: data.payment_id, // Use payment_id
+              transactionId: data.payhere_transaction_id,
             };
             await booking.save();
           } else {
@@ -313,12 +311,13 @@ router.post(
             );
           }
         }
-        return res.status(200).send("OK");
+
+        return res.status(200).send("ok");
       } else {
         console.warn(
           `PayHere IPN payment status: ${data.status_code} for ${data.order_id}`
         );
-        return res.status(200).send("OK");
+        return res.status(200).send("ok");
       }
     } catch (err) {
       console.error("Error processing PayHere IPN:", err);
