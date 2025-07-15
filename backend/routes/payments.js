@@ -132,7 +132,8 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
 
     // --- Prepare PayHere Payment Params ---
     const paymentParams = {
-      merchant_id: PAYHERE_MERCHANT_ID, // Ensure this env var is set correctly
+      sandbox: true, // Important for testing!
+      merchant_id: PAYHERE_MERCHANT_ID,
       return_url: "https://www.aiocart.lk",
       cancel_url: "https://www.aiocart.lk/checkout",
       notify_url: "https://api.aiocart.lk/api/payments/payhere/ipn",
@@ -140,12 +141,12 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       items: combinedItemLabel,
       currency: "LKR",
       amount: totalAmount.toFixed(2),
-      first_name: req.user.firstName || "",
-      last_name: req.user.lastName || "",
-      email: req.user.email || "",
-      phone: req.user.phone || "",
-      address: shippingAddress.street || "",
-      city: shippingAddress.city || "",
+      first_name: req.user.firstName || "Customer",
+      last_name: req.user.lastName || "Name",
+      email: req.user.email || "no-reply@aiocart.lk",
+      phone: req.user.phone || "0771234567",
+      address: shippingAddress.street || "Unknown Address",
+      city: shippingAddress.city || "Unknown City",
     };
 
     // Log to backend console for debugging
