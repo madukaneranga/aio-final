@@ -229,7 +229,7 @@ router.post(
       const localMd5sig = generatePayHereHash({
         merchantId: data.merchant_id,
         orderId: data.order_id,
-        amount: data.payhere_amount.toFixed(2),
+        amount: data.payhere_amount,
         currency: data.payhere_currency,
         merchantSecret: PAYHERE_SECRET,
       });
