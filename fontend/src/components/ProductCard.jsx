@@ -27,15 +27,39 @@ const ProductCard = ({ product }) => {
   return (
     <Link to={`/product/${product._id}`} className="block">
       <div className="product-card bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="relative">
+        {/* === Start Image Hover Logic Modification === */}
+        <div className="relative w-full h-48 overflow-hidden group">
+          {/* First Image */}
           <img
-            src={product.images?.[0] ? 
-              (product.images[0].startsWith('http') ? product.images[0] : `${import.meta.env.VITE_API_URL}${product.images[0]}`) : 
-              'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
+            src={
+              product.images?.[0]
+                ? product.images[0].startsWith('http')
+                  ? product.images[0]
+                  : `${import.meta.env.VITE_API_URL}${product.images[0]}`
+                : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
             }
             alt={product.title}
-            className="w-full h-48 object-cover"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ${
+              product.images?.[1]
+                ? 'group-hover:opacity-0' // fade out if second image exists
+                : 'group-hover:opacity-50' // blink same image
+            }`}
           />
+
+          {/* Second Image (if available) */}
+          {product.images?.[1] && (
+            <img
+              src={
+                product.images[1].startsWith('http')
+                  ? product.images[1]
+                  : `${import.meta.env.VITE_API_URL}${product.images[1]}`
+              }
+              alt={`${product.title} hover`}
+              className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+            />
+          )}
+
+          {/* Add to Cart Button */}
           {user?.role === 'customer' && (
             <button
               onClick={handleAddToCart}
@@ -45,6 +69,7 @@ const ProductCard = ({ product }) => {
             </button>
           )}
         </div>
+        {/* === End Image Hover Logic Modification === */}
         
         <div className="p-4">
           <h3 className="font-semibold text-lg mb-2 line-clamp-2">{product.title}</h3>

@@ -1,6 +1,6 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import React from "react";
+import { Link } from "react-router-dom";
+import { Mail, Phone, MapPin } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -11,7 +11,8 @@ const Footer = () => {
           <div>
             <h3 className="text-2xl font-bold mb-4">AIO</h3>
             <p className="text-gray-400 mb-4">
-              All In One - Your complete e-commerce platform for products and services.
+              All In One - Your complete e-commerce platform for products and
+              services.
             </p>
             <div className="flex space-x-4">
               <div className="flex items-center text-gray-400">
@@ -26,22 +27,34 @@ const Footer = () => {
             <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/stores" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/stores"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Stores
                 </Link>
               </li>
               <li>
-                <Link to="/products" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/products"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Products
                 </Link>
               </li>
               <li>
-                <Link to="/services" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/services"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Services
                 </Link>
               </li>
               <li>
-                <Link to="/create-store" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/create-store"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Start Selling
                 </Link>
               </li>
@@ -53,24 +66,36 @@ const Footer = () => {
             <h4 className="text-lg font-semibold mb-4">Support</h4>
             <ul className="space-y-2">
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/help-center"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Help Center
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/contact-us"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Contact Us
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/privacy-policy"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Link
+                  to="/terms-of-service"
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Terms of Service
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
