@@ -180,17 +180,20 @@ function generatePayHereIPNHash({
   statusCode,
   merchantSecret,
 }) {
-  const initialString = merchantId + orderId + amount + currency + statusCode;
-
-  const firstHash = crypto
+  const hashedSecret = crypto
     .createHash("md5")
-    .update(initialString)
+    .update(merchantSecret)
     .digest("hex")
     .toUpperCase();
 
+  const hashString =
+    merchantId + orderId + amount + currency + statusCode + hashedSecret;
+
+  console.log("Expected hash string:", hashString); // 🔍 Debug output
+
   const finalHash = crypto
     .createHash("md5")
-    .update(firstHash + merchantSecret)
+    .update(hashString)
     .digest("hex")
     .toUpperCase();
 
@@ -260,7 +263,7 @@ router.post(
       const localMd5sig = generatePayHereIPNHash({
         merchantId: data.merchant_id,
         orderId: data.order_id,
-        amount: data.payhere_amount,
+        amount: parseFloat(data.payhere_amount).toFixed(2),
         currency: data.payhere_currency,
         statusCode: data.status_code,
         merchantSecret: PAYHERE_SECRET,
