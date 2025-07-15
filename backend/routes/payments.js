@@ -76,7 +76,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         storeId: orderStoreId,
         items: orderItems,
         totalAmount,
-        platformFee: commissionAmount,
+        platformFee: commissionAmount.toFixed(2),
         storeAmount,
         shippingAddress,
         status: "pending",
@@ -111,8 +111,8 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         startTime: item.startTime,
         endTime: item.endTime,
         notes: item.notes,
-        totalAmount: serviceAmount,
-        platformFee: commissionAmount,
+        totalAmount: serviceAmount.toFixed(2),
+        platformFee: commissionAmount.toFixed(2),
         storeAmount,
         status: "pending",
         combinedId,
@@ -226,23 +226,13 @@ router.post(
     const data = req.body;
 
     try {
-      const md5secret = crypto
-        .createHash("md5")
-        .update(PAYHERE_SECRET)
-        .digest("hex");
-
-      const localMd5sig = crypto
-        .createHash("md5")
-        .update(
-          data.merchant_id +
-            data.order_id +
-            data.payhere_amount +
-            data.payhere_currency +
-            data.status_code +
-            md5secret
-        )
-        .digest("hex")
-        .toUpperCase();
+      const localMd5sig = generatePayHereHash({
+        merchantId: data.merchant_id,
+        orderId: data.order_id,
+        amount: payhere_amount.toFixed(2),
+        currency: payhere_currency,
+        merchantSecret: PAYHERE_SECRET,
+      });
 
       if (localMd5sig !== data.md5sig) {
         console.error("Invalid MD5 signature on PayHere IPN");
