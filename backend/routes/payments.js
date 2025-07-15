@@ -80,8 +80,8 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         storeAmount,
         shippingAddress,
         status: "pending",
+        combinedId, 
       });
-      
 
       await order.save();
       createdEntities.order = order;
@@ -115,6 +115,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         platformFee: commissionAmount,
         storeAmount,
         status: "pending",
+        combinedId,
       });
 
       await booking.save();
@@ -145,7 +146,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       merchant_id: PAYHERE_MERCHANT_ID,
       return_url: "https://aiocart.lk",
       cancel_url: "https://aiocart.lk/checkout",
-      notify_url: "https://www.aiocart.lk/api/payments/payhere/ipn",
+      notify_url: "https://aio-backend-x770.onrender.com/api/payments/payhere/ipn",
       order_id: combinedId,
       items: combinedItemLabel,
       currency: "LKR",
@@ -205,21 +206,11 @@ function generatePayHereHash({
   return hash;
 }
 
-router.post(
-  "/payhere/ipn",
-  express.urlencoded({ extended: true }),
-  async (req, res) => {
-    try {
-      // Log all data just in case
-      console.log("PayHere IPN received:", req.body);
+router.post("/payhere/ipn", express.urlencoded({ extended: true }), (req, res) => {
+  console.log("✅ PayHere IPN HIT:", req.body);
+  res.send("ok");
+});
 
-      // existing logic...
-    } catch (err) {
-      console.error("PayHere IPN error:", err);
-      res.status(500).send("Error");
-    }
-  }
-);
 
 // Handle PayHere IPN (payment notifications)
 /*router.post(
