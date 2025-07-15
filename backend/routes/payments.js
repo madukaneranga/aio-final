@@ -234,6 +234,7 @@ router.post(
         merchantSecret: PAYHERE_SECRET,
       });
 
+      
       if (localMd5sig !== data.md5sig) {
         console.error("Invalid MD5 signature on PayHere IPN");
         return res.status(400).send("Invalid IPN");
