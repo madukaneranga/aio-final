@@ -80,13 +80,13 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         storeAmount,
         shippingAddress,
         status: "pending",
-        combinedId, 
+        combinedId,
       });
 
       await order.save();
       createdEntities.order = order;
     }
-
+    const combinedId = `CMB_${Date.now()}_${req.user._id}`;
     // --- Handle Booking Creation ---
     for (const item of bookingItems) {
       const service = await Service.findById(item.serviceId);
@@ -129,7 +129,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
     }
 
     // --- Combine Order ID and Booking IDs for unified payment reference ---
-    const combinedId = `CMB_${Date.now()}_${req.user._id}`;
+
     const combinedItemLabel = `OrderAndBooking_${combinedId}`;
 
     const hash = generatePayHereHash({
@@ -146,7 +146,8 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       merchant_id: PAYHERE_MERCHANT_ID,
       return_url: "https://aiocart.lk",
       cancel_url: "https://aiocart.lk/checkout",
-      notify_url: "https://aio-backend-x770.onrender.com/api/payments/payhere/ipn",
+      notify_url:
+        "https://aio-backend-x770.onrender.com/api/payments/payhere/ipn",
       order_id: combinedId,
       items: combinedItemLabel,
       currency: "LKR",
@@ -206,11 +207,14 @@ function generatePayHereHash({
   return hash;
 }
 
-router.post("/payhere/ipn", express.urlencoded({ extended: true }), (req, res) => {
-  console.log("✅ PayHere IPN HIT:", req.body);
-  res.send("ok");
-});
-
+router.post(
+  "/payhere/ipn",
+  express.urlencoded({ extended: true }),
+  (req, res) => {
+    console.log("✅ PayHere IPN HIT:", req.body);
+    res.send("ok");
+  }
+);
 
 // Handle PayHere IPN (payment notifications)
 /*router.post(
