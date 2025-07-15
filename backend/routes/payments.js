@@ -200,7 +200,6 @@ function generatePayHereIPNHash({
   return finalHash;
 }
 
-
 function generatePayHereHash({
   merchantId,
   orderId,
@@ -235,8 +234,6 @@ function generatePayHereHash({
 
   return hash;
 }
-
-
 
 // Handle PayHere IPN (payment notifications)
 router.post(
@@ -286,8 +283,7 @@ router.post(
       // Rest of the IPN handling logic (as in your original code)
       if (data.status_code === "2") {
         let order = await Order.findOne({ combinedId: data.order_id });
-        if (order && order.status !== "paid") {
-          order.status = "paid";
+        if (order && order.paymentDetails?.paymentStatus !== "paid") {
           for (const item of order.items) {
             await Product.findByIdAndUpdate(item.productId, {
               $inc: { stock: -item.quantity },
@@ -316,8 +312,7 @@ router.post(
           await order.save();
         } else {
           let booking = await Booking.findOne({ combinedId: data.order_id });
-          if (booking && booking.status !== "paid") {
-            booking.status = "paid";
+          if (booking && booking.paymentDetails?.paymentStatus !== "paid") {
             await Store.findByIdAndUpdate(booking.storeId, {
               $inc: { totalSales: booking.storeAmount },
             });

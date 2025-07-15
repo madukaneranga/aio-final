@@ -63,7 +63,7 @@ const orderSchema = new mongoose.Schema({
     country: String,
   },
   paymentDetails: {
-    localPaymentId: String,
+    transactionId: String,
     paymentStatus: String,
     paidAt: Date,
     paymentMethod: String,
