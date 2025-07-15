@@ -36,6 +36,8 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  combinedId: { type: String, index: true },  // optional index for quick lookup
+
   storeAmount: {
     type: Number,
     required: true
