@@ -207,6 +207,7 @@ function generatePayHereHash({
   return hash;
 }
 
+/*
 router.post(
   "/payhere/ipn",
   express.urlencoded({ extended: true }),
@@ -215,9 +216,10 @@ router.post(
     res.send("ok");
   }
 );
+*/
 
 // Handle PayHere IPN (payment notifications)
-/*router.post(
+router.post(
   "/payhere/ipn",
   express.urlencoded({ extended: true }),
   async (req, res) => {
@@ -333,7 +335,7 @@ router.post(
     }
   }
 );
-*/
+
 router.put("/:id/cancel", authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
