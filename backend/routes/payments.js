@@ -12,7 +12,7 @@ const router = express.Router();
 
 const PAYHERE_MERCHANT_ID = "1231188"; // sandbox merchant id
 const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy"; // replace with your sandbox secret
-
+const PAYHERE_REFUND_URL = "https://sandbox.payhere.lk/merchant/v1/refund";
 //checkout
 router.post("/create-combined-intent", authenticate, async (req, res) => {
   try {
@@ -81,6 +81,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         shippingAddress,
         status: "pending",
       });
+      
 
       await order.save();
       createdEntities.order = order;
@@ -321,6 +322,87 @@ router.post(
     }
   }
 );
+
+router.put("/:id/cancel", authenticate, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (order.customerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (order.status !== "pending") {
+      return res.status(400).json({ error: "Order cannot be cancelled" });
+    }
+
+    const orderTime = new Date(order.createdAt);
+    const now = new Date();
+    const timeDiff = (now - orderTime) / (1000 * 60);
+
+    if (timeDiff > 5) {
+      return res.status(400).json({ error: "Cancellation window has expired" });
+    }
+
+    let notes = "Cancelled by customer";
+    // --- Refund if paid with PayHere ---
+    if (order.paid && order.paymentMethod === "payhere") {
+      const reason = "User cancelled order";
+      const amount = parseFloat(order.totalAmount).toFixed(2);
+
+      const hashString =
+        PAYHERE_MERCHANT_ID +
+        order.orderId +
+        amount +
+        reason +
+        PAYHERE_MERCHANT_SECRET;
+      const hash = crypto
+        .createHash("md5")
+        .update(hashString)
+        .digest("hex")
+        .toUpperCase();
+
+      const refundBody = {
+        merchant_id: PAYHERE_MERCHANT_ID,
+        order_id: order.orderId,
+        amount: amount,
+        reason: reason,
+        hash: hash,
+      };
+
+      const refundResponse = await fetch(PAYHERE_REFUND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(refundBody),
+      });
+
+      const refundResult = await refundResponse.json();
+      console.log("Refund result:", refundResult);
+
+      if (refundResult.status !== 1) {
+        return res
+          .status(500)
+          .json({ error: "Refund failed: " + refundResult.message });
+      }
+      notes += " and refunded via PayHere";
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: "cancelled",
+        notes: notes,
+      },
+      { new: true }
+    );
+
+    res.json(updatedOrder);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Get payment methods available in Sri Lanka
 router.get("/payment-methods", (req, res) => {

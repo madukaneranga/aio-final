@@ -71,7 +71,7 @@ const Orders = () => {
   const cancelOrder = async (orderId) => {
     setCancelling(orderId);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/${orderId}/cancel`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
