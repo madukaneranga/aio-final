@@ -172,6 +172,32 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
   }
 });
 
+function generatePayHereIPNHash({
+  merchantId,
+  orderId,
+  amount,
+  currency,
+  statusCode,
+  merchantSecret,
+}) {
+  const initialString = merchantId + orderId + amount + currency + statusCode;
+
+  const firstHash = crypto
+    .createHash("md5")
+    .update(initialString)
+    .digest("hex")
+    .toUpperCase();
+
+  const finalHash = crypto
+    .createHash("md5")
+    .update(firstHash + merchantSecret)
+    .digest("hex")
+    .toUpperCase();
+
+  return finalHash;
+}
+
+
 function generatePayHereHash({
   merchantId,
   orderId,
@@ -207,16 +233,7 @@ function generatePayHereHash({
   return hash;
 }
 
-/*
-router.post(
-  "/payhere/ipn",
-  express.urlencoded({ extended: true }),
-  (req, res) => {
-    console.log("✅ PayHere IPN HIT:", req.body);
-    res.send("ok");
-  }
-);
-*/
+
 
 // Handle PayHere IPN (payment notifications)
 router.post(
@@ -240,13 +257,15 @@ router.post(
     }
 
     try {
-      const localMd5sig = generatePayHereHash({
+      const localMd5sig = generatePayHereIPNHash({
         merchantId: data.merchant_id,
         orderId: data.order_id,
         amount: data.payhere_amount,
         currency: data.payhere_currency,
+        statusCode: data.status_code,
         merchantSecret: PAYHERE_SECRET,
       });
+
       console.log("Generated Local MD5 Hash:", localMd5sig);
       console.log("Received MD5 Hash:", data.md5sig);
       console.log("Hash Input Values:", {
