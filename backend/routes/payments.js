@@ -130,13 +130,21 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
     const combinedId = `CMB_${Date.now()}_${req.user._id}`;
     const combinedItemLabel = `OrderAndBooking_${combinedId}`;
 
+    const hash = generatePayHereHash({
+      merchantId: PAYHERE_MERCHANT_ID,
+      orderId: combinedId,
+      amount: totalAmount.toFixed(2),
+      currency: "LKR",
+      merchantSecret: PAYHERE_SECRET,
+    });
+
     // --- Prepare PayHere Payment Params ---
     const paymentParams = {
       sandbox: true, // Important for testing!
       merchant_id: PAYHERE_MERCHANT_ID,
-      return_url: "https://www.aiocart.lk",
-      cancel_url: "https://www.aiocart.lk/checkout",
-      notify_url: "https://api.aiocart.lk/api/payments/payhere/ipn",
+      return_url: "http://aiocart.lk",
+      cancel_url: "http://aiocart.lk/checkout",
+      notify_url: "http://www.aiocart.lk/api/payments/payhere/ipn",
       order_id: combinedId,
       items: combinedItemLabel,
       currency: "LKR",
@@ -147,6 +155,8 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       phone: req.user.phone || "0771234567",
       address: shippingAddress.street || "Unknown Address",
       city: shippingAddress.city || "Unknown City",
+      country: "Sri Lanka",
+      hash: hash,
     };
 
     // Log to backend console for debugging
@@ -158,6 +168,41 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
     res.status(500).json({ error: "Failed to create payment intent" });
   }
 });
+
+function generatePayHereHash({
+  merchantId,
+  orderId,
+  amount,
+  currency,
+  merchantSecret,
+}) {
+  // Coerce merchantSecret to string
+  const secretStr = String(merchantSecret);
+
+  const hashedSecret = crypto
+    .createHash("md5")
+    .update(secretStr)
+    .digest("hex")
+    .toUpperCase();
+
+  const amountFormatted = parseFloat(amount).toFixed(2);
+
+  // Coerce all inputs to string to avoid type issues
+  const hashString =
+    String(merchantId) +
+    String(orderId) +
+    amountFormatted +
+    String(currency) +
+    hashedSecret;
+
+  const hash = crypto
+    .createHash("md5")
+    .update(hashString)
+    .digest("hex")
+    .toUpperCase();
+
+  return hash;
+}
 
 // Handle PayHere IPN (payment notifications)
 router.post(
