@@ -87,6 +87,7 @@ router.put('/:id/status', authenticate, authorize('store_owner'), async (req, re
 });
 
 // Allow customers to cancel orders within 5 minutes
+/*
 router.put('/:id/cancel', authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -126,5 +127,5 @@ router.put('/:id/cancel', authenticate, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
+*/
 export default router;
