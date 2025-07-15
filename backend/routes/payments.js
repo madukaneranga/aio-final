@@ -143,9 +143,9 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
     const paymentParams = {
       sandbox: true, // Important for testing!
       merchant_id: PAYHERE_MERCHANT_ID,
-      return_url: "http://aiocart.lk",
-      cancel_url: "http://aiocart.lk/checkout",
-      notify_url: "http://www.aiocart.lk/api/payments/payhere/ipn",
+      return_url: "https://aiocart.lk",
+      cancel_url: "https://aiocart.lk/checkout",
+      notify_url: "https://www.aiocart.lk/api/payments/payhere/ipn",
       order_id: combinedId,
       items: combinedItemLabel,
       currency: "LKR",
@@ -205,8 +205,24 @@ function generatePayHereHash({
   return hash;
 }
 
-// Handle PayHere IPN (payment notifications)
 router.post(
+  "/payhere/ipn",
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    try {
+      // Log all data just in case
+      console.log("PayHere IPN received:", req.body);
+
+      // existing logic...
+    } catch (err) {
+      console.error("PayHere IPN error:", err);
+      res.status(500).send("Error");
+    }
+  }
+);
+
+// Handle PayHere IPN (payment notifications)
+/*router.post(
   "/payhere/ipn",
   express.urlencoded({ extended: true }),
   async (req, res) => {
@@ -322,7 +338,7 @@ router.post(
     }
   }
 );
-
+*/
 router.put("/:id/cancel", authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
