@@ -31,6 +31,12 @@ import NotFound from './pages/NotFound';
 import Admin from './pages/Admin';
 import SalesAnalytics from './pages/SalesAnalytics';
 import PlatformSettings from './pages/PlatformSettings';
+import HelpCenter from './pages/HelpCenter';
+import ContactUs from './pages/ContactUs';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+
+
 import './App.css';
 
 function App() {
@@ -68,6 +74,10 @@ function App() {
                   <Route path="/sales-analytics" element={<SalesAnalytics />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/platform-settings" element={<PlatformSettings />} />
+                  <Route path="/help-center" element={<HelpCenter />} />
+                  <Route path="/contact-us" element={<ContactUs />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/terms-of-service" element={<TermsOfService />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
