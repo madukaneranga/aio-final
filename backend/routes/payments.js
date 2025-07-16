@@ -10,10 +10,9 @@ import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
 
-const PAYHERE_MERCHANT_ID = "1231188"; // sandbox merchant id
-const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy"; // replace with your sandbox secret
+const PAYHERE_MERCHANT_ID = "1231188";
+const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy";
 const PAYHERE_REFUND_URL = "https://sandbox.payhere.lk/merchant/v1/refund";
-// PayHere Credentials - store in env vars for production
 const PAYHERE_APP_ID =
   process.env.PAYHERE_APP_ID || "4OVxzVJAbSK4JFnJjJNzoH3TV";
 const PAYHERE_APP_SECRET =
@@ -496,7 +495,6 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 // Get payment methods available in Sri Lanka
 router.get("/payment-methods", (req, res) => {

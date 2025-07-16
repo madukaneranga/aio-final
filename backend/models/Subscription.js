@@ -38,7 +38,6 @@ const subscriptionSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
-  localPaymentId: String,
   paymentHistory: [
     {
       amount: Number,
