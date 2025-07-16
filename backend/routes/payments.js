@@ -15,10 +15,10 @@ const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy"; /
 const PAYHERE_REFUND_URL = "https://sandbox.payhere.lk/merchant/v1/refund";
 // PayHere Credentials - store in env vars for production
 const PAYHERE_APP_ID =
-  process.env.PAYHERE_APP_ID || "4OVxzQlbccS4JFnJjJNzoH3TV";
+  process.env.PAYHERE_APP_ID || "4OVxzVJAbSK4JFnJjJNzoH3TV";
 const PAYHERE_APP_SECRET =
   process.env.PAYHERE_APP_SECRET ||
-  "4jw2K5bCgkR4ZGTyfLLD4n4eVJrJ7wtZF4uUvOg9J9Jy";
+  "8cJlAdroxID8n0No30NAwT8m22kmMKNW98cJlqgSYpMa";
 const PAYHERE_OAUTH_URL = "https://sandbox.payhere.lk/merchant/v1/oauth/token";
 
 //checkout
@@ -365,7 +365,9 @@ router.post(
 
 // Helper: Get Base64 encoded auth code from AppID and AppSecret
 function getAuthCode() {
-  return "NE9WeHpRbGJjY1M0SkZuSmpKTnpvSDNUVjo0ancySzViQ2drUjRaR1R5ZkxMRDRuNGVWSnJKN3d0WkY0dVV2T2c5SjlKeQ==";
+  return Buffer.from(`${PAYHERE_APP_ID}:${PAYHERE_APP_SECRET}`).toString(
+    "base64"
+  );
 }
 
 // Helper: Get Access Token from PayHere
