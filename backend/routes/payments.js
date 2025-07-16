@@ -380,7 +380,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
     let notes = "Cancelled by customer";
     // --- Refund if paid with PayHere ---
-    if (order.paid && order.paymentMethod === "payhere") {
+    if (order && order.paymentDetails?.paymentMethod === "payhere") {
       const reason = "User cancelled order";
       const amount = parseFloat(order.totalAmount).toFixed(2);
 
