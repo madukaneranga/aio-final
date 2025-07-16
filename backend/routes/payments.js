@@ -435,6 +435,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
         console.error("Failed to get PayHere access token:", err);
         throw err; // re-throw to be caught by outer catch
       });
+      console.log(accessToken);
 
       // Prepare refund request body
       const refundBody = {
