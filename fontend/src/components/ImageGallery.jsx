@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation, Pagination } from 'swiper/modules';
-import 'swiper/css';
-import 'swiper/css/navigation';
-import 'swiper/css/pagination';
+import React, { useState } from "react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination } from "swiper/modules";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
 
 const ImageGallery = ({ images, title }) => {
   const [selectedImage, setSelectedImage] = useState(0);
@@ -21,14 +21,17 @@ const ImageGallery = ({ images, title }) => {
       {/* Main Image */}
       <div className="relative">
         <img
-          src={images[selectedImage] ? 
-            (images[selectedImage].startsWith('http') ? images[selectedImage] : `${import.meta.env.VITE_API_URL}${images[selectedImage]}`) : 
-            'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop'
+          src={
+            images[selectedImage]
+              ? images[selectedImage].startsWith("http")
+                ? images[selectedImage]
+                : `${import.meta.env.VITE_API_URL}${images[selectedImage]}`
+              : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
           }
           alt={title}
-          className="w-full h-96 object-cover rounded-lg"
+          className="hidden sm:block w-full h-96 object-cover rounded-lg"
         />
-        
+
         {/* Mobile Swiper for single image view */}
         <div className="md:hidden">
           <Swiper
@@ -43,9 +46,12 @@ const ImageGallery = ({ images, title }) => {
             {images.map((image, index) => (
               <SwiperSlide key={index}>
                 <img
-                  src={image ? 
-                    (image.startsWith('http') ? image : `${import.meta.env.VITE_API_URL}${image}`) : 
-                    'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop'
+                  src={
+                    image
+                      ? image.startsWith("http")
+                        ? image
+                        : `${import.meta.env.VITE_API_URL}${image}`
+                      : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
                   }
                   alt={`${title} ${index + 1}`}
                   className="w-full h-full object-cover rounded-lg"
@@ -65,14 +71,17 @@ const ImageGallery = ({ images, title }) => {
               onClick={() => setSelectedImage(index)}
               className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
                 selectedImage === index
-                  ? 'border-black ring-2 ring-black ring-opacity-50'
-                  : 'border-gray-200 hover:border-gray-400'
+                  ? "border-black ring-2 ring-black ring-opacity-50"
+                  : "border-gray-200 hover:border-gray-400"
               }`}
             >
               <img
-                src={image ? 
-                  (image.startsWith('http') ? image : `${import.meta.env.VITE_API_URL}${image}`) : 
-                  'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop'
+                src={
+                  image
+                    ? image.startsWith("http")
+                      ? image
+                      : `${import.meta.env.VITE_API_URL}${image}`
+                    : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
                 }
                 alt={`${title} ${index + 1}`}
                 className="w-full h-full object-cover"

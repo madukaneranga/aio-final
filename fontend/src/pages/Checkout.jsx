@@ -206,7 +206,9 @@ const Checkout = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        alert(`Payment intent creation failed: ${data.error || "Unknown error"}`);
+        alert(
+          `Payment intent creation failed: ${data.error || "Unknown error"}`
+        );
         setLoading(false);
         return;
       }
