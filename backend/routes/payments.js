@@ -13,6 +13,14 @@ const router = express.Router();
 const PAYHERE_MERCHANT_ID = "1231188"; // sandbox merchant id
 const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy"; // replace with your sandbox secret
 const PAYHERE_REFUND_URL = "https://sandbox.payhere.lk/merchant/v1/refund";
+// PayHere Credentials - store in env vars for production
+const PAYHERE_APP_ID =
+  process.env.PAYHERE_APP_ID || "4OVxzQlbccS4JFnJjJNzoH3TV";
+const PAYHERE_APP_SECRET =
+  process.env.PAYHERE_APP_SECRET ||
+  "4jw2K5bCgkR4ZGTyfLLD4n4eVJrJ7wtZF4uUvOg9J9Jy";
+const PAYHERE_OAUTH_URL = "https://sandbox.payhere.lk/merchant/v1/oauth/token";
+
 //checkout
 router.post("/create-combined-intent", authenticate, async (req, res) => {
   try {
@@ -355,6 +363,37 @@ router.post(
   }
 );
 
+// Helper: Get Base64 encoded auth code from AppID and AppSecret
+function getAuthCode() {
+  return Buffer.from(`${PAYHERE_APP_ID}:${PAYHERE_APP_SECRET}`).toString(
+    "base64"
+  );
+}
+
+// Helper: Get Access Token from PayHere
+async function getAccessToken() {
+  const response = await fetch(PAYHERE_OAUTH_URL, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + getAuthCode(),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get access token");
+  }
+
+  const data = await response.json();
+  if (!data.access_token) {
+    throw new Error("No access token received");
+  }
+
+  return data.access_token;
+}
+
+// Main Cancel Route
 router.put("/:id/cancel", authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -378,47 +417,45 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
     let notes = "Cancelled by customer";
 
-    // Refund if paid
     if (order.paymentDetails?.paymentMethod === "payhere") {
-      const reason = "User cancelled order";
-      const amount = parseFloat(order.totalAmount).toFixed(2);
+      const paymentId = order.paymentDetails.transactionId;
+      if (!paymentId) {
+        return res
+          .status(400)
+          .json({ error: "No PayHere payment ID found for refund" });
+      }
 
-      const hash = generateRefundHash({
-        merchantId: PAYHERE_MERCHANT_ID,
-        paymentId: order.paymentDetails.transactionId,
-        amount: amount,
-        reason: reason,
-        merchantSecret: PAYHERE_SECRET,
-      });
+      // Get Access Token
+      const accessToken = await getAccessToken();
 
+      // Prepare refund request body
       const refundBody = {
-        merchant_id: PAYHERE_MERCHANT_ID,
-        payment_id: order.paymentDetails.transactionId, // ✅ Use PayHere payment_id here
-        amount: amount,
-        reason: reason,
-        hash: hash,
+        payment_id: paymentId,
+        description: "User cancelled order",
       };
 
-      console.log("Refund request body:", refundBody);
-
+      // Call PayHere Refund API
       const refundResponse = await fetch(PAYHERE_REFUND_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(refundBody),
       });
 
       const refundResult = await refundResponse.json();
-      console.log("Refund response:", refundResult);
 
       if (refundResult.status !== 1) {
         return res
           .status(500)
-          .json({ error: "Refund failed: " + refundResult.message });
+          .json({ error: "Refund failed: " + refundResult.msg });
       }
 
       notes += " and refunded via PayHere";
     }
 
+    // Update order status
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id,
       { status: "cancelled", notes },
