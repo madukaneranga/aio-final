@@ -358,9 +358,7 @@ router.post(
 router.put("/:id/cancel", authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ error: "Order not found" });
-    }
+    if (!order) return res.status(404).json({ error: "Order not found" });
 
     if (order.customerId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: "Access denied" });
@@ -379,17 +377,19 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     }
 
     let notes = "Cancelled by customer";
-    // --- Refund if paid with PayHere ---
-    if (order && order.paymentDetails?.paymentMethod === "payhere") {
+
+    // Refund if paid
+    if (order.paymentDetails?.paymentMethod === "payhere") {
       const reason = "User cancelled order";
       const amount = parseFloat(order.totalAmount).toFixed(2);
 
       const hashString =
         PAYHERE_MERCHANT_ID +
-        order.orderId +
+        order.combinedId +
         amount +
         reason +
-        PAYHERE_MERCHANT_SECRET;
+        PAYHERE_SECRET;
+
       const hash = crypto
         .createHash("md5")
         .update(hashString)
@@ -398,11 +398,13 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
       const refundBody = {
         merchant_id: PAYHERE_MERCHANT_ID,
-        order_id: order.orderId,
+        order_id: order.combinedId,
         amount: amount,
         reason: reason,
         hash: hash,
       };
+
+      console.log("Refund request body:", refundBody);
 
       const refundResponse = await fetch(PAYHERE_REFUND_URL, {
         method: "POST",
@@ -411,30 +413,30 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
       });
 
       const refundResult = await refundResponse.json();
-      console.log("Refund result:", refundResult);
+      console.log("Refund response:", refundResult);
 
       if (refundResult.status !== 1) {
         return res
           .status(500)
           .json({ error: "Refund failed: " + refundResult.message });
       }
+
       notes += " and refunded via PayHere";
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id,
-      {
-        status: "cancelled",
-        notes: notes,
-      },
+      { status: "cancelled", notes },
       { new: true }
     );
 
     res.json(updatedOrder);
   } catch (error) {
+    console.error("Cancel error:", error);
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // Get payment methods available in Sri Lanka
 router.get("/payment-methods", (req, res) => {
