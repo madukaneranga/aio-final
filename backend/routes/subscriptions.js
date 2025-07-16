@@ -6,22 +6,50 @@ import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
-const PAYHERE_MERCHANT_ID = "1231188";
-const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy";
+// =================== 🔐 PAYHERE CONFIG ===================
+const PAYHERE_BASE_URL = "https://sandbox.payhere.lk";
+const PAYHERE_MERCHANT_ID = "1231188"; // Replace with live merchant ID when needed
+const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy"; // Replace with live merchant secret
 
+const PAYHERE_RETURN_URL = "https://aiocart.lk/dashboard";
+const PAYHERE_CANCEL_URL = "https://aiocart.lk/dashboard";
+const PAYHERE_NOTIFY_URL = "https://aio-backend-x770.onrender.com/api/subscriptions/ipn";
+
+// =================== 🔧 UTIL FUNCTIONS ===================
+function generatePayHereHash({ merchantId, orderId, amount, currency, merchantSecret }) {
+  const hashedSecret = crypto.createHash("md5").update(String(merchantSecret)).digest("hex").toUpperCase();
+  const amountFormatted = parseFloat(amount).toFixed(2);
+  const hashString = String(merchantId) + String(orderId) + amountFormatted + String(currency) + hashedSecret;
+  return crypto.createHash("md5").update(hashString).digest("hex").toUpperCase();
+}
+
+async function getPayHereAccessToken() {
+  const base64Auth = Buffer.from(`${process.env.PAYHERE_APP_ID}:${process.env.PAYHERE_APP_SECRET}`).toString("base64");
+
+  const res = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/oauth/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${base64Auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  const data = await res.json();
+  if (!data.access_token) throw new Error("Access token not received from PayHere");
+  return data.access_token;
+}
+
+// =================== 📦 ROUTES ===================
 
 // POST /api/subscriptions/create-subscription
 router.post("/create-subscription", authenticate, async (req, res) => {
   try {
     const userId = req.user._id;
-
-    // 🔍 Find the store owned by the user
     const store = await Store.findOne({ ownerId: userId });
     if (!store) return res.status(404).json({ error: "Store not found for this user" });
 
-    // 📦 Get or create subscription
     let subscription = await Subscription.findOne({ userId });
-
     if (!subscription) {
       const now = new Date();
       const endDate = new Date(now);
@@ -43,104 +71,175 @@ router.post("/create-subscription", authenticate, async (req, res) => {
     }
 
     const orderId = `SUB_${subscription._id}`;
-    const itemName = `Monthly Subscription for ${store.name}`;
-    const amount = subscription.amount;
-    const currency = subscription.currency;
-
     const hash = generatePayHereHash({
       merchantId: PAYHERE_MERCHANT_ID,
       orderId,
-      amount,
-      currency,
+      amount: subscription.amount,
+      currency: subscription.currency,
       merchantSecret: PAYHERE_SECRET,
     });
-
-    // ✅ Use address, email, phone from user model
-    const firstName = req.user.name?.split(" ")[0] || "Customer";
-    const lastName = req.user.name?.split(" ")[1] || "Name";
-    const email = req.user.email || "no-reply@aiocart.lk";
-    const phone = req.user.phone || "0771234567";
-    const address = req.user.address?.street || "Unknown Address";
-    const city = req.user.address?.city || "Unknown City";
 
     const paymentParams = {
       sandbox: true,
       merchant_id: PAYHERE_MERCHANT_ID,
-      return_url: "https://aiocart.lk/dashboard",
-      cancel_url: "https://aiocart.lk/dashboard",
-      notify_url: "https://aio-backend-x770.onrender.com/api/subscriptions/ipn",
+      return_url: PAYHERE_RETURN_URL,
+      cancel_url: PAYHERE_CANCEL_URL,
+      notify_url: PAYHERE_NOTIFY_URL,
       order_id: orderId,
-      items: itemName,
-      currency,
-      amount: parseFloat(amount).toFixed(2),
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone,
-      address,
-      city,
+      items: `Monthly Subscription for ${store.name}`,
+      currency: subscription.currency,
+      amount: parseFloat(subscription.amount).toFixed(2),
+      first_name: req.user.name?.split(" ")[0] || "Customer",
+      last_name: req.user.name?.split(" ")[1] || "Name",
+      email: req.user.email || "no-reply@aiocart.lk",
+      phone: req.user.phone || "0771234567",
+      address: req.user.address?.street || "Unknown Address",
+      city: req.user.address?.city || "Unknown City",
       country: "Sri Lanka",
       recurrence: "1 Month",
       duration: "Forever",
       hash,
     };
 
-    console.log("PayHere Params:", paymentParams);
-
-    return res.json({
-      success: true,
-      paymentParams,
-      subscriptionId: subscription._id,
-    });
+    res.json({ success: true, paymentParams, subscriptionId: subscription._id });
   } catch (error) {
-    console.error("Error in create-subscription:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Error in create-subscription:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
+// POST /api/subscriptions/ipn
+router.post("/ipn", async (req, res) => {
+  try {
+    const {
+      merchant_id,
+      order_id,
+      payment_id,
+      subscription_id,
+      payhere_amount,
+      payhere_currency,
+      status_code,
+      md5sig,
+    } = req.body;
 
-function generatePayHereHash({
-  merchantId,
-  orderId,
-  amount,
-  currency,
-  merchantSecret,
-}) {
-  // Coerce merchantSecret to string
-  const secretStr = String(merchantSecret);
+    const localMd5Sig = crypto
+      .createHash("md5")
+      .update(
+        merchant_id +
+        order_id +
+        payhere_amount +
+        payhere_currency +
+        status_code +
+        crypto.createHash("md5").update(PAYHERE_SECRET).digest("hex").toUpperCase()
+      )
+      .digest("hex")
+      .toUpperCase();
 
-  const hashedSecret = crypto
-    .createHash("md5")
-    .update(secretStr)
-    .digest("hex")
-    .toUpperCase();
+    if (localMd5Sig !== md5sig) {
+      return res.status(400).send("Invalid signature");
+    }
 
-  const amountFormatted = parseFloat(amount).toFixed(2);
+    const subscriptionId = order_id.replace("SUB_", "");
+    const subscription = await Subscription.findById(subscriptionId);
+    if (!subscription) return res.status(404).send("Subscription not found");
 
-  // Coerce all inputs to string to avoid type issues
-  const hashString =
-    String(merchantId) +
-    String(orderId) +
-    amountFormatted +
-    String(currency) +
-    hashedSecret;
+    if (status_code === "2") {
+      subscription.status = "active";
+      subscription.recurrenceId = subscription_id;
+      subscription.paymentHistory.push({
+        paymentId: payment_id,
+        amount: payhere_amount,
+        currency: payhere_currency,
+        paidAt: new Date(),
+      });
+      await subscription.save();
+    }
 
-  const hash = crypto
-    .createHash("md5")
-    .update(hashString)
-    .digest("hex")
-    .toUpperCase();
+    res.send("OK");
+  } catch (err) {
+    console.error("❌ Error in IPN:", err);
+    res.status(500).send("IPN Error");
+  }
+});
 
-  return hash;
-}
+// POST /api/subscriptions/cancel
+router.post("/cancel", authenticate, async (req, res) => {
+  try {
+    const { subscriptionId } = req.body;
+    const subscription = await Subscription.findById(subscriptionId);
 
-// Get user's subscription
-router.get('/my-subscription', authenticate, authorize('store_owner'), async (req, res) => {
+    if (!subscription) return res.status(404).json({ error: "Subscription not found" });
+    if (subscription.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
+
+    if (!subscription.recurrenceId) {
+      subscription.status = "cancelled";
+      await subscription.save();
+      return res.json({ message: "Subscription cancelled locally" });
+    }
+
+    const accessToken = await getPayHereAccessToken();
+
+    const cancelRes = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
+    });
+
+    const cancelData = await cancelRes.json();
+
+    if (cancelData.status !== 1) {
+      return res.status(500).json({ error: cancelData.msg || "Failed to cancel on PayHere" });
+    }
+
+    subscription.status = "cancelled";
+    await subscription.save();
+    res.json({ message: "Subscription cancelled successfully" });
+  } catch (err) {
+    console.error("❌ Error cancelling subscription:", err);
+    res.status(500).json({ error: "Server error cancelling subscription" });
+  }
+});
+
+// POST /api/subscriptions/retry
+router.post("/retry", authenticate, async (req, res) => {
+  try {
+    const { recurrenceId } = req.body;
+    const accessToken = await getPayHereAccessToken();
+
+    const retryRes = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/subscription/retry`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ subscription_id: recurrenceId }),
+    });
+
+    const retryData = await retryRes.json();
+
+    if (retryData.status !== 1) {
+      return res.status(400).json({ error: retryData.msg || "Retry failed" });
+    }
+
+    res.json({ message: "Retry successful" });
+  } catch (err) {
+    console.error("❌ Retry error:", err);
+    res.status(500).json({ error: "Retry error" });
+  }
+});
+
+// GET /api/subscriptions/my-subscription
+router.get("/my-subscription", authenticate, authorize("store_owner"), async (req, res) => {
   try {
     const subscription = await Subscription.findOne({
       userId: req.user._id,
-      status: 'active'
-    }).populate('storeId', 'name');
+      status: "active",
+    }).populate("storeId", "name");
 
     res.json(subscription);
   } catch (error) {
@@ -148,10 +247,9 @@ router.get('/my-subscription', authenticate, authorize('store_owner'), async (re
   }
 });
 
-// Admin: Get all subscriptions
+// GET /api/subscriptions/admin/all
 router.get("/admin/all", authenticate, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.email !== "admin@aio.com") {
       return res.status(403).json({ error: "Admin access required" });
     }
