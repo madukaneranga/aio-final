@@ -167,6 +167,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       address: shippingAddress.street || "Unknown Address",
       city: shippingAddress.city || "Unknown City",
       country: "Sri Lanka",
+      authorize: "1",
       hash: hash,
     };
 
@@ -444,8 +445,8 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
       // Prepare refund request body
       const refundBody = {
-        payment_id: paymentId,
         description: "User cancelled order",
+        authorization_token: accessToken,
       };
 
       console.log(refundBody);
@@ -497,27 +498,6 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
   }
 });
 
-function generateRefundHash({
-  merchantId,
-  paymentId,
-  amount,
-  reason,
-  merchantSecret,
-}) {
-  const hashedSecret = crypto
-    .createHash("md5")
-    .update(String(merchantSecret))
-    .digest("hex")
-    .toUpperCase();
-
-  const hashString = merchantId + paymentId + amount + reason + hashedSecret;
-
-  return crypto
-    .createHash("md5")
-    .update(hashString)
-    .digest("hex")
-    .toUpperCase();
-}
 
 // Get payment methods available in Sri Lanka
 router.get("/payment-methods", (req, res) => {
