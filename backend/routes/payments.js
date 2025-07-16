@@ -389,7 +389,7 @@ async function getAccessToken() {
   if (!data.access_token) {
     throw new Error("No access token received");
   }
-
+  console.log(data);
   return data.access_token;
 }
 
@@ -426,12 +426,17 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     if (order.paymentDetails?.paymentMethod === "payhere") {
       const paymentId = order.paymentDetails.transactionId;
       if (!paymentId) {
-        console.error("No PayHere payment ID found in order.paymentDetails:", order.paymentDetails);
-        return res.status(400).json({ error: "No PayHere payment ID found for refund" });
+        console.error(
+          "No PayHere payment ID found in order.paymentDetails:",
+          order.paymentDetails
+        );
+        return res
+          .status(400)
+          .json({ error: "No PayHere payment ID found for refund" });
       }
 
       // Get Access Token
-      const accessToken = await getAccessToken().catch(err => {
+      const accessToken = await getAccessToken().catch((err) => {
         console.error("Failed to get PayHere access token:", err);
         throw err; // re-throw to be caught by outer catch
       });
@@ -442,6 +447,8 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
         payment_id: paymentId,
         description: "User cancelled order",
       };
+
+      console.log(refundBody);
 
       // Call PayHere Refund API
       const refundResponse = await fetch(PAYHERE_REFUND_URL, {
@@ -455,7 +462,12 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
       if (!refundResponse.ok) {
         const text = await refundResponse.text();
-        console.error("PayHere refund API failed, status:", refundResponse.status, "body:", text);
+        console.error(
+          "PayHere refund API failed, status:",
+          refundResponse.status,
+          "body:",
+          text
+        );
         return res.status(500).json({ error: "Refund API call failed" });
       }
 
@@ -463,7 +475,9 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
       if (refundResult.status !== 1) {
         console.error("Refund failed with message:", refundResult.msg);
-        return res.status(500).json({ error: "Refund failed: " + refundResult.msg });
+        return res
+          .status(500)
+          .json({ error: "Refund failed: " + refundResult.msg });
       }
 
       notes += " and refunded via PayHere";
@@ -482,7 +496,6 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 function generateRefundHash({
   merchantId,
