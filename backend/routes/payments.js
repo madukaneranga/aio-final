@@ -383,24 +383,17 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
       const reason = "User cancelled order";
       const amount = parseFloat(order.totalAmount).toFixed(2);
 
-      const hashString =
-        PAYHERE_MERCHANT_ID +
-        order.combinedId +
-        amount +
-        reason +
-        PAYHERE_SECRET;
-
-      const hash = generatePayHereHash({
+      const hash = generateRefundHash({
         merchantId: PAYHERE_MERCHANT_ID,
-        orderId: order.combinedId,
+        paymentId: order.paymentDetails.transactionId,
         amount: amount,
-        currency: "LKR",
+        reason: reason,
         merchantSecret: PAYHERE_SECRET,
       });
 
       const refundBody = {
         merchant_id: PAYHERE_MERCHANT_ID,
-        order_id: order.combinedId,
+        payment_id: order.paymentDetails.transactionId, // ✅ Use PayHere payment_id here
         amount: amount,
         reason: reason,
         hash: hash,
@@ -438,6 +431,28 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+function generateRefundHash({
+  merchantId,
+  paymentId,
+  amount,
+  reason,
+  merchantSecret,
+}) {
+  const hashedSecret = crypto
+    .createHash("md5")
+    .update(String(merchantSecret))
+    .digest("hex")
+    .toUpperCase();
+
+  const hashString = merchantId + paymentId + amount + reason + hashedSecret;
+
+  return crypto
+    .createHash("md5")
+    .update(hashString)
+    .digest("hex")
+    .toUpperCase();
+}
 
 // Get payment methods available in Sri Lanka
 router.get("/payment-methods", (req, res) => {
