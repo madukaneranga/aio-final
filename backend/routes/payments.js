@@ -385,7 +385,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
       const hashString =
         PAYHERE_MERCHANT_ID +
-        order.paymentDetails.transactionId +
+        order.combinedId +
         amount +
         reason +
         PAYHERE_SECRET;
@@ -398,7 +398,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
       const refundBody = {
         merchant_id: PAYHERE_MERCHANT_ID,
-        order_id: order.paymentDetails.transactionId,
+        order_id: order.combinedId,
         amount: amount,
         reason: reason,
         hash: hash,
