@@ -393,7 +393,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
       const hash = generatePayHereHash({
         merchantId: PAYHERE_MERCHANT_ID,
         orderId: order.combinedId,
-        amount: amount.toFixed(2),
+        amount: amount,
         currency: "LKR",
         merchantSecret: PAYHERE_SECRET,
       });
