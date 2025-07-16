@@ -67,6 +67,7 @@ const orderSchema = new mongoose.Schema({
     paymentStatus: String,
     paidAt: Date,
     paymentMethod: String,
+    authorizationToken: String,
   },
   trackingNumber: String,
   notes: String,

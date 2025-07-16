@@ -312,11 +312,13 @@ router.post(
             type: "order",
           });
           await commission.save();
+
           order.paymentDetails = {
             paymentStatus: "paid",
             paidAt: new Date(),
             paymentMethod: "payhere",
             transactionId: data.payment_id, // Use payment_id
+            authorizationToken:data.authorization_token,
           };
           await order.save();
         } else {
@@ -336,11 +338,13 @@ router.post(
               type: "booking",
             });
             await commission.save();
+
             booking.paymentDetails = {
               paymentStatus: "paid",
               paidAt: new Date(),
               paymentMethod: "payhere",
               transactionId: data.payment_id, // Use payment_id
+              authorizationToken:data.authorization_token,
             };
             await booking.save();
           } else {
@@ -446,7 +450,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
       // Prepare refund request body
       const refundBody = {
         description: "User cancelled order",
-        authorization_token: accessToken,
+        authorization_token: order.paymentDetails.authorizationToken,
       };
 
       console.log(refundBody);

@@ -52,7 +52,8 @@ const bookingSchema = new mongoose.Schema({
     transactionId: String,
     paymentStatus: String,
     paidAt: Date,
-    paymentMethod: String
+    paymentMethod: String,
+    authorizationToken: String,
   },
   createdAt: {
     type: Date,
