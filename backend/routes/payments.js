@@ -397,13 +397,18 @@ async function getAccessToken() {
 router.put("/:id/cancel", authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: "Order not found" });
+    if (!order) {
+      console.error("Order not found for ID:", req.params.id);
+      return res.status(404).json({ error: "Order not found" });
+    }
 
     if (order.customerId.toString() !== req.user._id.toString()) {
+      console.error("User ID mismatch:", req.user._id, order.customerId);
       return res.status(403).json({ error: "Access denied" });
     }
 
     if (order.status !== "pending") {
+      console.error("Order status not pending:", order.status);
       return res.status(400).json({ error: "Order cannot be cancelled" });
     }
 
@@ -412,6 +417,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     const timeDiff = (now - orderTime) / (1000 * 60);
 
     if (timeDiff > 5) {
+      console.error("Cancellation window expired, timeDiff:", timeDiff);
       return res.status(400).json({ error: "Cancellation window has expired" });
     }
 
@@ -420,13 +426,15 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     if (order.paymentDetails?.paymentMethod === "payhere") {
       const paymentId = order.paymentDetails.transactionId;
       if (!paymentId) {
-        return res
-          .status(400)
-          .json({ error: "No PayHere payment ID found for refund" });
+        console.error("No PayHere payment ID found in order.paymentDetails:", order.paymentDetails);
+        return res.status(400).json({ error: "No PayHere payment ID found for refund" });
       }
 
       // Get Access Token
-      const accessToken = await getAccessToken();
+      const accessToken = await getAccessToken().catch(err => {
+        console.error("Failed to get PayHere access token:", err);
+        throw err; // re-throw to be caught by outer catch
+      });
 
       // Prepare refund request body
       const refundBody = {
@@ -444,12 +452,17 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
         body: JSON.stringify(refundBody),
       });
 
+      if (!refundResponse.ok) {
+        const text = await refundResponse.text();
+        console.error("PayHere refund API failed, status:", refundResponse.status, "body:", text);
+        return res.status(500).json({ error: "Refund API call failed" });
+      }
+
       const refundResult = await refundResponse.json();
 
       if (refundResult.status !== 1) {
-        return res
-          .status(500)
-          .json({ error: "Refund failed: " + refundResult.msg });
+        console.error("Refund failed with message:", refundResult.msg);
+        return res.status(500).json({ error: "Refund failed: " + refundResult.msg });
       }
 
       notes += " and refunded via PayHere";
@@ -457,7 +470,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
 
     // Update order status
     const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
+      order._id,
       { status: "cancelled", notes },
       { new: true }
     );
@@ -468,6 +481,7 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 function generateRefundHash({
   merchantId,
