@@ -162,45 +162,6 @@ const StoreDashboard = () => {
     }
   };
 
-  const renewSubscription = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/renew`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to renew");
-
-      const { payHereURL, data } = await response.json();
-
-      // Create and submit PayHere payment form
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = payHereURL;
-
-      Object.entries(data).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = value;
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit(); // Redirect to PayHere
-
-      // 🔄 If PayHere handles IPN and redirects back, you can refresh the UI after redirection
-      // If needed, add fetchDashboardData() on the return page
-    } catch (error) {
-      console.error("Error renewing subscription:", error);
-      alert("Error renewing subscription");
-    }
-  };
 
   const cancelSubscription = async () => {
     console.log("cancelSubscription called");
@@ -228,31 +189,66 @@ const StoreDashboard = () => {
   };
 
   const createSubscription = async () => {
-    try {
-      // Create initial subscription
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ storeId: storeData._id }),
-        }
-      );
-
-      if (response.ok) {
-        alert("Your monthly subscription (LKR 1,000) is now active.");
-        fetchDashboardData(); // ✅ Refresh UI immediately
-      } else {
-        const errorData = await response.json();
-        alert("Subscription setup failed. Please contact support: " + errorData?.error || "Unknown error");
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       }
-    } catch (error) {
-      console.error("Cancel error:", error);
-      alert("Error cancelling subscription");
+    );
+
+    if (response.ok) {
+      const { paymentParams } = await response.json();
+
+      // 🔥 Start PayHere payment modal
+      await startPayHerePayment(paymentParams);
+
+      alert("Your monthly subscription (LKR 1,000) is now active.");
+      fetchDashboardData(); // ✅ Refresh UI
+    } else {
+      const errorData = await response.json();
+      alert(
+        "Subscription setup failed. Please contact support: " +
+          (errorData?.error || "Unknown error")
+      );
     }
+  } catch (error) {
+    console.error("Subscription error:", error);
+    alert("Error starting subscription. Please try again.");
+  }
+};
+
+
+  const startPayHerePayment = (paymentParams) => {
+    return new Promise((resolve, reject) => {
+      if (!window.payhere) {
+        alert("Payment gateway not loaded. Please refresh and try again.");
+        return reject(new Error("PayHere SDK not loaded"));
+      }
+
+      window.payhere.onCompleted = function (orderId) {
+        console.log("✅ Payment completed. Order ID:", orderId);
+        resolve(orderId);
+      };
+
+      window.payhere.onDismissed = function () {
+        alert("Payment was cancelled.");
+        reject(new Error("Payment cancelled"));
+      };
+
+      window.payhere.onError = function (error) {
+        console.error("❌ PayHere error:", error);
+        alert("Payment failed. Please try again.");
+        reject(new Error("Payment error: " + error));
+      };
+
+      console.log("▶️ Starting PayHere payment with:", paymentParams);
+      window.payhere.startPayment(paymentParams);
+    });
   };
 
   const handleEdit = (item) => {
@@ -530,7 +526,7 @@ const StoreDashboard = () => {
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
                 {subscription ? (
                   <button
-                    onClick={renewSubscription}
+                    onClick={createSubscription}
                     className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
                   >
                     Renew Subscription

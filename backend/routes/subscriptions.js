@@ -134,6 +134,19 @@ function generatePayHereHash({
   return hash;
 }
 
+// Get user's subscription
+router.get('/my-subscription', authenticate, authorize('store_owner'), async (req, res) => {
+  try {
+    const subscription = await Subscription.findOne({
+      userId: req.user._id,
+      status: 'active'
+    }).populate('storeId', 'name');
+
+    res.json(subscription);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Admin: Get all subscriptions
 router.get("/admin/all", authenticate, async (req, res) => {
