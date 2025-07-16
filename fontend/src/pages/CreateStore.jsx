@@ -27,6 +27,7 @@ const CreateStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [checkingStore, setCheckingStore] = useState(true);
+   const [payhereLoaded, setPayhereLoaded] = useState(false);
 
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
