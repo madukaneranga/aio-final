@@ -365,9 +365,7 @@ router.post(
 
 // Helper: Get Base64 encoded auth code from AppID and AppSecret
 function getAuthCode() {
-  return Buffer.from(`${PAYHERE_APP_ID}:${PAYHERE_APP_SECRET}`).toString(
-    "base64"
-  );
+  return "NE9WeHpRbGJjY1M0SkZuSmpKTnpvSDNUVjo0ancySzViQ2drUjRaR1R5ZkxMRDRuNGVWSnJKN3d0WkY0dVV2T2c5SjlKeQ==";
 }
 
 // Helper: Get Access Token from PayHere
