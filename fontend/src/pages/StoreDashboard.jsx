@@ -266,48 +266,63 @@ const StoreDashboard = () => {
   };
 
   const createSubscription = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    if (response.ok) {
+      const { paymentParams } = await response.json();
+
+      await loadPayHereSDK();
+
+      // 🔥 Start PayHere payment modal
+      await startPayHerePayment(paymentParams);
+
+      // ✅ Refresh subscription and dashboard data after successful payment
+      await fetchDashboardData();
+
+      // 💡 Wait for subscription to update
+      const refreshedSubscription = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
         {
-          method: "POST",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
 
-      if (response.ok) {
-        const { paymentParams } = await response.json();
+      const subscriptionData = await refreshedSubscription.json();
+      setSubscription(subscriptionData);
 
-
-        await loadPayHereSDK();
-        // 🔥 Start PayHere payment modal
-        await startPayHerePayment(paymentParams);
-
-        fetchDashboardData();
-        alert(
-          `Your monthly subscription (LKR ${subscription.amount}) is now active.`
-        );
-
-        // ✅ Refresh UI
-      } else {
-        const errorData = await response.json();
-        alert(
-          "Subscription setup failed. Please contact support: " +
-            (errorData?.error || "Unknown error")
-        );
-      }
-    } catch (error) {
-      console.error("Subscription error:", error);
-      alert("Error starting subscription. Please try again.");
+      alert(
+        `Your monthly subscription (LKR ${subscriptionData.amount}) is now active.`
+      );
+    } else {
+      const errorData = await response.json();
+      alert(
+        "Subscription setup failed. Please contact support: " +
+          (errorData?.error || "Unknown error")
+      );
     }
-  };
+  } catch (error) {
+    console.error("Subscription error:", error);
+    alert("Error starting subscription. Please try again.");
+  }
+};
+
 
   const startPayHerePayment = (paymentParams) => {
     return new Promise((resolve, reject) => {
       if (!window.payhere) {
+        
         alert("Payment gateway not loaded. Please refresh and try again.");
         return reject(new Error("PayHere SDK not loaded"));
       }
