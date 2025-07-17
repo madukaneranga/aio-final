@@ -4,6 +4,7 @@ import Subscription from "../models/Subscription.js";
 import Store from "../models/Store.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import User from "../models/User.js";
+import Package from "../models/Package.js";
 
 const router = express.Router();
 
@@ -90,7 +91,7 @@ router.post("/create-subscription", authenticate, async (req, res) => {
         startDate: now,
         endDate,
         paymentHistory: [],
-        package:"basic"
+        package: "basic",
       });
       await subscription.save();
     }
@@ -312,6 +313,56 @@ router.get(
     }
   }
 );
+
+// PUT /api/subscriptions/upgrade
+router.put("/upgrade", authenticate, async (req, res) => {
+  const { packageName } = req.body;
+  const userId = req.user._id;
+
+  try {
+    // Find current subscription
+    const subscription = await Subscription.findOne({ userId });
+    if (!subscription) {
+      return res.status(404).json({ message: "Subscription not found" });
+    }
+
+    // Prevent upgrading to same package
+    if (subscription.package === packageName) {
+      return res.status(400).json({ message: "Already on this package" });
+    }
+
+    // Check 2-month cooldown
+    if (subscription.lastUpgradeAt) {
+      const nextAllowedUpgradeDate = new Date(subscription.lastUpgradeAt);
+      nextAllowedUpgradeDate.setMonth(nextAllowedUpgradeDate.getMonth() + 3);
+
+      if (new Date() < nextAllowedUpgradeDate) {
+        return res.status(403).json({
+          message:
+            "You can only upgrade after 3 months from the last upgrade date",
+        });
+      }
+    }
+
+    // Validate package exists and get amount
+    const pkg = await Package.findOne({ name: packageName });
+    if (!pkg) {
+      return res.status(400).json({ message: "Invalid package selected" });
+    }
+
+    // Update subscription
+    subscription.package = pkg.name;
+    subscription.amount = pkg.amount;
+    subscription.lastUpgradeAt = new Date();
+
+    await subscription.save();
+
+    res.json(subscription);
+  } catch (error) {
+    console.error("Upgrade subscription error:", error);
+    res.status(500).json({ message: "Failed to upgrade subscription" });
+  }
+});
 
 // GET /api/subscriptions/admin/all
 router.get("/admin/all", authenticate, async (req, res) => {

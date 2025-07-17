@@ -25,11 +25,10 @@ const subscriptionSchema = new mongoose.Schema({
     type: String,
     default: "LKR",
   },
-  package: 
-    {    
-      type: String,
-      default: "basic",
-    },
+  package: {
+    type: String,
+    default: "basic",
+  },
   status: {
     type: String,
     enum: ["pending", "active", "inactive", "cancelled", "expired"],
@@ -42,6 +41,10 @@ const subscriptionSchema = new mongoose.Schema({
   endDate: {
     type: Date,
     required: true,
+  },
+  lastUpgradeAt: {
+    type: Date,
+    default: null,
   },
   paymentHistory: [
     {
