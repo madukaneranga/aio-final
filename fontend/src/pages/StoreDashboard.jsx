@@ -515,6 +515,14 @@ const StoreDashboard = () => {
                   </span>
                 </p>
                 <p className="text-gray-600">
+                  Package:{" "}
+                  <span
+                    className={`font-medium text-gold-600`}
+                  >
+                    {subscription.package.toUpperCase()}
+                  </span>
+                </p>
+                <p className="text-gray-600">
                   Expires: {new Date(subscription.endDate).toLocaleDateString()}
                 </p>
                 <p className="text-gray-600">
