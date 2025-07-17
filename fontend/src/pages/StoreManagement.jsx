@@ -242,7 +242,7 @@ const StoreManagement = () => {
           setSuccess(`Review ${isVisible ? "shown" : "hidden"} successfully!`);
         }
       } else {
-        setInvitation("Subscribe now to unlock review management features.");
+        setInvitation("To manage reviews and enhance your brand credibility, simply upgrade your package. It’s quick, easy, and unlocks powerful features to grow your business.");
       }
     } catch (error) {
       setError("Failed to update review visibility");
