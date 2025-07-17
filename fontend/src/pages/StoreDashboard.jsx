@@ -538,6 +538,14 @@ const StoreDashboard = () => {
                     Re-Subscribe
                   </button>
                 )}
+                {subscription && (
+                  <button
+                    onClick={createSubscription}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
+                  >
+                    Subscribe
+                  </button>
+                )}
 
                 {subscription.status !== "cancelled" &&
                   new Date(subscription.startdate).getTime() +
