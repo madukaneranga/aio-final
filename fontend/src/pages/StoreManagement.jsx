@@ -17,8 +17,10 @@ const StoreManagement = () => {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
   const [error, setError] = useState("");
+  const [invitation, setInvitation] = useState("");
   const [success, setSuccess] = useState("");
   const [reviewFilter, setReviewFilter] = useState("all");
+  const [subscription, setSubscription] = useState(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -61,6 +63,21 @@ const StoreManagement = () => {
           },
         });
       }
+
+      // Fetch subscription
+      const subscriptionResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (!subscriptionResponse.ok) {
+        throw new Error("Failed to fetch subscription");
+      }
+      const subscriptionData = await subscriptionResponse.json();
+      setSubscription(subscriptionData);
     } catch (error) {
       console.error("Error fetching store:", error);
       setError("Failed to load store data");
@@ -207,21 +224,25 @@ const StoreManagement = () => {
 
   const toggleReviewVisibility = async (reviewId, isVisible) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/reviews/${reviewId}/visibility`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ isVisible }),
-        }
-      );
+      if (subscription && subscription.package === "standard") {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/reviews/${reviewId}/visibility`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: JSON.stringify({ isVisible }),
+          }
+        );
 
-      if (response.ok) {
-        fetchReviews();
-        setSuccess(`Review ${isVisible ? "shown" : "hidden"} successfully!`);
+        if (response.ok) {
+          fetchReviews();
+          setSuccess(`Review ${isVisible ? "shown" : "hidden"} successfully!`);
+        }
+      } else {
+        setInvitation("To manage reviews and enhance your brand credibility, simply upgrade your package. It’s quick, easy, and unlocks powerful features to grow your business.");
       }
     } catch (error) {
       setError("Failed to update review visibility");
@@ -344,6 +365,11 @@ const StoreManagement = () => {
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
             {error}
+          </div>
+        )}
+        {invitation && (
+          <div className="bg-amber-100 border border-amber-400 text-amber-700 px-4 py-3 rounded mb-6">
+            {invitation}
           </div>
         )}
 
