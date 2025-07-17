@@ -90,16 +90,7 @@ const CreateStore = () => {
 
       const { paymentParams } = await subResponse.json();
 
-      // **Wrap payment in its own try/catch**
-      try {
-        await startPayHerePayment(paymentParams);
-      } catch (paymentError) {
-        // Payment was cancelled or errored
-        console.error("Payment failed or cancelled:", paymentError);
-        setError(paymentError.message || "Payment failed or cancelled.");
-        setLoading(false);
-        return; 
-      }
+      await startPayHerePayment(paymentParams);
 
       // ✅ Only runs if payment succeeded
       const payload = {
@@ -142,32 +133,38 @@ const CreateStore = () => {
 
   // 💳 Start PayHere Payment with JS SDK
   const startPayHerePayment = (paymentParams) => {
-    return new Promise((resolve, reject) => {
-      if (!window.payhere) {
-        alert("Payment gateway not loaded. Please refresh and try again.");
-        return reject(new Error("PayHere SDK not loaded"));
-      }
+  return new Promise((resolve, reject) => {
+    if (!window.payhere) {
+      return reject(new Error("PayHere SDK not loaded"));
+    }
 
-      window.payhere.onCompleted = function (orderId) {
-        console.log("✅ Payment completed. Order ID:", orderId);
-        resolve(orderId);
-      };
+    let handled = false; // prevent multiple calls
 
-      window.payhere.onDismissed = function () {
-        alert("Payment was cancelled.");
-        reject(new Error("Payment cancelled"));
-      };
+    window.payhere.onCompleted = function (orderId) {
+      if (handled) return;
+      handled = true;
+      console.log("✅ Payment completed. Order ID:", orderId);
+      resolve(orderId);
+    };
 
-      window.payhere.onError = function (error) {
-        console.error("❌ PayHere error:", error);
-        alert("Payment failed. Please try again.");
-        reject(new Error("Payment error: " + error));
-      };
+    window.payhere.onDismissed = function () {
+      if (handled) return;
+      handled = true;
+      console.log("❌ Payment dismissed.");
+      reject(new Error("Payment was cancelled."));
+    };
 
-      console.log("▶️ Starting PayHere payment with:", paymentParams);
-      window.payhere.startPayment(paymentParams);
-    });
-  };
+    window.payhere.onError = function (error) {
+      if (handled) return;
+      handled = true;
+      console.error("❌ PayHere error:", error);
+      reject(new Error("Payment error: " + error));
+    };
+
+    console.log("▶️ Starting PayHere payment...");
+    window.payhere.startPayment(paymentParams);
+  });
+};
 
   const handleChange = (e) => {
     const { name, value } = e.target;
