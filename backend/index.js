@@ -19,6 +19,8 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import commissionRoutes from './routes/commissions.js';
 import platformSettingsRoutes from './routes/platformSettings.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import packageRoutes from "./routes/packages.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +61,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/commissions', commissionRoutes);
 app.use('/api/platform-settings', platformSettingsRoutes);
+app.use("/api/packages", packageRoutes);
 
 // Serve static files from React build
 app.use(express.static(path.join(__dirname, '../dist')));
