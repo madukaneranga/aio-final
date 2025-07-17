@@ -162,7 +162,6 @@ const StoreDashboard = () => {
     }
   };
 
-
   const cancelSubscription = async () => {
     console.log("cancelSubscription called");
     try {
@@ -189,39 +188,38 @@ const StoreDashboard = () => {
   };
 
   const createSubscription = async () => {
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
-
-    if (response.ok) {
-      const { paymentParams } = await response.json();
-
-      // 🔥 Start PayHere payment modal
-      await startPayHerePayment(paymentParams);
-
-      alert("Your monthly subscription (LKR 1,000) is now active.");
-      fetchDashboardData(); // ✅ Refresh UI
-    } else {
-      const errorData = await response.json();
-      alert(
-        "Subscription setup failed. Please contact support: " +
-          (errorData?.error || "Unknown error")
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
       );
-    }
-  } catch (error) {
-    console.error("Subscription error:", error);
-    alert("Error starting subscription. Please try again.");
-  }
-};
 
+      if (response.ok) {
+        const { paymentParams } = await response.json();
+
+        // 🔥 Start PayHere payment modal
+        await startPayHerePayment(paymentParams);
+
+        alert("Your monthly subscription (LKR 1,000) is now active.");
+        fetchDashboardData(); // ✅ Refresh UI
+      } else {
+        const errorData = await response.json();
+        alert(
+          "Subscription setup failed. Please contact support: " +
+            (errorData?.error || "Unknown error")
+        );
+      }
+    } catch (error) {
+      console.error("Subscription error:", error);
+      alert("Error starting subscription. Please try again.");
+    }
+  };
 
   const startPayHerePayment = (paymentParams) => {
     return new Promise((resolve, reject) => {
@@ -524,14 +522,7 @@ const StoreDashboard = () => {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-                {subscription ? (
-                  <button
-                    onClick={createSubscription}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
-                  >
-                    Renew Subscription
-                  </button>
-                ) : (
+                {subscription.status !== "cancelled" && (
                   <button
                     onClick={createSubscription}
                     className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
@@ -540,14 +531,18 @@ const StoreDashboard = () => {
                   </button>
                 )}
 
-                {subscription.status !== "cancelled" && (
-                  <button
-                    onClick={cancelSubscription}
-                    className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors w-full sm:w-auto"
-                  >
-                    Cancel Subscription
-                  </button>
-                )}
+                {subscription.status !== "cancelled" &&
+                  new Date() >=
+                    new Date(subscription.startDate).setDate(
+                      new Date(subscription.startDate).getDate() + 6
+                    ) && (
+                    <button
+                      onClick={cancelSubscription}
+                      className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors w-full sm:w-auto"
+                    >
+                      Cancel Subscription
+                    </button>
+                  )}
               </div>
             </div>
           </div>
