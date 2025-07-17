@@ -516,9 +516,7 @@ const StoreDashboard = () => {
                 </p>
                 <p className="text-gray-600">
                   Package:{" "}
-                  <span
-                    className={`font-medium text-gold-600`}
-                  >
+                  <span className={`font-medium text-gold-600`}>
                     {subscription.package.toUpperCase()}
                   </span>
                 </p>
@@ -558,6 +556,35 @@ const StoreDashboard = () => {
                       Cancel Subscription
                     </button>
                   )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!subscription && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Subscription Status
+                </h3>
+                <p className="text-gray-600">
+                  Status: <span className="text-red-600">PENDING</span>
+                </p>
+                <p className="text-red-600">
+                  A subscription is required to sell your products or services
+                  on AIO.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
+
+                  <button
+                    onClick={createSubscription}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
+                  >
+                    Subscribe
+                  </button>
+              
               </div>
             </div>
           </div>
