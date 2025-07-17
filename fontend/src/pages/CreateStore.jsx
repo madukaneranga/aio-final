@@ -435,12 +435,13 @@ const CreateStore = () => {
                 <h4 className="font-semibold text-blue-900 mb-2">
                   Monthly Subscription
                 </h4>
-                <p className="text-blue-800 mb-2">LKR 1,000 per month</p>
+                <p className="text-blue-800 mb-2">LKR 1,500 per month</p>
                 <ul className="text-sm text-blue-700 space-y-1">
                   <li>• Unlimited product/service listings</li>
                   <li>• Advanced analytics and reports</li>
                   <li>• Customer management tools</li>
                   <li>• 24/7 support</li>
+                  <li>• You can cancel your subscription anytime after 6 days from the date of activation.</li>
                 </ul>
               </div>
 

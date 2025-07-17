@@ -206,7 +206,7 @@ const StoreDashboard = () => {
         // 🔥 Start PayHere payment modal
         await startPayHerePayment(paymentParams);
 
-        alert("Your monthly subscription (LKR 1,000) is now active.");
+        alert("Your monthly subscription (LKR 1,500) is now active.");
         fetchDashboardData(); // ✅ Refresh UI
       } else {
         const errorData = await response.json();
