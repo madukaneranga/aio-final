@@ -90,8 +90,8 @@ router.post("/create-subscription", authenticate, async (req, res) => {
         startDate: now,
         endDate,
         paymentHistory: [],
+        package:"basic"
       });
-
       await subscription.save();
     }
 

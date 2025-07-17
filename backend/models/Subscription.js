@@ -25,6 +25,11 @@ const subscriptionSchema = new mongoose.Schema({
     type: String,
     default: "LKR",
   },
+  package: 
+    {    
+      name: String,
+      default: "basic",
+    },
   status: {
     type: String,
     enum: ["pending", "active", "inactive", "cancelled", "expired"],
