@@ -3,7 +3,13 @@ import mongoose from "mongoose";
 const packageSchema = new mongoose.Schema({
   name: {
     type: String,
-    default: "basic"
+    enum: [
+      "basic",
+      "standard",
+      "pro",
+      "premium",
+    ],
+    default: "basic",
   },
   amount: {
     type: Number,
