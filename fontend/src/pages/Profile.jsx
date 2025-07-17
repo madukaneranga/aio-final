@@ -68,54 +68,59 @@ const Profile = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  setSuccess("");
 
-    try {
+  try {
+    let imageUrl = null;
+
+    if (profileImage) {
       // Upload a single image to Firebase
-          const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
-          await uploadBytes(imageRef, profileImage);
-          const imageUrl = await getDownloadURL(imageRef);
-
-      const payload = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address, // assuming it's already an object
-        profileImage: imageUrl,
-      };
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/users/profile`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (response.ok) {
-        const updatedProfile = await response.json();
-        setProfile(updatedProfile);
-        setEditing(false);
-        setProfileImage(null);
-        setSuccess("Profile updated successfully!");
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to update profile");
-      }
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+      const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
+      await uploadBytes(imageRef, profileImage);
+      imageUrl = await getDownloadURL(imageRef);
     }
-  };
+
+    const payload = {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      address: formData.address, // assuming it's already an object
+      ...(imageUrl && { profileImage: imageUrl }), // only include if uploaded
+    };
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/users/profile`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (response.ok) {
+      const updatedProfile = await response.json();
+      setProfile(updatedProfile);
+      setEditing(false);
+      setProfileImage(null);
+      setSuccess("Profile updated successfully!");
+    } else {
+      const errorData = await response.json();
+      setError(errorData.error || "Failed to update profile");
+    }
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    setError("Network error. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
