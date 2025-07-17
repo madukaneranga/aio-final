@@ -59,86 +59,80 @@ const CreateStore = () => {
   }, []);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    try {
-      // 🔄 Upload hero images to Firebase
-      const uploadPromises = heroImages.map(async (file) => {
-        const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, file);
-        return getDownloadURL(imageRef);
-      });
+  try {
+    // 🔄 Upload hero images to Firebase
+    const uploadPromises = heroImages.map(async (file) => {
+      const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
+      await uploadBytes(imageRef, file);
+      return getDownloadURL(imageRef);
+    });
 
-      const imageUrls = await Promise.all(uploadPromises);
+    const imageUrls = await Promise.all(uploadPromises);
 
-      // 🏪 Create the store
-      const payload = {
-        name: formData.name,
-        type: formData.type,
-        description: formData.description,
-        themeColor: formData.themeColor,
-        contactInfo: formData.contactInfo,
-        timeSlots: timeSlots,
-        heroImages: imageUrls,
-      };
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to create store");
+    // 💳 Get payment parameters from backend
+    const subResponse = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       }
+    );
 
-      const storeData = await response.json();
-
-      // 💳 Start subscription
-      const subResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!subResponse.ok) {
-        alert(
-          "Store created, but failed to start subscription. Please contact support."
-        );
-        await refreshUser();
-        return navigate("/dashboard");
-      }
-
-      const { paymentParams } = await subResponse.json();
-
-      // 🚀 Start PayHere modal payment
-      await startPayHerePayment(paymentParams);
-
-      // Optional post-payment action
-      alert("Subscription payment successful!");
-      await refreshUser();
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Error:", error);
-      setError(error.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!subResponse.ok) {
+      throw new Error("Failed to initiate subscription payment.");
     }
-  };
+
+    const { paymentParams } = await subResponse.json();
+
+    // 🚀 Start PayHere modal payment
+    await startPayHerePayment(paymentParams);
+
+    // ✅ Payment completed, now create the store
+    const payload = {
+      name: formData.name,
+      type: formData.type,
+      description: formData.description,
+      themeColor: formData.themeColor,
+      contactInfo: formData.contactInfo,
+      timeSlots: timeSlots,
+      heroImages: imageUrls,
+    };
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/stores`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Store creation failed after payment.");
+    }
+
+    alert("Store created and subscription started successfully!");
+    await refreshUser();
+    navigate("/dashboard");
+  } catch (error) {
+    console.error("Error:", error);
+    setError(error.message || "Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // 💳 Start PayHere Payment with JS SDK
   const startPayHerePayment = (paymentParams) => {
