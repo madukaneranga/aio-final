@@ -27,7 +27,7 @@ const CreateStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [checkingStore, setCheckingStore] = useState(true);
-  const [payhereLoaded, setPayhereLoaded] = useState(false);
+   const [payhereLoaded, setPayhereLoaded] = useState(false);
 
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -59,112 +59,108 @@ const CreateStore = () => {
   }, []);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    try {
-      // Upload images
-      const uploadPromises = heroImages.map(async (file) => {
-        const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, file);
-        return getDownloadURL(imageRef);
-      });
-      const imageUrls = await Promise.all(uploadPromises);
-
-      // Get payment params
-      const subResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!subResponse.ok) {
-        throw new Error("Failed to initiate subscription payment.");
+  try {
+    // 💳 Start subscription & get payment params
+    const subResponse = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       }
+    );
 
-      const { paymentParams } = await subResponse.json();
-
-      await startPayHerePayment(paymentParams);
-
-      // ✅ Only runs if payment succeeded
-      const payload = {
-        name: formData.name,
-        type: formData.type,
-        description: formData.description,
-        themeColor: formData.themeColor,
-        contactInfo: formData.contactInfo,
-        timeSlots: timeSlots,
-        heroImages: imageUrls,
-      };
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Store creation failed after payment.");
-      }
-
-      alert("Store created and subscription started successfully!");
-      await refreshUser();
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Error:", error);
-      setError(error.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!subResponse.ok) {
+      throw new Error("Failed to initiate subscription payment.");
     }
-  };
+
+    const { paymentParams } = await subResponse.json();
+
+    // 🚀 Start PayHere payment
+    await startPayHerePayment(paymentParams);
+
+    // ✅ If payment successful, upload images
+    const uploadPromises = heroImages.map(async (file) => {
+      const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
+      await uploadBytes(imageRef, file);
+      return getDownloadURL(imageRef);
+    });
+    const imageUrls = await Promise.all(uploadPromises);
+
+    // ✅ Then create the store
+    const payload = {
+      name: formData.name,
+      type: formData.type,
+      description: formData.description,
+      themeColor: formData.themeColor,
+      contactInfo: formData.contactInfo,
+      timeSlots: timeSlots,
+      heroImages: imageUrls,
+    };
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/stores`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Failed to create store after payment");
+    }
+
+    alert("Store created successfully after payment!");
+    await refreshUser();
+    navigate("/dashboard");
+  } catch (error) {
+    console.error("Error:", error);
+    setError(error.message || "Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // 💳 Start PayHere Payment with JS SDK
   const startPayHerePayment = (paymentParams) => {
-  return new Promise((resolve, reject) => {
-    if (!window.payhere) {
-      return reject(new Error("PayHere SDK not loaded"));
-    }
+    return new Promise((resolve, reject) => {
+      if (!window.payhere) {
+        alert("Payment gateway not loaded. Please refresh and try again.");
+        return reject(new Error("PayHere SDK not loaded"));
+      }
 
-    let handled = false; // prevent multiple calls
+      window.payhere.onCompleted = function (orderId) {
+        console.log("✅ Payment completed. Order ID:", orderId);
+        resolve(orderId);
+      };
 
-    window.payhere.onCompleted = function (orderId) {
-      if (handled) return;
-      handled = true;
-      console.log("✅ Payment completed. Order ID:", orderId);
-      resolve(orderId);
-    };
+      window.payhere.onDismissed = function () {
+        alert("Payment was cancelled.");
+        reject(new Error("Payment cancelled"));
+      };
 
-    window.payhere.onDismissed = function () {
-      if (handled) return;
-      handled = true;
-      console.log("❌ Payment dismissed.");
-      reject(new Error("Payment was cancelled."));
-    };
+      window.payhere.onError = function (error) {
+        console.error("❌ PayHere error:", error);
+        alert("Payment failed. Please try again.");
+        reject(new Error("Payment error: " + error));
+      };
 
-    window.payhere.onError = function (error) {
-      if (handled) return;
-      handled = true;
-      console.error("❌ PayHere error:", error);
-      reject(new Error("Payment error: " + error));
-    };
-
-    console.log("▶️ Starting PayHere payment...");
-    window.payhere.startPayment(paymentParams);
-  });
-};
+      console.log("▶️ Starting PayHere payment with:", paymentParams);
+      window.payhere.startPayment(paymentParams);
+    });
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
