@@ -27,7 +27,7 @@ const subscriptionSchema = new mongoose.Schema({
   },
   package: 
     {    
-      name: String,
+      type: String,
       default: "basic",
     },
   status: {
