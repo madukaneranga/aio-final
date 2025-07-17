@@ -522,20 +522,19 @@ const StoreDashboard = () => {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-                {subscription.status !== "cancelled" && (
+                {subscription.status === "cancelled" && (
                   <button
                     onClick={createSubscription}
                     className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
                   >
-                    Subscribe
+                    Re-Subscribe
                   </button>
                 )}
 
                 {subscription.status !== "cancelled" &&
-                  new Date() >=
-                    new Date(subscription.startDate).setDate(
-                      new Date(subscription.startDate).getDate() + 6
-                    ) && (
+                  new Date(subscription.startdate).getTime() +
+                    6 * 24 * 60 * 60 * 1000 <
+                    new Date().getTime() && (
                     <button
                       onClick={cancelSubscription}
                       className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors w-full sm:w-auto"
