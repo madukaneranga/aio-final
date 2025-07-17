@@ -516,10 +516,11 @@ const StoreDashboard = () => {
                 </p>
                 <p className="text-gray-600">
                   Package:{" "}
-                  <span className={`font-medium text-gold-600`}>
+                  <span className="font-medium text-amber-600">
                     {subscription.package.toUpperCase()}
                   </span>
                 </p>
+
                 <p className="text-gray-600">
                   Expires: {new Date(subscription.endDate).toLocaleDateString()}
                 </p>
@@ -536,15 +537,6 @@ const StoreDashboard = () => {
                     Re-Subscribe
                   </button>
                 )}
-                {subscription && (
-                  <button
-                    onClick={createSubscription}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
-                  >
-                    Subscribe
-                  </button>
-                )}
-
                 {subscription.status !== "cancelled" &&
                   new Date(subscription.startdate).getTime() +
                     6 * 24 * 60 * 60 * 1000 <
@@ -577,14 +569,12 @@ const StoreDashboard = () => {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-
-                  <button
-                    onClick={createSubscription}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
-                  >
-                    Subscribe
-                  </button>
-              
+                <button
+                  onClick={createSubscription}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
+                >
+                  Subscribe
+                </button>
               </div>
             </div>
           </div>
