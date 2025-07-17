@@ -3,6 +3,7 @@ import crypto from "crypto";
 import Subscription from "../models/Subscription.js";
 import Store from "../models/Store.js";
 import { authenticate, authorize } from "../middleware/auth.js";
+import User from "../models/User.js";
 
 const router = express.Router();
 
@@ -13,18 +14,40 @@ const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy"; /
 
 const PAYHERE_RETURN_URL = "https://aiocart.lk/dashboard";
 const PAYHERE_CANCEL_URL = "https://aiocart.lk/dashboard";
-const PAYHERE_NOTIFY_URL = "https://aio-backend-x770.onrender.com/api/subscriptions/ipn";
+const PAYHERE_NOTIFY_URL =
+  "https://aio-backend-x770.onrender.com/api/subscriptions/ipn";
 
 // =================== 🔧 UTIL FUNCTIONS ===================
-function generatePayHereHash({ merchantId, orderId, amount, currency, merchantSecret }) {
-  const hashedSecret = crypto.createHash("md5").update(String(merchantSecret)).digest("hex").toUpperCase();
+function generatePayHereHash({
+  merchantId,
+  orderId,
+  amount,
+  currency,
+  merchantSecret,
+}) {
+  const hashedSecret = crypto
+    .createHash("md5")
+    .update(String(merchantSecret))
+    .digest("hex")
+    .toUpperCase();
   const amountFormatted = parseFloat(amount).toFixed(2);
-  const hashString = String(merchantId) + String(orderId) + amountFormatted + String(currency) + hashedSecret;
-  return crypto.createHash("md5").update(hashString).digest("hex").toUpperCase();
+  const hashString =
+    String(merchantId) +
+    String(orderId) +
+    amountFormatted +
+    String(currency) +
+    hashedSecret;
+  return crypto
+    .createHash("md5")
+    .update(hashString)
+    .digest("hex")
+    .toUpperCase();
 }
 
 async function getPayHereAccessToken() {
-  const base64Auth = Buffer.from(`${process.env.PAYHERE_APP_ID}:${process.env.PAYHERE_APP_SECRET}`).toString("base64");
+  const base64Auth = Buffer.from(
+    `${process.env.PAYHERE_APP_ID}:${process.env.PAYHERE_APP_SECRET}`
+  ).toString("base64");
 
   const res = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/oauth/token`, {
     method: "POST",
@@ -36,7 +59,8 @@ async function getPayHereAccessToken() {
   });
 
   const data = await res.json();
-  if (!data.access_token) throw new Error("Access token not received from PayHere");
+  if (!data.access_token)
+    throw new Error("Access token not received from PayHere");
   return data.access_token;
 }
 
@@ -47,7 +71,8 @@ router.post("/create-subscription", authenticate, async (req, res) => {
   try {
     const userId = req.user._id;
     const store = await Store.findOne({ ownerId: userId });
-    if (!store) return res.status(404).json({ error: "Store not found for this user" });
+    if (!store)
+      return res.status(404).json({ error: "Store not found for this user" });
 
     let subscription = await Subscription.findOne({ userId });
     if (!subscription) {
@@ -59,7 +84,7 @@ router.post("/create-subscription", authenticate, async (req, res) => {
         userId,
         storeId: store._id,
         plan: "monthly",
-        amount: 1000,
+        amount: 1500,
         currency: "LKR",
         status: "pending",
         startDate: now,
@@ -101,7 +126,11 @@ router.post("/create-subscription", authenticate, async (req, res) => {
       hash,
     };
 
-    res.json({ success: true, paymentParams, subscriptionId: subscription._id });
+    res.json({
+      success: true,
+      paymentParams,
+      subscriptionId: subscription._id,
+    });
   } catch (error) {
     console.error("❌ Error in create-subscription:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -126,11 +155,15 @@ router.post("/ipn", async (req, res) => {
       .createHash("md5")
       .update(
         merchant_id +
-        order_id +
-        payhere_amount +
-        payhere_currency +
-        status_code +
-        crypto.createHash("md5").update(PAYHERE_SECRET).digest("hex").toUpperCase()
+          order_id +
+          payhere_amount +
+          payhere_currency +
+          status_code +
+          crypto
+            .createHash("md5")
+            .update(PAYHERE_SECRET)
+            .digest("hex")
+            .toUpperCase()
       )
       .digest("hex")
       .toUpperCase();
@@ -153,6 +186,15 @@ router.post("/ipn", async (req, res) => {
         paidAt: new Date(),
       });
       await subscription.save();
+
+      const user = await User.findById(subscription.userId);
+      const store = await Store.findById(subscription.storeId);
+
+      user.subscriptionStatus = "active";
+      await user.save();
+
+      store.isActive = "true";
+      await user.save();
     }
 
     res.send("OK");
@@ -168,7 +210,8 @@ router.post("/cancel", authenticate, async (req, res) => {
     const { subscriptionId } = req.body;
     const subscription = await Subscription.findById(subscriptionId);
 
-    if (!subscription) return res.status(404).json({ error: "Subscription not found" });
+    if (!subscription)
+      return res.status(404).json({ error: "Subscription not found" });
     if (subscription.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: "Unauthorized access" });
     }
@@ -181,23 +224,38 @@ router.post("/cancel", authenticate, async (req, res) => {
 
     const accessToken = await getPayHereAccessToken();
 
-    const cancelRes = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
-    });
+    const cancelRes = await fetch(
+      `${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
+      }
+    );
 
     const cancelData = await cancelRes.json();
 
     if (cancelData.status !== 1) {
-      return res.status(500).json({ error: cancelData.msg || "Failed to cancel on PayHere" });
+      return res
+        .status(500)
+        .json({ error: cancelData.msg || "Failed to cancel on PayHere" });
     }
 
     subscription.status = "cancelled";
     await subscription.save();
+
+    const user = await User.findById(subscription.userId);
+    const store = await Store.findById(subscription.storeId);
+
+    user.subscriptionStatus = "inactive";
+    await user.save();
+
+    store.isActive = "false";
+    await user.save();
+
     res.json({ message: "Subscription cancelled successfully" });
   } catch (err) {
     console.error("❌ Error cancelling subscription:", err);
@@ -211,14 +269,17 @@ router.post("/retry", authenticate, async (req, res) => {
     const { recurrenceId } = req.body;
     const accessToken = await getPayHereAccessToken();
 
-    const retryRes = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/subscription/retry`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ subscription_id: recurrenceId }),
-    });
+    const retryRes = await fetch(
+      `${PAYHERE_BASE_URL}/merchant/v1/subscription/retry`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ subscription_id: recurrenceId }),
+      }
+    );
 
     const retryData = await retryRes.json();
 
@@ -234,18 +295,23 @@ router.post("/retry", authenticate, async (req, res) => {
 });
 
 // GET /api/subscriptions/my-subscription
-router.get("/my-subscription", authenticate, authorize("store_owner"), async (req, res) => {
-  try {
-    const subscription = await Subscription.findOne({
-      userId: req.user._id,
-      status: "active",
-    }).populate("storeId", "name");
+router.get(
+  "/my-subscription",
+  authenticate,
+  authorize("store_owner"),
+  async (req, res) => {
+    try {
+      const subscription = await Subscription.findOne({
+        userId: req.user._id,
+        status: "active",
+      }).populate("storeId", "name");
 
-    res.json(subscription);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+      res.json(subscription);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // GET /api/subscriptions/admin/all
 router.get("/admin/all", authenticate, async (req, res) => {
