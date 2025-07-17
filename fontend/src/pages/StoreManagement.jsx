@@ -19,6 +19,7 @@ const StoreManagement = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [reviewFilter, setReviewFilter] = useState("all");
+  const [subscription, setSubscription] = useState(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -61,6 +62,22 @@ const StoreManagement = () => {
           },
         });
       }
+
+      const subscriptionResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (!subscriptionResponse.ok) {
+        throw new Error("Failed to fetch subscription");
+      }
+      const subscriptionData = await subscriptionResponse.json();
+      setSubscription(subscriptionData);
+
+      
     } catch (error) {
       console.error("Error fetching store:", error);
       setError("Failed to load store data");
