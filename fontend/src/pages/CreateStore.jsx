@@ -27,7 +27,7 @@ const CreateStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [checkingStore, setCheckingStore] = useState(true);
-   const [payhereLoaded, setPayhereLoaded] = useState(false);
+  const [payhereLoaded, setPayhereLoaded] = useState(false);
 
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -64,16 +64,44 @@ const CreateStore = () => {
     setError("");
 
     try {
-      // 🔄 Upload hero images to Firebase
+      // Upload images
       const uploadPromises = heroImages.map(async (file) => {
         const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
         await uploadBytes(imageRef, file);
         return getDownloadURL(imageRef);
       });
-
       const imageUrls = await Promise.all(uploadPromises);
 
-      // 🏪 Create the store
+      // Get payment params
+      const subResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (!subResponse.ok) {
+        throw new Error("Failed to initiate subscription payment.");
+      }
+
+      const { paymentParams } = await subResponse.json();
+
+      // **Wrap payment in its own try/catch**
+      try {
+        await startPayHerePayment(paymentParams);
+      } catch (paymentError) {
+        // Payment was cancelled or errored
+        console.error("Payment failed or cancelled:", paymentError);
+        setError(paymentError.message || "Payment failed or cancelled.");
+        setLoading(false);
+        return; 
+      }
+
+      // ✅ Only runs if payment succeeded
       const payload = {
         name: formData.name,
         type: formData.type,
@@ -98,38 +126,10 @@ const CreateStore = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to create store");
+        throw new Error(data.error || "Store creation failed after payment.");
       }
 
-      const storeData = await response.json();
-
-      // 💳 Start subscription
-      const subResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!subResponse.ok) {
-        alert(
-          "Store created, but failed to start subscription. Please contact support."
-        );
-        await refreshUser();
-        return navigate("/dashboard");
-      }
-
-      const { paymentParams } = await subResponse.json();
-
-      // 🚀 Start PayHere modal payment
-      await startPayHerePayment(paymentParams);
-
-      // Optional post-payment action
-      alert("Subscription payment successful!");
+      alert("Store created and subscription started successfully!");
       await refreshUser();
       navigate("/dashboard");
     } catch (error) {
@@ -155,13 +155,13 @@ const CreateStore = () => {
 
       window.payhere.onDismissed = function () {
         alert("Payment was cancelled.");
-        return reject(new Error("Payment cancelled"));
+        reject(new Error("Payment cancelled"));
       };
 
       window.payhere.onError = function (error) {
         console.error("❌ PayHere error:", error);
         alert("Payment failed. Please try again.");
-        return reject(new Error("Payment error: " + error));
+        reject(new Error("Payment error: " + error));
       };
 
       console.log("▶️ Starting PayHere payment with:", paymentParams);
