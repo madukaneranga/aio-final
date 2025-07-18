@@ -60,51 +60,76 @@ const StoreDashboard = () => {
     }
   }, [packages]);
 
-
   const loadPayHereSDK = () => {
-  return new Promise((resolve, reject) => {
-    if (window.payhere) return resolve();
+    return new Promise((resolve, reject) => {
+      if (window.payhere) return resolve();
 
-    const script = document.createElement("script");
-    script.src = "https://sandbox.payhere.lk/lib/payhere.js";
-    script.type = "text/javascript";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("PayHere SDK failed to load"));
-    document.body.appendChild(script);
-  });
-};
+      const script = document.createElement("script");
+      script.src = "https://sandbox.payhere.lk/lib/payhere.js";
+      script.type = "text/javascript";
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("PayHere SDK failed to load"));
+      document.body.appendChild(script);
+    });
+  };
 
   const handlePackageUpgrade = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/upgrade`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ packageName: selectedPackage }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to upgrade package");
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/subscriptions/upgrade`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ packageName: selectedPackage }),
       }
+    );
 
-      const updatedSubscription = await response.json();
+    const result = await response.json();
 
-      // Update subscription state in your parent component (if needed)
-      setSubscription(updatedSubscription);
-
-      // Close modal and notify
-      setShowUpgradeModal(false);
-      alert(`Successfully upgraded to: ${selectedPackage.toUpperCase()}`);
-    } catch (error) {
-      console.error(error);
-      alert(error.message);
+    // 🛑 Handle downgrade restriction (if backend returns 403)
+    if (response.status === 403 && result.nextAvailableDowngradeDate) {
+      const formattedDate = new Date(result.nextAvailableDowngradeDate).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      alert(`⛔ You can downgrade only after: ${formattedDate}`);
+      return;
     }
-  };
+
+    // ❌ Other error
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to upgrade package");
+    }
+
+    // 💳 If PayHere payment is required
+    if (result.paymentRequired && result.paymentParams) {
+      try {
+        const orderId = await startPayHerePayment(result.paymentParams);
+        console.log("✅ PayHere Payment successful with Order ID:", orderId);
+      } catch (paymentError) {
+        console.error("❌ Payment failed:", paymentError);
+        alert("Payment was not successful. Upgrade was not completed.");
+        return;
+      }
+    }
+
+    // ✅ Update subscription
+    setSubscription(result.updatedSubscription || result);
+
+    // ✅ Close modal
+    setShowUpgradeModal(false);
+
+    alert(`✅ Successfully upgraded to: ${selectedPackage.toUpperCase()}`);
+  } catch (error) {
+    console.error("❌ Upgrade Error:", error);
+    alert(error.message || "Something went wrong during the upgrade.");
+  }
+};
+
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -266,63 +291,61 @@ const StoreDashboard = () => {
   };
 
   const createSubscription = async () => {
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
-
-    if (response.ok) {
-      const { paymentParams } = await response.json();
-
-      await loadPayHereSDK();
-
-      // 🔥 Start PayHere payment modal
-      await startPayHerePayment(paymentParams);
-
-      // ✅ Refresh subscription and dashboard data after successful payment
-      await fetchDashboardData();
-
-      // 💡 Wait for subscription to update
-      const refreshedSubscription = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
         {
+          method: "POST",
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
 
-      const subscriptionData = await refreshedSubscription.json();
-      setSubscription(subscriptionData);
+      if (response.ok) {
+        const { paymentParams } = await response.json();
 
-      alert(
-        `Your monthly subscription (LKR ${subscriptionData.amount}) is now active.`
-      );
-    } else {
-      const errorData = await response.json();
-      alert(
-        "Subscription setup failed. Please contact support: " +
-          (errorData?.error || "Unknown error")
-      );
+        await loadPayHereSDK();
+
+        // 🔥 Start PayHere payment modal
+        await startPayHerePayment(paymentParams);
+
+        // ✅ Refresh subscription and dashboard data after successful payment
+        await fetchDashboardData();
+
+        // 💡 Wait for subscription to update
+        const refreshedSubscription = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+
+        const subscriptionData = await refreshedSubscription.json();
+        setSubscription(subscriptionData);
+
+        alert(
+          `Your monthly subscription (LKR ${subscriptionData.amount}) is now active.`
+        );
+      } else {
+        const errorData = await response.json();
+        alert(
+          "Subscription setup failed. Please contact support: " +
+            (errorData?.error || "Unknown error")
+        );
+      }
+    } catch (error) {
+      console.error("Subscription error:", error);
+      alert("Error starting subscription. Please try again.");
     }
-  } catch (error) {
-    console.error("Subscription error:", error);
-    alert("Error starting subscription. Please try again.");
-  }
-};
-
+  };
 
   const startPayHerePayment = (paymentParams) => {
     return new Promise((resolve, reject) => {
       if (!window.payhere) {
-        
         alert("Payment gateway not loaded. Please refresh and try again.");
         return reject(new Error("PayHere SDK not loaded"));
       }
@@ -680,53 +703,58 @@ const StoreDashboard = () => {
         )}
 
         {/* Upgrade Package Invitation */}
-        {subscription && subscription?.package !== "premium" && (
-          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 mb-4">
-            <h3 className="text-base font-semibold text-blue-900 mb-1">
-              Upgrade Your Package
-            </h3>
-            <p className="text-sm text-blue-800 mb-2">
-              You are currently on the{" "}
-              <span className="font-semibold">
-                {subscription?.package.toUpperCase() || "BASIC"}
-              </span>{" "}
-              package.
-            </p>
-            <p className="text-sm text-blue-700 mb-3">
-              Unlock more features and increase your limits by upgrading your
-              subscription.
-            </p>
-            <button
-              onClick={() => {
-                if (packages.length > 0) {
-                  setSelectedPackage(packages[0].name); // default to first package
-                }
-                setShowUpgradeModal(true);
-              }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
-            >
-              Upgrade Now
-            </button>
+        {subscription && (
+          <div className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 mb-4 w-full">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div className="text-sm">
+                <h3 className="text-white font-semibold mb-1">
+                  Manage Your Package
+                </h3>
+                <p className="text-gray-200">
+                  Current:{" "}
+                  <span className="font-semibold text-white">
+                    {subscription?.package.toUpperCase() || "BASIC"}
+                  </span>
+                </p>
+                <p className="text-gray-400 sm:block">
+                  You can upgrade anytime. Downgrades are allowed only after one
+                  month from your last update.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (packages.length > 0) {
+                    setSelectedPackage(
+                      subscription?.package || packages[0].name
+                    );
+                    setShowUpgradeModal(true);
+                  }
+                }}
+                className="bg-white text-black px-3 py-1.5 rounded-md hover:bg-gray-300 transition-colors text-sm self-start md:self-center"
+              >
+                Manage
+              </button>
+            </div>
           </div>
         )}
 
         {showUpgradeModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div className="bg-black rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-700">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Upgrade Package
+                  <h2 className="text-2xl font-bold text-white">
+                    Manage Your Subscription
                   </h2>
                   <button
                     onClick={() => setShowUpgradeModal(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                    className="text-gray-400 hover:text-white text-2xl"
                   >
                     ×
                   </button>
                 </div>
 
-                {/* ✅ Show loading if packages not ready */}
                 {!packages.length || !selectedPackage ? (
                   <p className="text-center text-gray-500">
                     Loading packages...
@@ -734,7 +762,7 @@ const StoreDashboard = () => {
                 ) : (
                   <>
                     {/* Tabs */}
-                    <div className="border-b mb-4">
+                    <div className="border-b border-gray-700 mb-4">
                       <nav className="flex space-x-4" aria-label="Tabs">
                         {packages.map((pkg) => (
                           <button
@@ -742,8 +770,8 @@ const StoreDashboard = () => {
                             onClick={() => setSelectedPackage(pkg.name)}
                             className={`px-4 py-2 font-medium ${
                               selectedPackage === pkg.name
-                                ? "border-b-2 border-blue-600 text-blue-600"
-                                : "text-gray-500 hover:text-blue-600"
+                                ? "border-b-2 border-white text-white"
+                                : "text-gray-400 hover:text-white"
                             }`}
                           >
                             {pkg.name.charAt(0).toUpperCase() +
@@ -760,7 +788,7 @@ const StoreDashboard = () => {
                         .map((pkg) => (
                           <ul
                             key={pkg._id}
-                            className="list-disc list-inside text-gray-700 space-y-1"
+                            className="list-disc list-inside text-gray-300 space-y-1"
                           >
                             {pkg.features.map((feature, index) => (
                               <li key={index}>{feature}</li>
@@ -769,11 +797,21 @@ const StoreDashboard = () => {
                         ))}
                     </div>
 
+                    {/* Downgrade Warning */}
+                    {packages.find((pkg) => pkg.name === selectedPackage)
+                      ?.amount < subscription?.amount && (
+                      <div className="mb-4 p-4 bg-gray-900 border border-yellow-600 rounded-md text-yellow-400">
+                        <strong>Warning:</strong> Downgrading may limit your
+                        current features or product/service capacity. This could
+                        affect your business performance. Proceed with caution.
+                      </div>
+                    )}
+
                     {/* Buttons */}
                     <div className="flex justify-end space-x-3">
                       <button
                         onClick={() => setShowUpgradeModal(false)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        className="px-4 py-2 border border-gray-500 rounded-lg text-gray-300 hover:bg-gray-800"
                       >
                         Cancel
                       </button>
@@ -781,11 +819,10 @@ const StoreDashboard = () => {
                         onClick={() => {
                           handlePackageUpgrade();
                           setShowUpgradeModal(false);
-                          // TODO: Add updatePackage(selectedPackage) function here
                         }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="px-4 py-2 bg-white text-black rounded-lg hover:bg-gray-300"
                       >
-                        Confirm Upgrade
+                        Confirm Change
                       </button>
                     </div>
                   </>

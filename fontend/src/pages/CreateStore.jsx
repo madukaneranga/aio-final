@@ -6,9 +6,9 @@ import ColorThemeSelector from "../components/ColorThemeSelector";
 import TimeSlotManager from "../components/TimeSlotManager";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Store, Package, Calendar, MapPin, Phone, Mail } from "lucide-react";
-//  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+import { storage } from "../utils/firebase";
+import Pricing from "../components/Pricing";
 
 const CreateStore = () => {
   const [formData, setFormData] = useState({
@@ -27,7 +27,8 @@ const CreateStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [checkingStore, setCheckingStore] = useState(true);
-   const [payhereLoaded, setPayhereLoaded] = useState(false);
+  const [payhereLoaded, setPayhereLoaded] = useState(false);
+  const [subPackage, setSubPackage] = useState("basic");
 
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -101,8 +102,6 @@ const CreateStore = () => {
         throw new Error(data.error || "Failed to create store");
       }
 
-      const storeData = await response.json();
-
       // 💳 Start subscription
       const subResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
@@ -112,6 +111,9 @@ const CreateStore = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          body: JSON.stringify({
+            packageName: subPackage,
+          }),
         }
       );
 
@@ -344,37 +346,36 @@ const CreateStore = () => {
                 />
               </div>
 
-              {/* Color Theme Selector */}
-              <ColorThemeSelector
-                selectedColor={formData.themeColor}
-                onColorChange={(color) =>
-                  setFormData({ ...formData, themeColor: color })
-                }
-              />
+              {/*
+  <ColorThemeSelector
+    selectedColor={formData.themeColor}
+    onColorChange={(color) =>
+      setFormData({ ...formData, themeColor: color })
+    }
+  />
 
-              {/* Time Slots for Service Stores */}
-              {formData.type === "service" && (
-                <TimeSlotManager
-                  timeSlots={timeSlots}
-                  onTimeSlotsChange={setTimeSlots}
-                />
-              )}
+  {formData.type === "service" && (
+    <TimeSlotManager
+      timeSlots={timeSlots}
+      onTimeSlotsChange={setTimeSlots}
+    />
+  )}
 
-              {/* Hero Images */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Store Hero Images (up to 5)
-                </label>
-                <p className="text-sm text-gray-500 mb-3">
-                  Upload high-quality images that represent your store
-                </p>
-                <ImageUpload
-                  images={heroImages}
-                  onImagesChange={setHeroImages}
-                  maxImages={5}
-                  multiple={true}
-                />
-              </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      Store Hero Images (up to 5)
+    </label>
+    <p className="text-sm text-gray-500 mb-3">
+      Upload high-quality images that represent your store
+    </p>
+    <ImageUpload
+      images={heroImages}
+      onImagesChange={setHeroImages}
+      maxImages={5}
+      multiple={true}
+    />
+  </div>
+*/}
 
               {/* Contact Information */}
               <div>
@@ -429,9 +430,9 @@ const CreateStore = () => {
                   />
                 </div>
               </div>
-
+              <Pricing subPackage={subPackage} setSubPackage={setSubPackage} />
               {/* Subscription Info */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              {/*<div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                 <h4 className="font-semibold text-blue-900 mb-2">
                   Monthly Subscription
                 </h4>
@@ -441,10 +442,13 @@ const CreateStore = () => {
                   <li>• Advanced analytics and reports</li>
                   <li>• Customer management tools</li>
                   <li>• 24/7 support</li>
-                  <li>• You can cancel your subscription anytime after 6 days from the date of activation.</li>
+                  <li>
+                    • You can cancel your subscription anytime after 6 days from
+                    the date of activation.
+                  </li>
                 </ul>
               </div>
-
+*/}
               <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"
