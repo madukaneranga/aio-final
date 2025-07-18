@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ImageUpload from "../components/ImageUpload";
+import ColorThemeSelector from "../components/ColorThemeSelector";
+import TimeSlotManager from "../components/TimeSlotManager";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Store, Camera, Eye, EyeOff, MessageSquare, Star } from "lucide-react";
 //  ADDED: Firebase storage imports
@@ -21,6 +23,7 @@ const StoreManagement = () => {
   const [success, setSuccess] = useState("");
   const [reviewFilter, setReviewFilter] = useState("all");
   const [subscription, setSubscription] = useState(null);
+  const [timeSlots, setTimeSlots] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -52,6 +55,7 @@ const StoreManagement = () => {
       if (response.ok) {
         const data = await response.json();
         setStore(data.store);
+        setTimeSlots(data.timeSlots);
         setFormData({
           name: data.store.name || "",
           description: data.store.description || "",
@@ -242,7 +246,9 @@ const StoreManagement = () => {
           setSuccess(`Review ${isVisible ? "shown" : "hidden"} successfully!`);
         }
       } else {
-        setInvitation("To manage reviews and enhance your brand credibility, simply upgrade your package. It’s quick, easy, and unlocks powerful features to grow your business.");
+        setInvitation(
+          "To manage reviews and enhance your brand credibility, simply upgrade your package. It’s quick, easy, and unlocks powerful features to grow your business."
+        );
       }
     } catch (error) {
       setError("Failed to update review visibility");
@@ -499,7 +505,21 @@ const StoreManagement = () => {
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                 />
               </div>
+              {/* Color Theme Selector */}
+              <ColorThemeSelector
+                selectedColor={formData.themeColor}
+                onColorChange={(color) =>
+                  setFormData({ ...formData, themeColor: color })
+                }
+              />
 
+              {/* Time Slots for Service Stores */}
+              {formData.type === "service" && (
+                <TimeSlotManager
+                  timeSlots={timeSlots}
+                  onTimeSlotsChange={setTimeSlots}
+                />
+              )}
               {/* Hero Images */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

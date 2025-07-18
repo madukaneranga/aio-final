@@ -70,10 +70,18 @@ async function getPayHereAccessToken() {
 // POST /api/subscriptions/create-subscription
 router.post("/create-subscription", authenticate, async (req, res) => {
   try {
+    const { packageName } = req.body; 
+
     const userId = req.user._id;
     const store = await Store.findOne({ ownerId: userId });
     if (!store)
       return res.status(404).json({ error: "Store not found for this user" });
+
+    if (!packageName)
+      return res.status(400).json({ error: "Package name is required" });
+
+
+    const selectedPackage = await Package.findOne({ name: packageName });
 
     let subscription = await Subscription.findOne({ userId });
     if (!subscription) {
@@ -85,13 +93,13 @@ router.post("/create-subscription", authenticate, async (req, res) => {
         userId,
         storeId: store._id,
         plan: "monthly",
-        amount: 1500,
+        amount: selectedPackage.amount,
         currency: "LKR",
         status: "pending",
         startDate: now,
         endDate,
         paymentHistory: [],
-        package: "basic",
+        package: packageName,
       });
       await subscription.save();
     }
@@ -180,12 +188,13 @@ router.post("/ipn", async (req, res) => {
     if (status_code === "2") {
       subscription.status = "active";
       subscription.recurrenceId = subscription_id;
-      subscription.paymentHistory.push({
-        paymentId: payment_id,
-        amount: payhere_amount,
-        currency: payhere_currency,
-        paidAt: new Date(),
-      });
+      (subscription.lastChangeAt = new Date()),
+        subscription.paymentHistory.push({
+          paymentId: payment_id,
+          amount: payhere_amount,
+          currency: payhere_currency,
+          paidAt: new Date(),
+        });
       await subscription.save();
 
       const user = await User.findById(subscription.userId);
@@ -213,16 +222,34 @@ router.post("/cancel", authenticate, async (req, res) => {
 
     if (!subscription)
       return res.status(404).json({ error: "Subscription not found" });
+
     if (subscription.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: "Unauthorized access" });
     }
 
+    // Check if 1 month has passed since last upgrade / change
+    if (subscription.lastChangeAt) {
+      const nextAllowedCancelDate = new Date(subscription.lastChangeAt);
+      nextAllowedCancelDate.setMonth(nextAllowedCancelDate.getMonth() + 1);
+
+      if (new Date() < nextAllowedCancelDate) {
+        return res.status(403).json({
+          error:
+            "You can cancel subscription only after 1 month from your last package change.",
+          nextAvailableCancelDate: nextAllowedCancelDate,
+        });
+      }
+    }
+
+    // If no PayHere subscription recurrence ID, just cancel locally
     if (!subscription.recurrenceId) {
       subscription.status = "cancelled";
+      subscription.cancelledAt = new Date();
       await subscription.save();
       return res.json({ message: "Subscription cancelled locally" });
     }
 
+    // Cancel subscription on PayHere
     const accessToken = await getPayHereAccessToken();
 
     const cancelRes = await fetch(
@@ -245,17 +272,20 @@ router.post("/cancel", authenticate, async (req, res) => {
         .json({ error: cancelData.msg || "Failed to cancel on PayHere" });
     }
 
+    // Update subscription status locally
     subscription.status = "cancelled";
+    subscription.cancelledAt = new Date();
     await subscription.save();
 
+    // Update user and store status
     const user = await User.findById(subscription.userId);
     const store = await Store.findById(subscription.storeId);
 
     user.subscriptionStatus = "inactive";
     await user.save();
 
-    store.isActive = "false";
-    await user.save();
+    store.isActive = false; // boolean false for clarity
+    await store.save();
 
     res.json({ message: "Subscription cancelled successfully" });
   } catch (err) {
@@ -320,47 +350,136 @@ router.put("/upgrade", authenticate, async (req, res) => {
   const userId = req.user._id;
 
   try {
-    // Find current subscription
     const subscription = await Subscription.findOne({ userId });
-    if (!subscription) {
+    if (!subscription)
       return res.status(404).json({ message: "Subscription not found" });
-    }
 
-    // Prevent upgrading to same package
-    if (subscription.package === packageName) {
-      return res.status(400).json({ message: "Already on this package" });
-    }
+    if (subscription.package === packageName)
+      return res
+        .status(400)
+        .json({ message: "You are already on this package." });
 
-    // Check 2-month cooldown
-    if (subscription.lastUpgradeAt) {
-      const nextAllowedUpgradeDate = new Date(subscription.lastUpgradeAt);
-      nextAllowedUpgradeDate.setMonth(nextAllowedUpgradeDate.getMonth() + 3);
+    const currentPackage = await Package.findOne({
+      name: subscription.package,
+    });
+    const selectedPackage = await Package.findOne({ name: packageName });
 
-      if (new Date() < nextAllowedUpgradeDate) {
+    if (!selectedPackage || !currentPackage)
+      return res.status(400).json({ message: "Invalid package selection." });
+
+    const isDowngrade = selectedPackage.amount < currentPackage.amount;
+
+    // Downgrade cooldown check (2 months)
+    if (isDowngrade && subscription.lastChangeAt) {
+      const nextAllowedDowngrade = new Date(subscription.lastChangeAt);
+      nextAllowedDowngrade.setMonth(nextAllowedDowngrade.getMonth() + 2);
+
+      if (new Date() < nextAllowedDowngrade) {
         return res.status(403).json({
           message:
-            "You can only upgrade after 3 months from the last upgrade date",
+            "You can downgrade only after 2 months from your last package change.",
+          nextAvailableDowngradeDate: nextAllowedDowngrade,
         });
       }
     }
 
-    // Validate package exists and get amount
-    const pkg = await Package.findOne({ name: packageName });
-    if (!pkg) {
-      return res.status(400).json({ message: "Invalid package selected" });
+    // Cancel existing PayHere subscription if exists
+    if (subscription.recurrenceId) {
+      const token = await getPayHereAccessToken();
+      const cancelRes = await fetch(
+        `${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
+        }
+      );
+
+      const cancelData = await cancelRes.json();
+      if (cancelData.status !== 1) {
+        return res.status(500).json({
+          message:
+            cancelData.msg || "Failed to cancel current PayHere subscription",
+        });
+      }
+
+      subscription.status = "cancelled";
+      subscription.cancelledAt = new Date();
+      await subscription.save();
     }
 
-    // Update subscription
-    subscription.package = pkg.name;
-    subscription.amount = pkg.amount;
-    subscription.lastUpgradeAt = new Date();
+    // Create new subscription for the selected package,
+    // copying old payment history
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1);
 
-    await subscription.save();
+    const store = await Store.findById(subscription.storeId);
 
-    res.json(subscription);
+    const newSubscription = new Subscription({
+      userId,
+      storeId: subscription.storeId,
+      plan: "monthly",
+      amount: selectedPackage.amount,
+      currency: "LKR",
+      status: "pending",
+      startDate: now,
+      endDate,
+      paymentHistory: subscription.paymentHistory || [],
+      package: selectedPackage.name,
+      lastChangeAt: now,
+    });
+
+    await newSubscription.save();
+
+    const orderId = `SUB_${newSubscription._id}`;
+    const hash = generatePayHereHash({
+      merchantId: PAYHERE_MERCHANT_ID,
+      orderId,
+      amount: newSubscription.amount,
+      currency: newSubscription.currency,
+      merchantSecret: PAYHERE_SECRET,
+    });
+
+    const paymentParams = {
+      sandbox: true,
+      merchant_id: PAYHERE_MERCHANT_ID,
+      return_url: PAYHERE_RETURN_URL,
+      cancel_url: PAYHERE_CANCEL_URL,
+      notify_url: PAYHERE_NOTIFY_URL,
+      order_id: orderId,
+      items: `Subscription (${selectedPackage.name}) for ${store.name}`,
+      currency: newSubscription.currency,
+      amount: parseFloat(newSubscription.amount).toFixed(2),
+      first_name: req.user.name?.split(" ")[0] || "Customer",
+      last_name: req.user.name?.split(" ")[1] || "Name",
+      email: req.user.email || "no-reply@aiocart.lk",
+      phone: req.user.phone || "0771234567",
+      address: req.user.address?.street || "Unknown Address",
+      city: req.user.address?.city || "Unknown City",
+      country: "Sri Lanka",
+      recurrence: "1 Month",
+      duration: "Forever",
+      hash,
+    };
+
+    return res.json({
+      success: true,
+      message: `Subscription ${
+        isDowngrade ? "downgrade" : "upgrade"
+      } initiated. Please proceed to payment.`,
+      subscriptionId: newSubscription._id,
+      paymentParams,
+      paymentRequired: true,
+    });
   } catch (error) {
-    console.error("Upgrade subscription error:", error);
-    res.status(500).json({ message: "Failed to upgrade subscription" });
+    console.error("❌ Subscription upgrade/downgrade error:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error during subscription change" });
   }
 });
 
