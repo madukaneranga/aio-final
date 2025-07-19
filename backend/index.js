@@ -6,8 +6,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
 import { Server } from "socket.io";
+import { existsSync } from "fs";
 
-// Route imports
+// Import your route modules
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import storeRoutes from "./routes/stores.js";
@@ -22,6 +23,7 @@ import commissionRoutes from "./routes/commissions.js";
 import notificationsRoutes from "./routes/notifications.js";
 import platformSettingsRoutes from "./routes/platformSettings.js";
 import packageRoutes from "./routes/packages.js";
+
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 dotenv.config();
@@ -30,16 +32,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const server = http.createServer(app); // for socket.io
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    credentials: true
+    credentials: true,
   },
 });
 
-// === SOCKET.IO CONNECTIONS ===
+// --- Socket.IO setup ---
 const userSocketMap = new Map();
 
 io.on("connection", (socket) => {
@@ -61,7 +63,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Export this function for routes to emit notifications
+// Function to emit notifications from routes or other parts of your app
 export const emitNotification = (userId, notification) => {
   const socketId = userSocketMap.get(userId);
   if (socketId) {
@@ -69,18 +71,20 @@ export const emitNotification = (userId, notification) => {
   }
 };
 
-// === MIDDLEWARE ===
-app.use(cors({
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true
-}));
+// --- Middleware ---
+app.use(
+  cors({
+    credentials: true,
+    origin: process.env.CLIENT_URL || "*",
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// === FILES ===
+// Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// === ROUTES ===
+// --- API Routes ---
 console.log("Starting route registrations");
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -96,30 +100,37 @@ app.use("/api/commissions", commissionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
+console.log("All routes registered");
 
-// === REACT BUILD ===
-app.use(express.static(path.join(__dirname, "../dist")));
+// --- React frontend serving ---
+const distPath = path.resolve(__dirname, "../dist");
+const indexHtmlPath = path.join(distPath, "index.html");
 
+if (existsSync(indexHtmlPath)) {
+  app.use(express.static(distPath));
+
+  // Serve React app only for non-API requests
+  app.get(/^\/(?!api).*/, (req, res) => {
+    res.sendFile(indexHtmlPath);
+  });
+}
+
+// Health check route
 app.get("/api/health", (req, res) => {
   res.json({ status: "Server is running" });
 });
 
-// SPA fallback
-app.get("*", (req, res) => {
-  res.sendFile(path.resolve(__dirname, "../dist", "index.html"));
-});
-
-// === ERROR HANDLERS ===
+// --- Error handlers ---
 app.use(notFound);
 app.use(errorHandler);
 
-// === CONNECT MONGO & START SERVER ===
+// --- Start MongoDB and server ---
 const PORT = process.env.PORT || 5000;
 
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log("MongoDB connected");      
+    console.log("MongoDB connected");
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
