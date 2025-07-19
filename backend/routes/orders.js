@@ -135,6 +135,7 @@ router.put(
       const notification = await Notification.create({
         userId: order.userId,
         title,
+        userType:"customer",
         body,
         type: "order_update",
         link: "/orders",

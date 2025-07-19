@@ -108,8 +108,9 @@ router.post("/", authenticate, authorize("customer"), async (req, res) => {
     const notification = await Notification.create({
       userId: store.ownerId,
       title: "New Review Received",
+      userType:"store_owner",
       body: "Your store has received a new customer review. Please respond to maintain excellent customer engagement.",
-      type: "review",
+      type: "review_update",
       link: `/store/${store._id}`,
     });
 
@@ -190,8 +191,9 @@ router.put(
       const notification = await Notification.create({
         userId: review.customerId, // customer's user ID
         title: "Response to Your Review",
+        userType:"customer",
         body: "The store owner has responded to your review. Please check their reply.",
-        type: "review_response",
+        type: "review_update",
         link: `/store/${store._id}`, // or the appropriate page
       });
 
