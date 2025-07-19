@@ -1,19 +1,17 @@
-// models/Notification.js
-import mongoose from "mongoose";
-
 const notificationSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    refPath: "userType", // dynamic reference
+    refPath: "userType",
   },
   userType: {
-  type: String,
-  enum: ["customer", "store_owner"],
-  required: true,
-},
+    type: String,
+    enum: ["customer", "store_owner"],
+    required: true,
+  },
   title: String,
   body: String,
+  link: String, // optional navigation link
   type: {
     type: String,
     enum: ["order_update", "booking_update", "review_update", "announcement"],
@@ -32,5 +30,8 @@ const notificationSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+
+notificationSchema.index({ userId: 1, isDeleted: 1, createdAt: -1 });
 
 export default mongoose.model("Notification", notificationSchema);
