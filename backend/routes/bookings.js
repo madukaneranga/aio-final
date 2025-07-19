@@ -124,6 +124,7 @@ router.put('/:id/status', authenticate, authorize('store_owner'), async (req, re
     const notification = await Notification.create({
       userId: booking.userId,
       title,
+      userType:"customer",
       body,
       type: 'booking_update',
       link: '/bookings',

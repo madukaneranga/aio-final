@@ -114,6 +114,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
           const notification = await Notification.create({
             userId: store.ownerId,
             title: `New order received`,
+            userType:"store_owner",
             body: `You have a new order with ID ${order._id}`,
             type: "order_update",
             link: `/store/orders`,
@@ -166,6 +167,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
           const notification = await Notification.create({
             userId: store.ownerId,
             title: `New booking received`,
+            userType:"store_owner",
             body: `You have a new booking with ID ${booking._id}`,
             type: "booking_update",
             link: `/store/bookings`,
