@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   CheckCircle,
   XCircle,
@@ -7,6 +7,7 @@ import {
   Gift,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useNotifications } from "../contexts/NotificationContext";
 
 const palette = {
   white: "#FFFFFF",
@@ -37,58 +38,17 @@ const typeIcons = {
 
 export default function NotificationPage() {
   const navigate = useNavigate();
+  const {
+    notifications,
+    loading,
+    markAsRead,
+    softDelete,
+    markAllRead,
+    setPage,
+    total,
+  } = useNotifications();
 
-  const [notifications, setNotifications] = useState([]);
-
-  /*const [notifications, setNotifications] = useState([
-    {
-      _id: "1",
-      title: "Order Confirmed",
-      body: "Your order #12345 has been confirmed.",
-      isRead: false,
-      type: "order",
-      createdAt: new Date().toISOString(),
-      link: "/orders/12345",
-    },
-    {
-      _id: "2",
-      title: "Limited Time Offer!",
-      body: "Get 20% off on your next purchase.",
-      isRead: false,
-      type: "promotion",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      _id: "3",
-      title: "Account Warning",
-      body: "Your account is nearing its storage limit.",
-      isRead: true,
-      type: "warning",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      _id: "4",
-      title: "System Maintenance",
-      body: "Scheduled maintenance on Friday 9 PM.",
-      isRead: true,
-      type: "announcement",
-      createdAt: new Date().toISOString(),
-    },
-  ]);*/
-
-  const markAsRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
-    );
-  };
-
-  const softDelete = (id) => {
-    setNotifications((prev) => prev.filter((n) => n._id !== id));
-  };
-
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-  };
+  const onLoadMore = () => setPage((p) => p + 1);
 
   const onNotificationClick = (n) => {
     if (!n.isRead) markAsRead(n._id);
@@ -113,11 +73,13 @@ export default function NotificationPage() {
           </button>
         </header>
 
-        {notifications.length === 0 && (
+        {notifications.length === 0 && !loading && (
           <p className="text-center mt-10 text-gray-500">
             No notifications to show.
           </p>
         )}
+
+        {loading && <p className="text-center mt-10">Loading notifications...</p>}
 
         <ul className="space-y-4">
           {notifications.map((n) => (
@@ -165,6 +127,22 @@ export default function NotificationPage() {
             </li>
           ))}
         </ul>
+
+        {notifications.length < total && (
+          <div className="flex justify-center mt-10">
+            <button
+              onClick={onLoadMore}
+              disabled={loading}
+              className={`px-6 py-3 rounded-xl font-semibold transition duration-300 shadow-md ${
+                loading
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-purple-600 hover:bg-purple-700 text-white"
+              }`}
+            >
+              {loading ? "Loading..." : "Load More"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

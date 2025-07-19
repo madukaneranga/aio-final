@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -37,60 +37,66 @@ import ContactUs from './pages/ContactUs';
 import Notifications from './pages/Notifications';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
-//10002B,240046,3C096C,5A189A,7B2CBF,9D4EDD,C77DFF,E0AAFF
 
 import './App.css';
 
+// ✅ Moved NotificationProvider into separate component to use `useAuth`
+function AppWrapper() {
+  const { currentUser } = useAuth();
+
+  return (
+    <NotificationProvider userId={currentUser?._id}>
+      <Router>
+        <div className="min-h-screen bg-white flex flex-col">
+          <Header />
+          <main className="flex-1">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/stores" element={<StoreList />} />
+              <Route path="/products" element={<ProductList />} />
+              <Route path="/services" element={<ServiceList />} />
+              <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/service/:id" element={<ServiceDetail />} />
+              <Route path="/store/:id" element={<StoreDetail />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/booking-summary" element={<BookingSummary />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/dashboard" element={<StoreDashboard />} />
+              <Route path="/create-store" element={<CreateStore />} />
+              <Route path="/create-product" element={<CreateProduct />} />
+              <Route path="/create-service" element={<CreateService />} />
+              <Route path="/manage-products" element={<ManageProducts />} />
+              <Route path="/manage-services" element={<ManageServices />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/bookings" element={<Bookings />} />
+              <Route path="/store-management" element={<StoreManagement />} />
+              <Route path="/sales-analytics" element={<SalesAnalytics />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/platform-settings" element={<PlatformSettings />} />
+              <Route path="/help-center" element={<HelpCenter />} />
+              <Route path="/contact-us" element={<ContactUs />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </Router>
+    </NotificationProvider>
+  );
+}
+
 function App() {
-
-
   return (
     <ErrorBoundary>
       <AuthProvider>
         <CartProvider>
-          <NotificationProvider>
-          <Router>
-            <div className="min-h-screen bg-white flex flex-col">
-              <Header />
-              <main className="flex-1">
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/stores" element={<StoreList />} />
-                  <Route path="/products" element={<ProductList />} />
-                  <Route path="/services" element={<ServiceList />} />
-                  <Route path="/product/:id" element={<ProductDetail />} />
-                  <Route path="/service/:id" element={<ServiceDetail />} />
-                  <Route path="/store/:id" element={<StoreDetail />} />
-                  <Route path="/cart" element={<Cart />} />
-                  <Route path="/booking-summary" element={<BookingSummary />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/dashboard" element={<StoreDashboard />} />
-                  <Route path="/create-store" element={<CreateStore />} />
-                  <Route path="/create-product" element={<CreateProduct />} />
-                  <Route path="/create-service" element={<CreateService />} />
-                  <Route path="/manage-products" element={<ManageProducts />} />
-                  <Route path="/manage-services" element={<ManageServices />} />
-                  <Route path="/orders" element={<Orders />} />
-                  <Route path="/bookings" element={<Bookings />} />
-                  <Route path="/store-management" element={<StoreManagement />} />
-                  <Route path="/sales-analytics" element={<SalesAnalytics />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/platform-settings" element={<PlatformSettings />} />
-                  <Route path="/help-center" element={<HelpCenter />} />
-                  <Route path="/contact-us" element={<ContactUs />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                  <Route path="/terms-of-service" element={<TermsOfService />} />
-                  <Route path="/notifications" element={<Notifications/>} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-              <Footer />
-            </div>
-          </Router>
-          </NotificationProvider>
+          <AppWrapper />
         </CartProvider>
       </AuthProvider>
     </ErrorBoundary>
