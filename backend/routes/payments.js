@@ -6,7 +6,7 @@ import Product from "../models/Product.js";
 import Service from "../models/Service.js";
 import Store from "../models/Store.js";
 import Commission from "../models/Commission.js";
-import Notification from "../routes/notifications.js";
+import Notification from "../models/Notification.js";
 import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -156,7 +156,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         await booking.save();
 
         // Notify store owner about the order creation
-        const store = await Store.findById(storeId);
+        const store = await Store.findById(service.storeId);
 
         if (booking) {
           await Notification.create({

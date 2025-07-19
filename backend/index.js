@@ -17,7 +17,7 @@ import paymentRoutes from "./routes/payments.js";
 import reviewRoutes from "./routes/reviews.js";
 import subscriptionRoutes from "./routes/subscriptions.js";
 import commissionRoutes from "./routes/commissions.js";
-import notificationsRoutes from './routes/notifications.js';
+import notificationsRoutes from "./routes/notifications.js";
 import platformSettingsRoutes from "./routes/platformSettings.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import packageRoutes from "./routes/packages.js";
@@ -52,7 +52,7 @@ app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/commissions", commissionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
-app.use('/api/notifications', notificationsRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 // Serve static files from React build
 app.use(express.static(path.join(__dirname, "../dist")));

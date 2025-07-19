@@ -1,7 +1,7 @@
 import express from "express";
 import Order from "../models/Order.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import Notification from "../routes/notifications.js";
+import Notification from "../models/Notification.js";
 
 const router = express.Router();
 
@@ -126,6 +126,9 @@ router.put(
         updates,
         { new: true }
       );
+
+      // Get friendly title & body
+    const { title, body } = getNotificationContent(status);
 
       // Send notification to customer
       await Notification.create({

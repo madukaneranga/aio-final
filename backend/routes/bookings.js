@@ -1,7 +1,7 @@
 import express from "express";
 import Booking from "../models/Booking.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import Notification from "../routes/notifications.js";
+import Notification from "../models/Notification.js";
 
 const router = express.Router();
 
