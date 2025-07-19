@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { formatLKR } from "../utils/currency";
+import Pricing from "../components/Pricing";
 import {
   Plus,
   Package,
@@ -37,16 +38,11 @@ const StoreDashboard = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(null);
-
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [packages, setPackages] = useState([]);
-  const [selectedPackage, setSelectedPackage] = useState("");
+  const [subPackage, setSubPackage] = useState("");
 
-  /*useEffect(() => {
-    if (user?.role === "store_owner") {
-      fetchDashboardData();
-    }
-  }, [user]);*/
+  const currentItems = products.length > 0 ? products : services;
 
   useEffect(() => {
     if (user?.role === "store_owner" && user?.storeId) {
@@ -55,8 +51,8 @@ const StoreDashboard = () => {
   }, [user]);
 
   useEffect(() => {
-    if (packages.length > 0 && !selectedPackage) {
-      setSelectedPackage(packages[0].name);
+    if (packages.length > 0 && !subPackage) {
+      setSubPackage(packages[0].name);
     }
   }, [packages]);
 
@@ -74,62 +70,63 @@ const StoreDashboard = () => {
   };
 
   const handlePackageUpgrade = async () => {
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/subscriptions/upgrade`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ packageName: selectedPackage }),
-      }
-    );
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/upgrade`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ packageName: subPackage }),
+        }
+      );
 
-    const result = await response.json();
+      const result = await response.json();
 
-    // 🛑 Handle downgrade restriction (if backend returns 403)
-    if (response.status === 403 && result.nextAvailableDowngradeDate) {
-      const formattedDate = new Date(result.nextAvailableDowngradeDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-      alert(`⛔ You can downgrade only after: ${formattedDate}`);
-      return;
-    }
-
-    // ❌ Other error
-    if (!response.ok) {
-      throw new Error(result.message || "Failed to upgrade package");
-    }
-
-    // 💳 If PayHere payment is required
-    if (result.paymentRequired && result.paymentParams) {
-      try {
-        const orderId = await startPayHerePayment(result.paymentParams);
-        console.log("✅ PayHere Payment successful with Order ID:", orderId);
-      } catch (paymentError) {
-        console.error("❌ Payment failed:", paymentError);
-        alert("Payment was not successful. Upgrade was not completed.");
+      // 🛑 Handle downgrade restriction (if backend returns 403)
+      if (response.status === 403 && result.nextAvailableDowngradeDate) {
+        const formattedDate = new Date(
+          result.nextAvailableDowngradeDate
+        ).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        alert(`⛔ You can downgrade only after: ${formattedDate}`);
         return;
       }
+
+      // ❌ Other error
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to upgrade package");
+      }
+
+      // 💳 If PayHere payment is required
+      if (result.paymentRequired && result.paymentParams) {
+        try {
+          const orderId = await startPayHerePayment(result.paymentParams);
+          console.log("✅ PayHere Payment successful with Order ID:", orderId);
+        } catch (paymentError) {
+          console.error("❌ Payment failed:", paymentError);
+          alert("Payment was not successful. Upgrade was not completed.");
+          return;
+        }
+      }
+
+      // ✅ Update subscription
+      setSubscription(result.updatedSubscription || result);
+
+      // ✅ Close modal
+      setShowUpgradeModal(false);
+
+      alert(`✅ Successfully upgraded to: ${subPackage.toUpperCase()}`);
+    } catch (error) {
+      console.error("❌ Upgrade Error:", error);
+      alert(error.message || "Something went wrong during the upgrade.");
     }
-
-    // ✅ Update subscription
-    setSubscription(result.updatedSubscription || result);
-
-    // ✅ Close modal
-    setShowUpgradeModal(false);
-
-    alert(`✅ Successfully upgraded to: ${selectedPackage.toUpperCase()}`);
-  } catch (error) {
-    console.error("❌ Upgrade Error:", error);
-    alert(error.message || "Something went wrong during the upgrade.");
-  }
-};
-
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -234,28 +231,24 @@ const StoreDashboard = () => {
       }
       const subscriptionData = await subscriptionResponse.json();
       setSubscription(subscriptionData);
+      setSubPackage(subscriptionData.package);
 
-      if (subscriptionData) {
-        //Packages
-        const packageResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/packages`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
-        if (!packageResponse.ok) {
-          throw new Error("Failed to fetch packages");
+      // Fetch all packages
+      const packageResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/packages`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
-        const packageData = await packageResponse.json();
-        console.log(packageData);
-
-        setPackages(packageData);
-        setSelectedPackage(
-          subscriptionData.package ? subscriptionData.package.toUpperCase() : ""
-        );
+      );
+      if (!packageResponse.ok) {
+        throw new Error("Failed to fetch packages");
       }
+      const packageData = await packageResponse.json();
+      console.log(packageData);
+
+      setPackages(packageData);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       // Optionally show an error message to the user
@@ -636,12 +629,6 @@ const StoreDashboard = () => {
                     {subscription.status.toUpperCase()}
                   </span>
                 </p>
-                <p className="text-gray-600">
-                  Package:{" "}
-                  <span className="font-medium text-amber-600">
-                    {subscription.package.toUpperCase()}
-                  </span>
-                </p>
 
                 <p className="text-gray-600">
                   Expires: {new Date(subscription.endDate).toLocaleDateString()}
@@ -704,19 +691,36 @@ const StoreDashboard = () => {
 
         {/* Upgrade Package Invitation */}
         {subscription && (
-          <div className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 mb-4 w-full">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div
+            className="
+      relative
+      w-full
+      rounded-lg
+      px-4 py-3 mb-4
+      bg-gradient-to-br
+      from-[#0A0017]
+      via-[#10002B]
+      via-[#240046]
+      via-[#3C096C]
+      via-[#5A189A]
+      via-[#7B2CBF]
+      via-[#9D4EDD]
+      to-[#C77DFF]
+      shadow-2xl
+      text-white
+      overflow-hidden
+    "
+          >
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div className="text-sm">
-                <h3 className="text-white font-semibold mb-1">
-                  Manage Your Package
-                </h3>
+                <h3 className="font-semibold mb-1">Manage Your Package</h3>
                 <p className="text-gray-200">
                   Current:{" "}
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold">
                     {subscription?.package.toUpperCase() || "BASIC"}
                   </span>
                 </p>
-                <p className="text-gray-400 sm:block">
+                <p className="text-gray-300 sm:block">
                   You can upgrade anytime. Downgrades are allowed only after one
                   month from your last update.
                 </p>
@@ -725,9 +729,7 @@ const StoreDashboard = () => {
               <button
                 onClick={() => {
                   if (packages.length > 0) {
-                    setSelectedPackage(
-                      subscription?.package || packages[0].name
-                    );
+                    setSubPackage(subscription?.package || packages[0].name);
                     setShowUpgradeModal(true);
                   }
                 }}
@@ -740,67 +742,30 @@ const StoreDashboard = () => {
         )}
 
         {showUpgradeModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
-            <div className="bg-black rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-700">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-white">
-                    Manage Your Subscription
-                  </h2>
-                  <button
-                    onClick={() => setShowUpgradeModal(false)}
-                    className="text-gray-400 hover:text-white text-2xl"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                {!packages.length || !selectedPackage ? (
-                  <p className="text-center text-gray-500">
+          <div
+            className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-6 z-50"
+            style={{ animation: "fadeIn 0.3s ease forwards" }}
+          >
+            <div
+              className="bg-gray-900 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-700 shadow-xl"
+              style={{ animation: "slideUp 0.3s ease forwards" }}
+            >
+              <div className="p-8">
+                {!packages.length || !subPackage ? (
+                  <p className="text-center text-gray-400 text-lg font-medium">
                     Loading packages...
                   </p>
                 ) : (
                   <>
-                    {/* Tabs */}
-                    <div className="border-b border-gray-700 mb-4">
-                      <nav className="flex space-x-4" aria-label="Tabs">
-                        {packages.map((pkg) => (
-                          <button
-                            key={pkg._id}
-                            onClick={() => setSelectedPackage(pkg.name)}
-                            className={`px-4 py-2 font-medium ${
-                              selectedPackage === pkg.name
-                                ? "border-b-2 border-white text-white"
-                                : "text-gray-400 hover:text-white"
-                            }`}
-                          >
-                            {pkg.name.charAt(0).toUpperCase() +
-                              pkg.name.slice(1)}
-                          </button>
-                        ))}
-                      </nav>
-                    </div>
-
-                    {/* Package Features */}
-                    <div className="mb-6">
-                      {packages
-                        .filter((pkg) => pkg.name === selectedPackage)
-                        .map((pkg) => (
-                          <ul
-                            key={pkg._id}
-                            className="list-disc list-inside text-gray-300 space-y-1"
-                          >
-                            {pkg.features.map((feature, index) => (
-                              <li key={index}>{feature}</li>
-                            ))}
-                          </ul>
-                        ))}
-                    </div>
+                    <Pricing
+                      subPackage={subPackage}
+                      setSubPackage={setSubPackage}
+                    />
 
                     {/* Downgrade Warning */}
-                    {packages.find((pkg) => pkg.name === selectedPackage)
-                      ?.amount < subscription?.amount && (
-                      <div className="mb-4 p-4 bg-gray-900 border border-yellow-600 rounded-md text-yellow-400">
+                    {packages.find((pkg) => pkg.name === subPackage)?.amount <
+                      subscription?.amount && (
+                      <div className="mt-6 mb-6 p-5 bg-yellow-900 border border-yellow-500 rounded-lg text-yellow-300 text-sm font-semibold shadow-sm">
                         <strong>Warning:</strong> Downgrading may limit your
                         current features or product/service capacity. This could
                         affect your business performance. Proceed with caution.
@@ -808,10 +773,10 @@ const StoreDashboard = () => {
                     )}
 
                     {/* Buttons */}
-                    <div className="flex justify-end space-x-3">
+                    <div className="flex justify-end space-x-4 mt-6">
                       <button
                         onClick={() => setShowUpgradeModal(false)}
-                        className="px-4 py-2 border border-gray-500 rounded-lg text-gray-300 hover:bg-gray-800"
+                        className="px-6 py-3 border border-gray-600 rounded-lg text-gray-400 hover:text-white hover:border-gray-400 transition-colors duration-300"
                       >
                         Cancel
                       </button>
@@ -820,7 +785,7 @@ const StoreDashboard = () => {
                           handlePackageUpgrade();
                           setShowUpgradeModal(false);
                         }}
-                        className="px-4 py-2 bg-white text-black rounded-lg hover:bg-gray-300"
+                        className="px-6 py-3 bg-white text-black rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-300"
                       >
                         Confirm Change
                       </button>
@@ -829,6 +794,27 @@ const StoreDashboard = () => {
                 )}
               </div>
             </div>
+
+            <style jsx>{`
+              @keyframes fadeIn {
+                from {
+                  opacity: 0;
+                }
+                to {
+                  opacity: 1;
+                }
+              }
+              @keyframes slideUp {
+                from {
+                  transform: translateY(20px);
+                  opacity: 0;
+                }
+                to {
+                  transform: translateY(0);
+                  opacity: 1;
+                }
+              }
+            `}</style>
           </div>
         )}
 

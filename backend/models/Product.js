@@ -25,8 +25,12 @@ const productSchema = new mongoose.Schema({
   },
   stock: {
     type: Number,
+    min: 5
+  },
+  isPreorder: {
+    type: Boolean,
     required: true,
-    min: 0
+    default:false,
   },
   storeId: {
     type: mongoose.Schema.Types.ObjectId,

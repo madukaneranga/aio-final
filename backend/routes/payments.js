@@ -6,6 +6,7 @@ import Product from "../models/Product.js";
 import Service from "../models/Service.js";
 import Store from "../models/Store.js";
 import Commission from "../models/Commission.js";
+import Notification from "../routes/notifications.js";
 import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -24,7 +25,7 @@ const PAYHERE_OAUTH_URL = "https://sandbox.payhere.lk/merchant/v1/oauth/token";
 router.post("/create-combined-intent", authenticate, async (req, res) => {
   try {
     const {
-      cartItems = [],
+      orderItems = [],
       bookingItems = [],
       shippingAddress = {},
       paymentMethod,
@@ -33,19 +34,21 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
     if (!paymentMethod || paymentMethod !== "payhere") {
       return res.status(400).json({ error: "Unsupported payment method" });
     }
+
     const combinedId = `CMB_${Date.now()}_${req.user._id}`;
     let totalAmount = 0;
-    const orderItems = [];
+
     const createdEntities = {
-      order: null,
+      order: [],
       bookings: [],
     };
 
-    // --- Handle Order Creation ---
-    if (cartItems.length > 0) {
-      let orderStoreId = null;
+    // --- Handle Orders ---
+    if (orderItems.length > 0) {
+      // Group order items by storeId
+      const storeOrderMap = new Map();
 
-      for (const item of cartItems) {
+      for (const item of orderItems) {
         const product = await Product.findById(item.productId);
         if (!product) {
           return res
@@ -59,74 +62,115 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             .json({ error: `Insufficient stock for ${product.title}` });
         }
 
-        if (!orderStoreId) {
-          orderStoreId =
-            typeof item.storeId === "object" ? item.storeId._id : item.storeId;
+        const storeId =
+          typeof item.storeId === "object"
+            ? item.storeId._id.toString()
+            : item.storeId.toString();
+
+        if (!storeOrderMap.has(storeId)) {
+          storeOrderMap.set(storeId, {
+            items: [],
+            totalAmount: 0,
+          });
         }
 
-        const itemTotal = product.price * item.quantity;
-        totalAmount += itemTotal;
+        const storeData = storeOrderMap.get(storeId);
 
-        orderItems.push({
+        storeData.items.push({
           productId: product._id,
           quantity: item.quantity,
           price: product.price,
         });
+
+        storeData.totalAmount += product.price * item.quantity;
       }
 
-      const commissionRate = 0.07;
-      const commissionAmount = totalAmount * commissionRate;
-      const storeAmount = totalAmount - commissionAmount;
+      // Create one Order per store group
+      for (const [storeId, storeData] of storeOrderMap.entries()) {
+        const commissionRate = 0.07;
+        const commissionAmount = storeData.totalAmount * commissionRate;
+        const storeAmount = storeData.totalAmount - commissionAmount;
 
-      const order = new Order({
-        customerId: req.user._id,
-        storeId: orderStoreId,
-        items: orderItems,
-        totalAmount,
-        platformFee: commissionAmount.toFixed(2),
-        storeAmount,
-        shippingAddress,
-        status: "pending",
-        combinedId,
-      });
+        const order = new Order({
+          customerId: req.user._id,
+          storeId,
+          items: storeData.items,
+          totalAmount: storeData.totalAmount,
+          platformFee: commissionAmount.toFixed(2),
+          storeAmount,
+          shippingAddress,
+          status: "pending",
+          combinedId,
+        });
 
-      await order.save();
-      createdEntities.order = order;
+        await order.save();
+
+        // Notify store owner about the order creation
+        const store = await Store.findById(storeId);
+
+        if (order) {
+          await Notification.create({
+            userId: store.ownerId,
+            title: `New order received`,
+            body: `You have a new order with ID ${order._id}`,
+            type: "order_update",
+            link: `/store/orders`,
+          });
+        }
+
+        createdEntities.order.push(order);
+        totalAmount += storeData.totalAmount;
+      }
     }
 
-    // --- Handle Booking Creation ---
-    for (const item of bookingItems) {
-      const service = await Service.findById(item.serviceId);
-      if (!service) {
-        return res
-          .status(404)
-          .json({ error: `Service ${item.serviceId} not found` });
+    // --- Handle Bookings ---
+    if (bookingItems.length > 0) {
+      for (const item of bookingItems) {
+        const service = await Service.findById(item.serviceId);
+        if (!service) {
+          return res
+            .status(404)
+            .json({ error: `Service ${item.serviceId} not found` });
+        }
+
+        const serviceAmount = service.price;
+        const commissionRate = 0.07;
+        const commissionAmount = serviceAmount * commissionRate;
+        const storeAmount = serviceAmount - commissionAmount;
+
+        const booking = new Booking({
+          customerId: req.user._id,
+          storeId: service.storeId,
+          serviceId: service._id,
+          bookingDate: item.bookingDate,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          notes: item.notes,
+          totalAmount: serviceAmount.toFixed(2),
+          platformFee: commissionAmount.toFixed(2),
+          storeAmount,
+          status: "pending",
+          combinedId,
+        });
+
+        await booking.save();
+
+        // Notify store owner about the order creation
+        const store = await Store.findById(storeId);
+
+        if (booking) {
+          await Notification.create({
+            userId: store.ownerId,
+            title: `New booking received`,
+            body: `You have a new booking with ID ${booking._id}`,
+            type: "booking_update",
+            link: `/store/bookings`,
+          });
+        }
+
+        createdEntities.bookings.push(booking);
+        totalAmount += serviceAmount;
       }
-
-      const serviceAmount = service.price;
-      totalAmount += serviceAmount;
-
-      const commissionRate = 0.07;
-      const commissionAmount = serviceAmount * commissionRate;
-      const storeAmount = serviceAmount - commissionAmount;
-
-      const booking = new Booking({
-        customerId: req.user._id,
-        storeId: service.storeId,
-        serviceId: service._id,
-        bookingDate: item.bookingDate,
-        startTime: item.startTime,
-        endTime: item.endTime,
-        notes: item.notes,
-        totalAmount: serviceAmount.toFixed(2),
-        platformFee: commissionAmount.toFixed(2),
-        storeAmount,
-        status: "pending",
-        combinedId,
-      });
-
-      await booking.save();
-      createdEntities.bookings.push(booking);
     }
 
     if (totalAmount <= 0) {
@@ -135,8 +179,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         .json({ error: "Total amount must be greater than zero" });
     }
 
-    // --- Combine Order ID and Booking IDs for unified payment reference ---
-
+    // --- Prepare PayHere Payment ---
     const combinedItemLabel = `OrderAndBooking_${combinedId}`;
 
     const hash = generatePayHereHash({
@@ -147,9 +190,8 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       merchantSecret: PAYHERE_SECRET,
     });
 
-    // --- Prepare PayHere Payment Params ---
     const paymentParams = {
-      sandbox: true, // Important for testing!
+      sandbox: true, // for testing
       merchant_id: PAYHERE_MERCHANT_ID,
       return_url: "https://aiocart.lk",
       cancel_url: "https://aiocart.lk/checkout",
@@ -166,10 +208,9 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       address: shippingAddress.street || "Unknown Address",
       city: shippingAddress.city || "Unknown City",
       country: "Sri Lanka",
-      hash: hash,
+      hash,
     };
 
-    // Log to backend console for debugging
     console.log("Payment Params generated for PayHere:", paymentParams);
 
     res.json({ success: true, paymentParams, combinedId, createdEntities });
@@ -273,56 +314,73 @@ router.post(
         merchantSecret: PAYHERE_SECRET,
       });
 
-      console.log("Generated Local MD5 Hash:", localMd5sig);
-      console.log("Received MD5 Hash:", data.md5sig);
-      console.log("Hash Input Values:", {
-        merchantId: data.merchant_id,
-        orderId: data.order_id,
-        amount: data.payhere_amount,
-        currency: data.payhere_currency,
-      });
-
       if (localMd5sig !== data.md5sig) {
         console.error("Invalid MD5 signature on PayHere IPN");
         return res.status(400).send("Invalid IPN: Hash mismatch");
       }
 
-      // Rest of the IPN handling logic (as in your original code)
       if (data.status_code === "2") {
-        let order = await Order.findOne({ combinedId: data.order_id });
-        if (order && order.paymentDetails?.paymentStatus !== "paid") {
-          for (const item of order.items) {
-            await Product.findByIdAndUpdate(item.productId, {
-              $inc: { stock: -item.quantity },
+        // Find unpaid orders for this combinedId
+        const orders = await Order.find({
+          combinedId: data.order_id,
+          "paymentDetails.paymentStatus": { $ne: "paid" },
+        });
+
+        // Find unpaid bookings for this combinedId
+        const bookings = await Booking.find({
+          combinedId: data.order_id,
+          "paymentDetails.paymentStatus": { $ne: "paid" },
+        });
+
+        if (orders.length > 0) {
+          // Process all orders
+          for (const order of orders) {
+            // Deduct stock for normal products only (skip preorder products)
+            for (const item of order.items) {
+              const product = await Product.findById(item.productId);
+              if (product && !product.isPreorder) {
+                await Product.findByIdAndUpdate(item.productId, {
+                  $inc: { stock: -item.quantity },
+                });
+              }
+            }
+
+            // Update store total sales
+            await Store.findByIdAndUpdate(order.storeId, {
+              $inc: { totalSales: order.storeAmount },
             });
+
+            // Save commission record
+            const commission = new Commission({
+              orderId: order._id,
+              storeId: order.storeId,
+              totalAmount: order.totalAmount,
+              commissionRate: 0.07,
+              commissionAmount: order.platformFee,
+              storeAmount: order.storeAmount,
+              currency: "LKR",
+              type: "order",
+            });
+            await commission.save();
+
+            // Mark order as paid
+            order.paymentDetails = {
+              paymentStatus: "paid",
+              paidAt: new Date(),
+              paymentMethod: "payhere",
+              transactionId: data.payment_id,
+            };
+            await order.save();
           }
-          await Store.findByIdAndUpdate(order.storeId, {
-            $inc: { totalSales: order.storeAmount },
-          });
-          const commission = new Commission({
-            orderId: order._id,
-            storeId: order.storeId,
-            totalAmount: order.totalAmount,
-            commissionRate: 0.07,
-            commissionAmount: order.platformFee,
-            storeAmount: order.storeAmount,
-            currency: "LKR",
-            type: "order",
-          });
-          await commission.save();
-          order.paymentDetails = {
-            paymentStatus: "paid",
-            paidAt: new Date(),
-            paymentMethod: "payhere",
-            transactionId: data.payment_id, // Use payment_id
-          };
-          await order.save();
-        } else {
-          let booking = await Booking.findOne({ combinedId: data.order_id });
-          if (booking && booking.paymentDetails?.paymentStatus !== "paid") {
+        } else if (bookings.length > 0) {
+          // Process all bookings
+          for (const booking of bookings) {
+            // Update store total sales
             await Store.findByIdAndUpdate(booking.storeId, {
               $inc: { totalSales: booking.storeAmount },
             });
+
+            // Save commission record
             const commission = new Commission({
               bookingId: booking._id,
               storeId: booking.storeId,
@@ -334,20 +392,23 @@ router.post(
               type: "booking",
             });
             await commission.save();
+
+            // Mark booking as paid
             booking.paymentDetails = {
               paymentStatus: "paid",
               paidAt: new Date(),
               paymentMethod: "payhere",
-              transactionId: data.payment_id, // Use payment_id
+              transactionId: data.payment_id,
             };
             await booking.save();
-          } else {
-            console.warn(
-              "Order or Booking not found or already paid for IPN:",
-              data.order_id
-            );
           }
+        } else {
+          console.warn(
+            "No unpaid orders or bookings found for combinedId:",
+            data.order_id
+          );
         }
+
         return res.status(200).send("OK");
       } else {
         console.warn(
@@ -357,7 +418,7 @@ router.post(
       }
     } catch (err) {
       console.error("Error processing PayHere IPN:", err);
-      res.status(500).send("Error");
+      return res.status(500).send("Error");
     }
   }
 );

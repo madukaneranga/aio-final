@@ -5,10 +5,10 @@ import { Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { formatLKR } from '../utils/currency';
 
 const Cart = () => {
-  const { cartItems, bookingItems, updateQuantity, removeFromCart, removeFromBooking, cartTotal, bookingTotal } = useCart();
+  const { orderItems, bookingItems, updateQuantity, removeFromOrder, removeFromBooking, orderTotal, bookingTotal } = useCart();
 
-  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0) + bookingItems.length;
-  const grandTotal = cartTotal + bookingTotal;
+  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0) + bookingItems.length;
+  const grandTotal = orderTotal + bookingTotal;
 
   if (totalItems === 0) {
     return (
@@ -50,11 +50,11 @@ const Cart = () => {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-6">
             {/* Products */}
-            {cartItems.length > 0 && (
+            {orderItems.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold mb-4">Products ({cartItems.length})</h2>
+                <h2 className="text-xl font-semibold mb-4">Products ({orderItems.length})</h2>
                 <div className="space-y-4">
-                  {cartItems.map((item) => (
+                  {orderItems.map((item) => (
                     <div key={item.id} className="cart-item-animate flex items-center space-x-4 p-4 border border-gray-200 rounded-lg">
                       <img
                         src={item.image ? 
@@ -86,7 +86,7 @@ const Cart = () => {
                       <div className="text-right">
                         <p className="font-semibold">{formatLKR(item.price * item.quantity)}</p>
                         <button
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => removeFromOrder(item.id)}
                           className="text-red-500 hover:text-red-700 transition-colors mt-1"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -140,10 +140,10 @@ const Cart = () => {
           <div className="bg-white rounded-lg shadow-sm p-6 h-fit">
             <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
             <div className="space-y-3">
-              {cartItems.length > 0 && (
+              {orderItems.length > 0 && (
                 <div className="flex justify-between">
-                  <span>Products ({cartItems.reduce((sum, item) => sum + item.quantity, 0)})</span>
-                  <span>{formatLKR(cartTotal)}</span>
+                  <span>Products ({orderItems.reduce((sum, item) => sum + item.quantity, 0)})</span>
+                  <span>{formatLKR(orderTotal)}</span>
                 </div>
               )}
               {bookingItems.length > 0 && (

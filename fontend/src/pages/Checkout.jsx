@@ -26,11 +26,11 @@ const provinces = [
 
 const Checkout = () => {
   const {
-    cartItems,
+    orderItems,
     bookingItems,
-    cartTotal,
+    orderTotal,
     bookingTotal,
-    clearCart,
+    clearOrder,
     clearBookings,
   } = useCart();
   const { user } = useAuth();
@@ -48,15 +48,15 @@ const Checkout = () => {
   const [payhereReady, setPayhereReady] = useState(false);
 
   const totalItems =
-    cartItems.reduce((sum, item) => sum + item.quantity, 0) +
+    orderItems.reduce((sum, item) => sum + item.quantity, 0) +
     bookingItems.length;
-  const subtotal = cartTotal + bookingTotal;
+  const subtotal = orderTotal + bookingTotal;
   const platformFee = subtotal * 0.07;
   const grandTotal = subtotal + platformFee;
 
   // Load PayHere script and detect when ready
   useEffect(() => {
-    if (cartItems.length || bookingItems.length) {
+    if (orderItems.length || bookingItems.length) {
       fetchPaymentMethods();
     }
 
@@ -75,7 +75,7 @@ const Checkout = () => {
     } else {
       setPayhereReady(true);
     }
-  }, [cartItems, bookingItems]);
+  }, [orderItems, bookingItems]);
 
   const fetchPaymentMethods = async () => {
     try {
@@ -84,9 +84,9 @@ const Checkout = () => {
       );
       if (response.ok) {
         const methods = await response.json();
-        // Always filter to payhere only if cartItems exist, otherwise show all
+        // Always filter to payhere only if orderItems exist, otherwise show all
         const filtered =
-          cartItems.length > 0
+          orderItems.length > 0
             ? methods.filter((method) => method.id === "payhere")
             : methods;
         setPaymentMethods(filtered.length > 0 ? filtered : methods);
@@ -146,7 +146,7 @@ const Checkout = () => {
     }
 
     if (
-      cartItems.length > 0 &&
+      orderItems.length > 0 &&
       (!shippingAddress.street ||
         !shippingAddress.city ||
         !shippingAddress.state ||
@@ -174,7 +174,7 @@ const Checkout = () => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
-            cartItems: cartItems.map((item) => ({
+            orderItems: orderItems.map((item) => ({
               productId: item.id,
               quantity: item.quantity,
               storeId:
@@ -227,13 +227,13 @@ const Checkout = () => {
       // Start PayHere payment
       await startPayHerePayment(paymentParams);
 
-      clearCart();
+      clearOrder();
       clearBookings();
       alert("Payment successful!");
 
-      if (cartItems.length > 0 && bookingItems.length > 0) {
+      if (orderItems.length > 0 && bookingItems.length > 0) {
         navigate("/orders");
-      } else if (cartItems.length > 0) {
+      } else if (orderItems.length > 0) {
         navigate("/orders");
       } else if (bookingItems.length > 0) {
         navigate("/bookings");
@@ -291,7 +291,7 @@ const Checkout = () => {
           {/* Checkout Form */}
           <div className="space-y-6">
             {/* Shipping Address */}
-            {cartItems.length > 0 && (
+            {orderItems.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
                   Shipping Address
@@ -454,11 +454,11 @@ const Checkout = () => {
             </h2>
 
             {/* Cart Items */}
-            {cartItems.length > 0 && (
+            {orderItems.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-medium text-gray-900 mb-3">Products</h3>
                 <div className="space-y-3">
-                  {cartItems.map((item) => (
+                  {orderItems.map((item) => (
                     <div key={item.id} className="flex items-center space-x-3">
                       <img
                         src={
