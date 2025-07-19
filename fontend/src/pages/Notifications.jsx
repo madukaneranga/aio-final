@@ -38,6 +38,8 @@ const typeIcons = {
 export default function NotificationPage() {
   const navigate = useNavigate();
 
+  const [notifications, setNotifications] = useState([]);
+
   /*const [notifications, setNotifications] = useState([
     {
       _id: "1",
