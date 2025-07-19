@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -33,17 +34,21 @@ import SalesAnalytics from './pages/SalesAnalytics';
 import PlatformSettings from './pages/PlatformSettings';
 import HelpCenter from './pages/HelpCenter';
 import ContactUs from './pages/ContactUs';
+import Notifications from './pages/Notifications';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
-
+//10002B,240046,3C096C,5A189A,7B2CBF,9D4EDD,C77DFF,E0AAFF
 
 import './App.css';
 
 function App() {
+
+
   return (
     <ErrorBoundary>
       <AuthProvider>
         <CartProvider>
+          <NotificationProvider>
           <Router>
             <div className="min-h-screen bg-white flex flex-col">
               <Header />
@@ -78,12 +83,14 @@ function App() {
                   <Route path="/contact-us" element={<ContactUs />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms-of-service" element={<TermsOfService />} />
+                  <Route path="/notifications" element={<Notifications/>} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
               <Footer />
             </div>
           </Router>
+          </NotificationProvider>
         </CartProvider>
       </AuthProvider>
     </ErrorBoundary>
