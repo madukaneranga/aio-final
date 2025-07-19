@@ -57,28 +57,7 @@ router.patch('/mark-all-read', authenticate, async (req, res) => {
   }
 });
 
-// Create (insert) a new notification
-router.post('/', authenticate, async (req, res) => {
-  try {
-    const { title, body, link, type } = req.body;
 
-    const newNotification = new Notification({
-      userId: req.user._id,
-      title,
-      body,
-      link,
-      type,
-      isRead: false,
-      isDeleted: false,
-    });
-
-    await newNotification.save();
-    res.status(201).json({ success: true, notification: newNotification });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to create notification' });
-  }
-});
 
 
 export default router;
