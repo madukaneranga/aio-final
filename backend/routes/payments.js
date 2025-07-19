@@ -120,7 +120,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             link: `/store/orders`,
           });
 
-          emitNotification(userId.toString(), notification);
+          emitNotification(store.ownerId.toString(), notification);
         }
 
         createdEntities.order.push(order);
@@ -173,7 +173,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             link: `/store/bookings`,
           });
 
-          emitNotification(userId.toString(), notification);
+          emitNotification(store.ownerId.toString(), notification);
         }
 
         createdEntities.bookings.push(booking);
