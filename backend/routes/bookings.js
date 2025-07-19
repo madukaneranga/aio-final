@@ -1,7 +1,9 @@
 import express from "express";
 import Booking from "../models/Booking.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import Notification from "../routes/notifications.js";
+import Notification from "../models/Notification.js";
+import { emitNotification } from "../index.js"; // path might change
+
 
 const router = express.Router();
 
@@ -119,7 +121,7 @@ router.put('/:id/status', authenticate, authorize('store_owner'), async (req, re
     const { title, body } = getNotificationContent(status);
 
     // Send notification to customer
-    await Notification.create({
+    const notification = await Notification.create({
       userId: booking.userId,
       title,
       body,
@@ -127,6 +129,8 @@ router.put('/:id/status', authenticate, authorize('store_owner'), async (req, re
       link: '/bookings',
     });
 
+    emitNotification(booking.userId.toString(), notification);
+    
     res.json(updatedBooking);
   } catch (error) {
     res.status(500).json({ error: error.message });
