@@ -103,10 +103,7 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "Server is running" });
 });
 
-// SPA fallback
-app.get("/", (req, res) => {
-  res.sendFile(path.resolve(__dirname, "../dist", "index.html"));
-});
+
 
 // === ERROR HANDLERS ===
 app.use(notFound);
