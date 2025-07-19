@@ -88,6 +88,20 @@ router.put('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+// Get settings history/audit log
+router.get('/history/audit', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const settings = await PlatformSettings.find()
+      .populate('lastUpdatedBy', 'name email')
+      .sort({ updatedAt: -1 })
+      .limit(50);
+
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get specific setting category
 router.get('/:category', authenticate, requireAdmin, async (req, res) => {
   try {
@@ -192,18 +206,6 @@ router.post('/reset', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Get settings history/audit log
-router.get('/history/audit', authenticate, requireAdmin, async (req, res) => {
-  try {
-    const settings = await PlatformSettings.find()
-      .populate('lastUpdatedBy', 'name email')
-      .sort({ updatedAt: -1 })
-      .limit(50);
 
-    res.json(settings);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 export default router;
