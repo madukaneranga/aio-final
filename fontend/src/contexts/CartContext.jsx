@@ -10,35 +10,46 @@ export const useCart = () => {
   return context;
 };
 
-export const CartProvider = ({ children }) => {
-  const [cartItems, setCartItems] = useState([]);
+export const CartProvider = ({ children, showToast }) => {
+  const [orderItems, setOrderItems] = useState([]);
   const [bookingItems, setBookingItems] = useState([]);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
+    const savedCart = localStorage.getItem('order');
     const savedBookings = localStorage.getItem('bookings');
-    
+
     if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
+      setOrderItems(JSON.parse(savedCart));
     }
-    
+
     if (savedBookings) {
       setBookingItems(JSON.parse(savedBookings));
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cartItems));
-  }, [cartItems]);
+    localStorage.setItem('order', JSON.stringify(orderItems));
+  }, [orderItems]);
 
   useEffect(() => {
     localStorage.setItem('bookings', JSON.stringify(bookingItems));
   }, [bookingItems]);
 
-  const addToCart = (product, quantity = 1) => {
-    setCartItems(prev => {
+  // Add to Order with confirmation if bookings exist
+  const addToOrder = (product, quantity = 1) => {
+    if (bookingItems.length > 0) {
+      const confirmClear = window.confirm(
+        'You have existing bookings in your cart. Adding an order will clear your bookings. Continue?'
+      );
+      if (!confirmClear) return;
+
+      setBookingItems([]);
+      if (showToast) showToast('Bookings cleared to add order items.');
+    }
+
+    setOrderItems(prev => {
       const existingItem = prev.find(item => item.id === product._id);
-      
+
       if (existingItem) {
         return prev.map(item =>
           item.id === product._id
@@ -46,80 +57,95 @@ export const CartProvider = ({ children }) => {
             : item
         );
       }
-      
-      return [...prev, {
-        id: product._id,
-        title: product.title,
-        price: product.price,
-        image: product.images?.[0],
-        quantity,
-        storeId: typeof product.storeId === 'object' ? product.storeId._id : product.storeId || product.storeId
-      }];
+
+      return [
+        ...prev,
+        {
+          id: product._id,
+          title: product.title,
+          price: product.price,
+          image: product.images?.[0],
+          quantity,
+          storeId:
+            typeof product.storeId === 'object'
+              ? product.storeId._id
+              : product.storeId || product.storeId,
+        },
+      ];
     });
   };
 
-  const removeFromCart = (productId) => {
-    setCartItems(prev => prev.filter(item => item.id !== productId));
+  // Add to Booking with confirmation if orders exist
+  const addToBooking = (service, bookingDetails) => {
+    if (orderItems.length > 0) {
+      const confirmClear = window.confirm(
+        'You have existing orders in your cart. Adding a booking will clear your orders. Continue?'
+      );
+      if (!confirmClear) return;
+
+      setOrderItems([]);
+      if (showToast) showToast('Orders cleared to add booking items.');
+    }
+
+    setBookingItems(prev => [
+      ...prev,
+      {
+        id: service._id,
+        title: service.title,
+        price: service.price,
+        image: service.images?.[0],
+        storeId:
+          typeof service.storeId === 'object'
+            ? service.storeId._id
+            : service.storeId || service.storeId,
+        ...bookingDetails,
+      },
+    ]);
+  };
+
+  const removeFromOrder = productId => {
+    setOrderItems(prev => prev.filter(item => item.id !== productId));
   };
 
   const updateQuantity = (productId, quantity) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromOrder(productId);
       return;
     }
-    
-    setCartItems(prev =>
-      prev.map(item =>
-        item.id === productId
-          ? { ...item, quantity }
-          : item
-      )
+
+    setOrderItems(prev =>
+      prev.map(item => (item.id === productId ? { ...item, quantity } : item))
     );
   };
 
-  const addToBooking = (service, bookingDetails) => {
-    setBookingItems(prev => [...prev, {
-      id: service._id,
-      title: service.title,
-      price: service.price,
-      image: service.images?.[0],
-      storeId: typeof service.storeId === 'object' ? service.storeId._id : service.storeId || service.storeId,
-      ...bookingDetails
-    }]);
-  };
-
-  const removeFromBooking = (serviceId) => {
+  const removeFromBooking = serviceId => {
     setBookingItems(prev => prev.filter(item => item.id !== serviceId));
   };
 
-  const clearCart = () => {
-    setCartItems([]);
-  };
+  const clearOrder = () => setOrderItems([]);
 
-  const clearBookings = () => {
-    setBookingItems([]);
-  };
+  const clearBookings = () => setBookingItems([]);
 
-  const cartTotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const orderTotal = orderItems.reduce(
+    (total, item) => total + item.price * item.quantity,
+    0
+  );
+
   const bookingTotal = bookingItems.reduce((total, item) => total + item.price, 0);
 
   const value = {
-    cartItems,
+    orderItems,
     bookingItems,
-    addToCart,
-    removeFromCart,
+    addToOrder,
+    removeFromOrder,
     updateQuantity,
     addToBooking,
     removeFromBooking,
-    clearCart,
+    clearOrder,
     clearBookings,
-    cartTotal,
-    bookingTotal
+    orderTotal,
+    bookingTotal,
   };
 
-  return (
-    <CartContext.Provider value={value}>
-      {children}
-    </CartContext.Provider>
-  );
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };

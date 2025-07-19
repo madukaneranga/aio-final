@@ -1,17 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
-import ImageGallery from '../components/ImageGallery';
-import { formatLKR } from '../utils/currency';
-import { ShoppingCart, Plus, Minus, Star, Store, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { useCart } from "../contexts/CartContext";
+import { useAuth } from "../contexts/AuthContext";
+import ImageGallery from "../components/ImageGallery";
+import { formatLKR } from "../utils/currency";
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  Star,
+  Store,
+  ArrowLeft,
+} from "lucide-react";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const { addToCart } = useCart();
+  const { addToOrder } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -21,35 +28,58 @@ const ProductDetail = () => {
 
   const fetchProduct = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products/${id}`);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/products/${id}`
+      );
       const data = await response.json();
       setProduct(data);
     } catch (error) {
-      console.error('Error fetching product:', error);
+      console.error("Error fetching product:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddToCart = () => {
+  const handleBuyNow = () => {
     if (!user) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
 
-    if (user.role !== 'customer') {
-      alert('Only customers can add items to cart');
+    if (user.role !== "customer") {
+      alert("Only customers can add items to cart");
       return;
     }
 
     // Ensure we pass the product with proper storeId
     const productWithStoreId = {
       ...product,
-      storeId: product.storeId?._id || product.storeId
+      storeId: product.storeId?._id || product.storeId,
     };
-    
-    addToCart(productWithStoreId, quantity);
-    alert('Product added to cart!');
+
+    addToOrder(productWithStoreId, quantity);
+    navigate("/cart");
+  };
+
+  const handleAddToCart = () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    if (user.role !== "customer") {
+      alert("Only customers can add items to cart");
+      return;
+    }
+
+    // Ensure we pass the product with proper storeId
+    const productWithStoreId = {
+      ...product,
+      storeId: product.storeId?._id || product.storeId,
+    };
+
+    addToOrder(productWithStoreId, quantity);
+    alert("Product added to cart!");
   };
 
   const handleQuantityChange = (change) => {
@@ -71,7 +101,9 @@ const ProductDetail = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Product not found</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Product not found
+          </h2>
           <Link to="/products" className="text-black hover:text-gray-700">
             Back to Products
           </Link>
@@ -103,9 +135,13 @@ const ProductDetail = () => {
           {/* Product Details */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">{product.title}</h1>
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                {product.title}
+              </h1>
               <div className="flex items-center space-x-4 mb-6">
-                <span className="text-5xl font-bold text-black">{formatLKR(product.price)}</span>
+                <span className="text-5xl font-bold text-black">
+                  {formatLKR(product.price)}
+                </span>
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-1">
                     <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
@@ -140,27 +176,39 @@ const ProductDetail = () => {
             {/* Product Description */}
             <div className="bg-white rounded-xl p-6 border border-gray-200">
               <h3 className="text-lg font-semibold mb-3">Description</h3>
-              <p className="text-gray-700 leading-relaxed">{product.description}</p>
+              <p className="text-gray-700 leading-relaxed">
+                {product.description}
+              </p>
             </div>
 
             {/* Stock Status */}
             <div className="bg-white rounded-xl p-6 border border-gray-200">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-gray-700">Stock Status</span>
-                <span className={`text-sm font-medium ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {product.stock > 0 ? `${product.stock} available` : 'Out of stock'}
+                <span className="text-sm font-medium text-gray-700">
+                  Stock Status
+                </span>
+                <span
+                  className={`text-sm font-medium ${
+                    product.stock > 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {product.stock > 0
+                    ? `${product.stock} available`
+                    : "Out of stock"}
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-black h-2 rounded-full transition-all"
-                  style={{ width: `${Math.min((product.stock / 100) * 100, 100)}%` }}
+                  style={{
+                    width: `${Math.min((product.stock / 100) * 100, 100)}%`,
+                  }}
                 ></div>
               </div>
             </div>
 
             {/* Quantity and Add to Cart */}
-            {product.stock > 0 && user?.role === 'customer' && (
+            {product.stock > 0 && user?.role === "customer" && (
               <div className="bg-white rounded-xl p-6 border border-gray-200 space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -174,7 +222,9 @@ const ProductDetail = () => {
                     >
                       <Minus className="w-5 h-5" />
                     </button>
-                    <span className="text-2xl font-semibold w-12 text-center">{quantity}</span>
+                    <span className="text-2xl font-semibold w-12 text-center">
+                      {quantity}
+                    </span>
                     <button
                       onClick={() => handleQuantityChange(1)}
                       disabled={quantity >= product.stock}
@@ -193,7 +243,10 @@ const ProductDetail = () => {
                     <ShoppingCart className="w-5 h-5" />
                     <span>Add to Cart</span>
                   </button>
-                  <button className="bg-white border-2 border-black text-black py-4 px-6 rounded-lg hover:bg-black hover:text-white transition-colors font-medium">
+                  <button
+                    onClick={handleBuyNow}
+                    className="bg-white border-2 border-black text-black py-4 px-6 rounded-lg hover:bg-black hover:text-white transition-colors font-medium"
+                  >
                     Buy Now - {formatLKR(product.price)}
                   </button>
                 </div>
@@ -202,15 +255,23 @@ const ProductDetail = () => {
 
             {product.stock === 0 && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                <p className="text-red-800 font-semibold text-lg">Out of Stock</p>
-                <p className="text-red-600">This item is currently unavailable.</p>
+                <p className="text-red-800 font-semibold text-lg">
+                  Out of Stock
+                </p>
+                <p className="text-red-600">
+                  This item is currently unavailable.
+                </p>
               </div>
             )}
 
-            {user?.role !== 'customer' && user && (
+            {user?.role !== "customer" && user && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-                <p className="text-yellow-800 font-semibold">Store Owner Account</p>
-                <p className="text-yellow-600">Only customers can purchase products.</p>
+                <p className="text-yellow-800 font-semibold">
+                  Store Owner Account
+                </p>
+                <p className="text-yellow-600">
+                  Only customers can purchase products.
+                </p>
               </div>
             )}
           </div>

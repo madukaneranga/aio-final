@@ -1,73 +1,109 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
-import { Search, ShoppingCart, User, Menu, X, Store, Plus, Package, Calendar, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { useCart } from "../contexts/CartContext";
+import { useNotifications } from "../contexts/NotificationContext";
+import {
+  Search,
+  ShoppingCart,
+  Bell,
+  User,
+  Menu,
+  X,
+  Store,
+  Plus,
+  Package,
+  Calendar,
+  TrendingUp,
+} from "lucide-react";
 
 const Header = () => {
   const { user, logout } = useAuth();
-  const { cartItems, bookingItems } = useCart();
+  const { orderItems, bookingItems } = useCart();
+  const { unreadCount } = useNotifications();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/products?search=${searchQuery}`);
-      setSearchQuery('');
+      setSearchQuery("");
     }
   };
 
   const handleLogout = () => {
     logout();
     setIsUserMenuOpen(false);
-    navigate('/');
+    navigate("/");
   };
 
-  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0) + bookingItems.length;
+  const totalItems =
+    orderItems.reduce((sum, item) => sum + item.quantity, 0) +
+    bookingItems.length;
 
   return (
-    <header className={`sticky top-0 z-50 transition-all duration-300 ${
-      isScrolled ? 'bg-white/95 backdrop-blur-md shadow-lg' : 'bg-white'
-    }`}>
+    <header
+      className={`sticky top-0 z-50 transition-all duration-300 ${
+        isScrolled ? "bg-white/95 backdrop-blur-md shadow-lg" : "bg-white"
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="text-2xl font-bold text-black hover:text-gray-700 transition-colors">
+          <Link
+            to="/"
+            className="text-2xl font-bold text-black hover:text-gray-700 transition-colors"
+          >
             AIO
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
-            <Link to="/stores" className="text-gray-700 hover:text-black transition-colors font-medium">
+            <Link
+              to="/stores"
+              className="text-gray-700 hover:text-black transition-colors font-medium"
+            >
               Stores
             </Link>
-            <Link to="/products" className="text-gray-700 hover:text-black transition-colors font-medium">
+            <Link
+              to="/products"
+              className="text-gray-700 hover:text-black transition-colors font-medium"
+            >
               Products
             </Link>
-            <Link to="/services" className="text-gray-700 hover:text-black transition-colors font-medium">
+            <Link
+              to="/services"
+              className="text-gray-700 hover:text-black transition-colors font-medium"
+            >
               Services
             </Link>
-            {user?.role === 'store_owner' && (
-              <Link to="/dashboard" className="text-gray-700 hover:text-black transition-colors font-medium">
+            {user?.role === "store_owner" && (
+              <Link
+                to="/dashboard"
+                className="text-gray-700 hover:text-black transition-colors font-medium"
+              >
                 Dashboard
               </Link>
             )}
           </nav>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="hidden lg:flex items-center space-x-2">
+          <form
+            onSubmit={handleSearch}
+            className="hidden lg:flex items-center space-x-2"
+          >
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
@@ -83,7 +119,7 @@ const Header = () => {
           {/* Right Side Actions */}
           <div className="flex items-center space-x-4">
             {/* Cart - Only for customers */}
-            {user?.role === 'customer' && (
+            {user?.role === "customer" && (
               <Link
                 to="/cart"
                 className="relative p-2 text-gray-700 hover:text-black transition-colors"
@@ -97,6 +133,21 @@ const Header = () => {
               </Link>
             )}
 
+            {user && (
+              <Link
+                to="/notifications"
+                className="relative p-2 text-gray-700 hover:text-black transition-colors"
+                aria-label={`You have ${unreadCount} unread notifications`}
+              >
+                <Bell className="w-6 h-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
             {/* User Menu */}
             {user ? (
               <div className="relative">
@@ -105,16 +156,20 @@ const Header = () => {
                   className="flex items-center space-x-2 p-2 text-gray-700 hover:text-black transition-colors"
                 >
                   <User className="w-6 h-6" />
-                  <span className="hidden sm:block font-medium">{user.name}</span>
+                  <span className="hidden sm:block font-medium">
+                    {user.name}
+                  </span>
                 </button>
-                
+
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                     <div className="px-4 py-2 border-b border-gray-200">
                       <p className="font-medium text-gray-900">{user.name}</p>
-                      <p className="text-sm text-gray-500 capitalize">{user.role.replace('_', ' ')}</p>
+                      <p className="text-sm text-gray-500 capitalize">
+                        {user.role.replace("_", " ")}
+                      </p>
                     </div>
-                    
+
                     <Link
                       to="/profile"
                       className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
@@ -122,8 +177,8 @@ const Header = () => {
                     >
                       Profile Settings
                     </Link>
-                    
-                    {user.role === 'customer' && (
+
+                    {user.role === "customer" && (
                       <>
                         <Link
                           to="/orders"
@@ -141,8 +196,8 @@ const Header = () => {
                         </Link>
                       </>
                     )}
-                    
-                    {user.role === 'store_owner' && (
+
+                    {user.role === "store_owner" && (
                       <>
                         <Link
                           to="/dashboard"
@@ -186,7 +241,7 @@ const Header = () => {
                         </Link>
                       </>
                     )}
-                    
+
                     <hr className="my-2" />
                     <button
                       onClick={handleLogout}
@@ -219,7 +274,11 @@ const Header = () => {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden p-2 text-gray-700 hover:text-black transition-colors"
             >
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
           </div>
         </div>
@@ -228,7 +287,10 @@ const Header = () => {
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-200">
             <div className="space-y-4">
-              <form onSubmit={handleSearch} className="flex items-center space-x-2">
+              <form
+                onSubmit={handleSearch}
+                className="flex items-center space-x-2"
+              >
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
@@ -240,7 +302,7 @@ const Header = () => {
                   />
                 </div>
               </form>
-              
+
               <nav className="space-y-2">
                 <Link
                   to="/stores"
@@ -263,7 +325,7 @@ const Header = () => {
                 >
                   Services
                 </Link>
-                {user?.role === 'store_owner' && (
+                {user?.role === "store_owner" && (
                   <Link
                     to="/dashboard"
                     className="block text-gray-700 hover:text-black transition-colors font-medium"
