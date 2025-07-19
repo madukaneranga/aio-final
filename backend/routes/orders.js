@@ -2,6 +2,7 @@ import express from "express";
 import Order from "../models/Order.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import Notification from "../models/Notification.js";
+import { emitNotification } from "../index.js";
 
 const router = express.Router();
 
@@ -128,16 +129,18 @@ router.put(
       );
 
       // Get friendly title & body
-    const { title, body } = getNotificationContent(status);
+      const { title, body } = getNotificationContent(status);
 
       // Send notification to customer
-      await Notification.create({
-        userId: booking.userId,
+      const notification = await Notification.create({
+        userId: order.userId,
         title,
         body,
         type: "order_update",
         link: "/orders",
       });
+
+      emitNotification(order.userId.toString(), notification);
 
       res.json(updatedOrder);
     } catch (error) {

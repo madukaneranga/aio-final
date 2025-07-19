@@ -5,6 +5,8 @@ import Booking from "../models/Booking.js";
 import Store from "../models/Store.js";
 import Notification from "../models/Notification.js";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { emitNotification } from "../index.js"; 
+
 
 const router = express.Router();
 
@@ -103,13 +105,15 @@ router.post("/", authenticate, authorize("customer"), async (req, res) => {
     // Notify store owner about the order creation
     const store = await Store.findById(storeId);
 
-    await Notification.create({
+    const notification = await Notification.create({
       userId: store.ownerId,
       title: "New Review Received",
       body: "Your store has received a new customer review. Please respond to maintain excellent customer engagement.",
       type: "review",
       link: `/store/${store._id}`,
     });
+
+    emitNotification(store.ownerId.toString(), notification);
 
     // Update store rating
     await updateStoreRating(storeId);
@@ -183,13 +187,15 @@ router.put(
       // Notify store owner about the order creation
       const store = await Store.findById(storeId);
 
-      await Notification.create({
-        userId: customer._id, // customer's user ID
+      const notification = await Notification.create({
+        userId: review.customerId, // customer's user ID
         title: "Response to Your Review",
         body: "The store owner has responded to your review. Please check their reply.",
         type: "review_response",
-        link: `/store/${order._id}`, // or the appropriate page
+        link: `/store/${store._id}`, // or the appropriate page
       });
+
+      emitNotification(review.customerId.toString(), notification);
 
       res.json(review);
     } catch (error) {

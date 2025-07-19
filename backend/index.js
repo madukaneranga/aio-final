@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import path from "path";
 import { fileURLToPath } from "url";
+import http from "http";
+import { Server } from "socket.io";
 
 // Route imports
 import authRoutes from "./routes/auth.js";
@@ -19,26 +21,66 @@ import subscriptionRoutes from "./routes/subscriptions.js";
 import commissionRoutes from "./routes/commissions.js";
 import notificationsRoutes from "./routes/notifications.js";
 import platformSettingsRoutes from "./routes/platformSettings.js";
-import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import packageRoutes from "./routes/packages.js";
+import { errorHandler, notFound } from "./middleware/errorHandler.js";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
-
 const app = express();
-const PORT = process.env.PORT || 5000;
+const server = http.createServer(app); // for socket.io
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
+  },
+});
 
-// Middleware
-app.use(cors());
+// === SOCKET.IO CONNECTIONS ===
+const userSocketMap = new Map();
+
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
+
+  socket.on("join", (userId) => {
+    userSocketMap.set(userId, socket.id);
+    console.log(`User ${userId} joined socket ${socket.id}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+    for (const [userId, socketId] of userSocketMap.entries()) {
+      if (socketId === socket.id) {
+        userSocketMap.delete(userId);
+        break;
+      }
+    }
+  });
+});
+
+// Export this function for routes to emit notifications
+export const emitNotification = (userId, notification) => {
+  const socketId = userSocketMap.get(userId);
+  if (socketId) {
+    io.to(socketId).emit("new-notification", notification);
+  }
+};
+
+// === MIDDLEWARE ===
+app.use(cors({
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files
+// === FILES ===
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Routes
+// === ROUTES ===
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/stores", storeRoutes);
@@ -54,28 +96,33 @@ app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
 
-// Serve static files from React build
+// === REACT BUILD ===
 app.use(express.static(path.join(__dirname, "../dist")));
-// MongoDB connection
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
 
-// Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "Server is running" });
 });
 
-// Serve React app for all non-API routes
+// SPA fallback
 app.get("*", (req, res) => {
   res.sendFile(path.resolve(__dirname, "../dist", "index.html"));
 });
 
-// Error handling middleware
+// === ERROR HANDLERS ===
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// === CONNECT MONGO & START SERVER ===
+const PORT = process.env.PORT || 5000;
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("MongoDB connected");      
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });

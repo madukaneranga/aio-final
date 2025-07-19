@@ -8,6 +8,8 @@ import Store from "../models/Store.js";
 import Commission from "../models/Commission.js";
 import Notification from "../models/Notification.js";
 import { authenticate } from "../middleware/auth.js";
+import { emitNotification } from "../index.js"
+
 
 const router = express.Router();
 
@@ -109,13 +111,15 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         const store = await Store.findById(storeId);
 
         if (order) {
-          await Notification.create({
+          const notification = await Notification.create({
             userId: store.ownerId,
             title: `New order received`,
             body: `You have a new order with ID ${order._id}`,
             type: "order_update",
             link: `/store/orders`,
           });
+
+          emitNotification(userId.toString(), notification);
         }
 
         createdEntities.order.push(order);
@@ -159,13 +163,15 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         const store = await Store.findById(service.storeId);
 
         if (booking) {
-          await Notification.create({
+          const notification = await Notification.create({
             userId: store.ownerId,
             title: `New booking received`,
             body: `You have a new booking with ID ${booking._id}`,
             type: "booking_update",
             link: `/store/bookings`,
           });
+
+          emitNotification(userId.toString(), notification);
         }
 
         createdEntities.bookings.push(booking);
