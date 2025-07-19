@@ -81,20 +81,65 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // === ROUTES ===
+console.log("Starting route registrations");
+
+console.log("Registering /api/auth routes");
 app.use("/api/auth", authRoutes);
+console.log("/api/auth routes registered");
+
+console.log("Registering /api/users routes");
 app.use("/api/users", userRoutes);
+console.log("/api/users routes registered");
+
+console.log("Registering /api/stores routes");
 app.use("/api/stores", storeRoutes);
+console.log("/api/stores routes registered");
+
+console.log("Registering /api/products routes");
 app.use("/api/products", productRoutes);
+console.log("/api/products routes registered");
+
+console.log("Registering /api/services routes");
 app.use("/api/services", serviceRoutes);
+console.log("/api/services routes registered");
+
+console.log("Registering /api/orders routes");
 app.use("/api/orders", orderRoutes);
+console.log("/api/orders routes registered");
+
+console.log("Registering /api/bookings routes");
 app.use("/api/bookings", bookingRoutes);
+console.log("/api/bookings routes registered");
+
+console.log("Registering /api/payments routes");
 app.use("/api/payments", paymentRoutes);
+console.log("/api/payments routes registered");
+
+console.log("Registering /api/reviews routes");
 app.use("/api/reviews", reviewRoutes);
+console.log("/api/reviews routes registered");
+
+console.log("Registering /api/subscriptions routes");
 app.use("/api/subscriptions", subscriptionRoutes);
+console.log("/api/subscriptions routes registered");
+
+console.log("Registering /api/commissions routes");
 app.use("/api/commissions", commissionRoutes);
+console.log("/api/commissions routes registered");
+
+console.log("Registering /api/platform-settings routes");
 app.use("/api/platform-settings", platformSettingsRoutes);
+console.log("/api/platform-settings routes registered");
+
+console.log("Registering /api/packages routes");
 app.use("/api/packages", packageRoutes);
+console.log("/api/packages routes registered");
+
+console.log("Registering /api/notifications routes");
 app.use("/api/notifications", notificationsRoutes);
+console.log("/api/notifications routes registered");
+
+console.log("All routes registered");
 
 // === REACT BUILD ===
 app.use(express.static(path.join(__dirname, "../dist")));
@@ -103,7 +148,10 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "Server is running" });
 });
 
-
+// SPA fallback
+app.get("/", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "../dist", "index.html"));
+});
 
 // === ERROR HANDLERS ===
 app.use(notFound);
