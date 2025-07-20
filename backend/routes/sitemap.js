@@ -1,10 +1,11 @@
+
 import express from "express";
 import Product from "../models/Product.js";
 import Service from "../models/Service.js";
 
 const router = express.Router();
 
-router.get("/sitemap.xml", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const products = await Product.find({}, "_id");
     const services = await Service.find({}, "_id");
@@ -58,9 +59,9 @@ router.get("/sitemap.xml", async (req, res) => {
     res.header("Content-Type", "application/xml");
     res.send(xml);
   } catch (err) {
+    console.error("Failed to generate sitemap:", err);
     res.status(500).send("Failed to generate sitemap");
   }
 });
-
 
 export default router;
