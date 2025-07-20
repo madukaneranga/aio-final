@@ -101,7 +101,7 @@ app.use("/api/commissions", commissionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
-app.use("/", sitemapRoutes);
+app.use("/sitemap.xml", sitemapRoutes);
 console.log("All routes registered");
 
 // --- React frontend serving ---
@@ -118,9 +118,9 @@ if (existsSync(indexHtmlPath)) {
 }
 
 // Health check route
-app.get("/api/health", (req, res) => {
-  res.json({ status: "Server is running" });
-});
+ app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
+    res.sendFile(indexHtmlPath);
+  });
 
 // --- Error handlers ---
 app.use(notFound);
