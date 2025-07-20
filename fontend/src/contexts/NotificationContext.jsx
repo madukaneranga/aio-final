@@ -1,116 +1,121 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from "react";
 import { io } from "socket.io-client";
 
 const NotificationContext = createContext();
-export const useNotifications = () => useContext(NotificationContext);
 
-export const NotificationProvider = ({ userId, children }) => {
+export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [socket, setSocket] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Setup socket connection
+  // 1. Fetch initial notifications
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications);
+        const unread = data.notifications.filter(n => !n.isRead && !n.isDeleted).length;
+        setUnreadCount(unread);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    }
+  };
+
+  // 2. Real-time setup
   useEffect(() => {
-    if (!userId) return;
+    fetchNotifications();
 
-    const s = io(import.meta.env.VITE_API_URL);
-    setSocket(s);
-    s.emit("join", userId);
+    const socket = io(import.meta.env.VITE_API_URL, {
+      auth: {
+        token: localStorage.getItem("token"),
+      },
+    });
 
-    s.on("new-notification", (notification) => {
+    socket.on("newNotification", (notification) => {
       setNotifications(prev => [notification, ...prev]);
+      setUnreadCount(prev => prev + 1);
     });
 
     return () => {
-      s.disconnect();
+      socket.disconnect();
     };
-  }, [userId]);
+  }, []);
 
-  // Fetch initial notifications
-  useEffect(() => {
-    if (!userId) {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
-
-    async function fetchNotifications() {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setNotifications(res.ok ? data.notifications : []);
-      } catch (err) {
-        console.error("Fetch error", err);
-        setNotifications([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchNotifications();
-  }, [userId]);
-
+  // 3. Mark one as read
   const markAsRead = async (id) => {
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       if (res.ok) {
-        setNotifications(prev => prev.map(n => (n._id === id ? { ...n, isRead: true } : n)));
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount((prev) => prev - 1);
       }
     } catch (e) {
       console.error("Mark read failed", e);
     }
   };
 
-  const softDelete = async (id) => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${id}/delete`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setNotifications(prev => prev.map(n => (n._id === id ? { ...n, isDeleted: true } : n)));
-      }
-    } catch (e) {
-      console.error("Soft delete failed", e);
-    }
-  };
-
+  // 4. Mark all as read
   const markAllRead = async () => {
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/mark-all-read`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       if (res.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, isRead: true }))
+        );
+        setUnreadCount(0);
       }
     } catch (e) {
       console.error("Mark all read failed", e);
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead && !n.isDeleted).length;
-  const visibleNotifications = notifications.filter(n => !n.isDeleted);
+  // 5. Soft delete
+  const softDelete = async (id) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${id}/delete`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === id ? { ...n, isDeleted: true } : n))
+        );
+      }
+    } catch (e) {
+      console.error("Soft delete failed", e);
+    }
+  };
 
   return (
-    <NotificationContext.Provider value={{
-      notifications: visibleNotifications,
-      unreadCount,
-      loading,
-      markAsRead,
-      softDelete,
-      markAllRead,
-    }}>
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        unreadCount,
+        fetchNotifications,
+        markAsRead,
+        markAllRead,
+        softDelete,
+        setNotifications,
+        setUnreadCount,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );
 };
+
+export const useNotifications = () => useContext(NotificationContext);

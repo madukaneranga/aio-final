@@ -122,7 +122,7 @@ router.put('/:id/status', authenticate, authorize('store_owner'), async (req, re
 
     // Send notification to customer
     const notification = await Notification.create({
-      userId: booking.userId,
+      userId: booking.customerId,
       title,
       userType:"customer",
       body,
@@ -130,7 +130,7 @@ router.put('/:id/status', authenticate, authorize('store_owner'), async (req, re
       link: '/bookings',
     });
 
-    emitNotification(booking.userId.toString(), notification);
+    emitNotification(booking.customerId.toString(), notification);
     
     res.json(updatedBooking);
   } catch (error) {

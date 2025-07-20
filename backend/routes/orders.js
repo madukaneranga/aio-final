@@ -108,13 +108,16 @@ router.put(
   async (req, res) => {
     try {
       const { status, trackingNumber, notes } = req.body;
+      console.log("Received status update:", { status, trackingNumber, notes });
 
       const order = await Order.findById(req.params.id);
       if (!order) {
+        console.log("Order not found:", req.params.id);
         return res.status(404).json({ error: "Order not found" });
       }
 
       if (order.storeId.toString() !== req.user.storeId.toString()) {
+        console.log("Access denied for user:", req.user._id);
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -127,24 +130,32 @@ router.put(
         updates,
         { new: true }
       );
+      console.log("Order updated:", updatedOrder);
 
       // Get friendly title & body
-      const { title, body } = getNotificationContent(status);
+      const { title, body } = getOrderNotificationContent(status);
+      console.log("Notification content:", { title, body });
 
       // Send notification to customer
       const notification = await Notification.create({
-        userId: order.userId,
+        userId: order.customerId,
         title,
-        userType:"customer",
+        userType: "customer",
         body,
         type: "order_update",
         link: "/orders",
       });
+      console.log("Notification created:", notification);
 
-      emitNotification(order.userId.toString(), notification);
+      try {
+        emitNotification(order.customerId.toString(), notification);
+      } catch (emitError) {
+        console.error("Failed to emit notification:", emitError);
+      }
 
       res.json(updatedOrder);
     } catch (error) {
+      console.error("Error in updating order status:", error);
       res.status(500).json({ error: error.message });
     }
   }
