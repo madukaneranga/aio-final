@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import vitePrerender from "vite-plugin-prerender";
+const dotenv = require("dotenv");
+dotenv.config();
 
 
 async function getDynamicRoutes() {
@@ -34,7 +36,6 @@ export default async () => {
       outDir: 'dist',
     },
     server: {
-      historyApiFallback: true,
       proxy: {
         '/api': process.env.VITE_API_URL || 'http://localhost:5000', 
       },
