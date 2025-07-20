@@ -118,9 +118,9 @@ if (existsSync(indexHtmlPath)) {
 }
 
 // Health check route
- app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
-    res.sendFile(indexHtmlPath);
-  });
+ //app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
+    //res.sendFile(indexHtmlPath);
+  //});
 
 // --- Error handlers ---
 app.use(notFound);
