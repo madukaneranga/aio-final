@@ -52,8 +52,6 @@ export default function Notifications() {
   } = useNotifications();
 
 
-  console.log("notifications length:", notifications.length);
-console.log("notifications data:", notifications);
 
   const onLoadMore = () => {
     if (setPage) setPage((p) => p + 1);
