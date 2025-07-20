@@ -30,7 +30,9 @@ const typeColors = {
 };
 
 const typeIcons = {
-  order: <CheckCircle className="w-5 h-5" />,
+  order_update: <CheckCircle className="w-5 h-5" />,
+  booking_update: <CheckCircle className="w-5 h-5" />,
+  review_update: <CheckCircle className="w-5 h-5" />,
   promotion: <Gift className="w-5 h-5" />,
   warning: <ShieldAlert className="w-5 h-5" />,
   announcement: <Megaphone className="w-5 h-5" />,
