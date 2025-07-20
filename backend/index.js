@@ -36,7 +36,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CLIENT_URL || "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
   },
@@ -112,10 +112,10 @@ if (existsSync(indexHtmlPath)) {
   app.use(express.static(distPath));
 
   // Serve React app only for non-API requests
-  //app.get(/^\/(?!api).*/, (req, res) => {
-    //res.sendFile(indexHtmlPath);
-  //});
-//}
+  app.get(/^\/(?!api).*/, (req, res) => {
+    res.sendFile(indexHtmlPath);
+  });
+}
 
 // Health check route
  app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
