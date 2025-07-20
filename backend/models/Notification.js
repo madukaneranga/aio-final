@@ -4,7 +4,7 @@ const notificationSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    refPath: "userType",
+    refPath: "User",
   },
   userType: {
     type: String,
@@ -34,6 +34,5 @@ const notificationSchema = new mongoose.Schema({
 });
 
 
-notificationSchema.index({ userId: 1, isDeleted: 1, createdAt: -1 });
 
 export default mongoose.model("Notification", notificationSchema);

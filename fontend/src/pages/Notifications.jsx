@@ -38,19 +38,26 @@ const typeIcons = {
   announcement: <Megaphone className="w-5 h-5" />,
 };
 
-export default function NotificationPage() {
+export default function Notifications() {
   const navigate = useNavigate();
   const {
     notifications,
     loading,
+    isLoaded,
     markAsRead,
     softDelete,
     markAllRead,
     setPage,
-    total,
+    total = 0,
   } = useNotifications();
 
-  const onLoadMore = () => setPage((p) => p + 1);
+
+  console.log("notifications length:", notifications.length);
+console.log("notifications data:", notifications);
+
+  const onLoadMore = () => {
+    if (setPage) setPage((p) => p + 1);
+  };
 
   const onNotificationClick = (n) => {
     if (!n.isRead) markAsRead(n._id);
@@ -75,13 +82,15 @@ export default function NotificationPage() {
           </button>
         </header>
 
-        {notifications.length === 0 && !loading && (
+        {!loading && isLoaded && notifications.length === 0 && (
           <p className="text-center mt-10 text-gray-500">
             No notifications to show.
           </p>
         )}
 
-        {loading && <p className="text-center mt-10">Loading notifications...</p>}
+        {loading && (
+          <p className="text-center mt-10 text-gray-500">Loading notifications...</p>
+        )}
 
         <ul className="space-y-4">
           {notifications.map((n) => (

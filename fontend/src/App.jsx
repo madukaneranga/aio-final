@@ -42,10 +42,9 @@ import './App.css';
 
 // ✅ Moved NotificationProvider into separate component to use `useAuth`
 function AppWrapper() {
-  const { currentUser } = useAuth();
 
   return (
-    <NotificationProvider userId={currentUser?._id}>
+    <NotificationProvider>
       <Router>
         <div className="min-h-screen bg-white flex flex-col">
           <Header />

@@ -231,7 +231,9 @@ const StoreDashboard = () => {
       }
       const subscriptionData = await subscriptionResponse.json();
       setSubscription(subscriptionData);
-      setSubPackage(subscriptionData.package);
+      if (subscriptionData) {
+        setSubPackage(subscriptionData.package);
+      }
 
       // Fetch all packages
       const packageResponse = await fetch(
