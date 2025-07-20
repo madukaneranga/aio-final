@@ -112,10 +112,10 @@ if (existsSync(indexHtmlPath)) {
   app.use(express.static(distPath));
 
   // Serve React app only for non-API requests
-  app.get(/^\/(?!api).*/, (req, res) => {
-    res.sendFile(indexHtmlPath);
-  });
-}
+  //app.get(/^\/(?!api).*/, (req, res) => {
+    //res.sendFile(indexHtmlPath);
+  //});
+//}
 
 // Health check route
  app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
