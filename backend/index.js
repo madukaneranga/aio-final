@@ -23,6 +23,7 @@ import commissionRoutes from "./routes/commissions.js";
 import notificationsRoutes from "./routes/notifications.js";
 import platformSettingsRoutes from "./routes/platformSettings.js";
 import packageRoutes from "./routes/packages.js";
+import sitemapRoutes from "./routes/sitemap.js";
 
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
@@ -100,6 +101,7 @@ app.use("/api/commissions", commissionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/", sitemapRoutes);
 console.log("All routes registered");
 
 // --- React frontend serving ---
