@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import http from "http";
 import { Server } from "socket.io";
 import { existsSync } from "fs";
+import jwt from "jsonwebtoken";
 
 // Import your route modules
 import authRoutes from "./routes/auth.js";
@@ -42,25 +43,36 @@ const io = new Server(server, {
   },
 });
 
+// --- Socket.IO authentication middleware ---
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    console.log("Socket auth failed: No token provided");
+    return next(new Error("Authentication error"));
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.userId = decoded.id; // Adjust if your JWT payload has a different user ID field
+    next();
+  } catch (err) {
+    console.log("Socket auth failed:", err.message);
+    return next(new Error("Authentication error"));
+  }
+});
+
 // --- Socket.IO setup ---
 const userSocketMap = new Map();
 
 io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
+  console.log("Socket connected:", socket.id, "userId:", socket.userId);
 
-  socket.on("join", (userId) => {
-    userSocketMap.set(userId, socket.id);
-    console.log(`User ${userId} joined socket ${socket.id}`);
-  });
+  // Save mapping userId -> socket.id
+  userSocketMap.set(socket.userId, socket.id);
 
   socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);
-    for (const [userId, socketId] of userSocketMap.entries()) {
-      if (socketId === socket.id) {
-        userSocketMap.delete(userId);
-        break;
-      }
-    }
+    userSocketMap.delete(socket.userId);
   });
 });
 
@@ -114,13 +126,13 @@ if (existsSync(indexHtmlPath)) {
   // Serve React app only for non-API requests
   app.get(/^\/(?!api).*/, (req, res) => {
     res.sendFile(indexHtmlPath);
-});
+  });
 }
 
 // Health check route
- app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
-    res.sendFile(indexHtmlPath);
-  });
+app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
+  res.sendFile(indexHtmlPath);
+});
 
 // --- Error handlers ---
 app.use(notFound);
