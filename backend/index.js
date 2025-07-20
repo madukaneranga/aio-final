@@ -23,7 +23,7 @@ import commissionRoutes from "./routes/commissions.js";
 import notificationsRoutes from "./routes/notifications.js";
 import platformSettingsRoutes from "./routes/platformSettings.js";
 import packageRoutes from "./routes/packages.js";
-//import sitemapRoutes from "./routes/sitemap.js";
+import sitemapRoutes from "./routes/sitemap.js";
 
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
@@ -101,7 +101,7 @@ app.use("/api/commissions", commissionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
-//app.use("/sitemap.xml", sitemapRoutes);
+app.use("/sitemap.xml", sitemapRoutes);
 console.log("All routes registered");
 
 // --- React frontend serving ---
@@ -112,15 +112,15 @@ if (existsSync(indexHtmlPath)) {
   app.use(express.static(distPath));
 
   // Serve React app only for non-API requests
-  //app.get(/^\/(?!api).*/, (req, res) => {
-    //res.sendFile(indexHtmlPath);
-//});
+  app.get(/^\/(?!api).*/, (req, res) => {
+    res.sendFile(indexHtmlPath);
+});
 }
 
 // Health check route
- //app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
-    //res.sendFile(indexHtmlPath);
-  //});
+ app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
+    res.sendFile(indexHtmlPath);
+  });
 
 // --- Error handlers ---
 app.use(notFound);
