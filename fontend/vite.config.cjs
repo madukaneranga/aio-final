@@ -5,8 +5,8 @@ import vitePrerender from "vite-plugin-prerender";
 
 async function getDynamicRoutes() {
   try {
-    const products = await fetch(`${import.meta.env.VITE_API_URL}/api/products`).then(res => res.json());
-    const services = await fetch(`${import.meta.env.VITE_API_URL}/api/services`).then(res => res.json());
+    const products = await fetch(`${process.env.VITE_API_URL}/api/products`).then(res => res.json());
+    const services = await fetch(`${process.env.VITE_API_URL}/api/services`).then(res => res.json());
 
     const productRoutes = products.map(p => `/products/${p.id}`);
     const serviceRoutes = services.map(s => `/services/${s.id}`);
@@ -36,7 +36,7 @@ export default async () => {
     server: {
       historyApiFallback: true,
       proxy: {
-        '/api': meta.env.VITE_API_URL || 'http://localhost:5000', 
+        '/api': process.env.VITE_API_URL || 'http://localhost:5000', 
       },
     },
   });
