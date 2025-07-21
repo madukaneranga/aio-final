@@ -15,13 +15,13 @@ const router = express.Router();
 
 const PAYHERE_MERCHANT_ID = "1231188";
 const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy";
-const PAYHERE_REFUND_URL = "https://sandbox.payhere.lk/merchant/v1/refund";
+const PAYHERE_REFUND_URL = "https://payhere.lk/merchant/v1/refund";
 const PAYHERE_APP_ID =
   process.env.PAYHERE_APP_ID || "4OVxzVJAbSK4JFnJjJNzoH3TV";
 const PAYHERE_APP_SECRET =
   process.env.PAYHERE_APP_SECRET ||
   "8cJlAdroxID8n0No30NAwT8m22kmMKNW98cJlqgSYpMa";
-const PAYHERE_OAUTH_URL = "https://sandbox.payhere.lk/merchant/v1/oauth/token";
+const PAYHERE_OAUTH_URL = "https://payhere.lk/merchant/v1/oauth/token";
 
 //checkout
 router.post("/create-combined-intent", authenticate, async (req, res) => {
