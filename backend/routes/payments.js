@@ -177,7 +177,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         if (booking) {
           const storeNotification = await Notification.create({
             userId: store.ownerId,
-            title: `New booking received`,
+            title: `New Booking received`,
             userType: "store_owner",
             body: `You have a new booking with ID #${booking._id.slice(-8)}`,
             type: "booking_update",

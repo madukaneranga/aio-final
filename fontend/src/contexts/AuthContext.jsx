@@ -44,6 +44,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
+        initSocket(token);
       } else {
         localStorage.removeItem("token");
         disconnectSocket(); // <-- Disconnect socket if invalid token
