@@ -121,8 +121,13 @@ const StoreManagement = () => {
       // If new images selected, upload and get URLs
       if (heroImages.length > 0) {
         const uploadPromises = heroImages.map(async (file) => {
+          const compressedFile = await imageCompression(file, {
+            maxSizeMB: 0.5, // compress to under 0.5 MB
+            maxWidthOrHeight: 800, // resize to 800px max
+            useWebWorker: true,
+          });
           const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-          await uploadBytes(imageRef, file);
+          await uploadBytes(imageRef, compressedFile);
           return getDownloadURL(imageRef);
         });
 
@@ -172,9 +177,14 @@ const StoreManagement = () => {
     if (!profileImage) return;
 
     try {
+      const compressedFile = await imageCompression(profileImage, {
+        maxSizeMB: 0.5, // compress to under 0.5 MB
+        maxWidthOrHeight: 800, // resize to 800px max
+        useWebWorker: true,
+      });
       // Upload a single image to Firebase
       const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
-      await uploadBytes(imageRef, profileImage);
+      await uploadBytes(imageRef, compressedFile);
       const imageUrl = await getDownloadURL(imageRef);
 
       const payload = {

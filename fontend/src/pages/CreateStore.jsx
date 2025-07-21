@@ -67,8 +67,15 @@ const CreateStore = () => {
     try {
       // 🔄 Upload hero images to Firebase
       const uploadPromises = heroImages.map(async (file) => {
+        // Resize/Compress the image
+        const compressedFile = await imageCompression(file, {
+          maxSizeMB: 0.5, // compress to under 0.5 MB
+          maxWidthOrHeight: 800, // resize to 800px max
+          useWebWorker: true,
+        });
+
         const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, file);
+        await uploadBytes(imageRef, compressedFile);
         return getDownloadURL(imageRef);
       });
 

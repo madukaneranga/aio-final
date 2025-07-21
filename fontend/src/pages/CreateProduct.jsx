@@ -1,85 +1,89 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import ImageUpload from '../components/ImageUpload';
-import LoadingSpinner from '../components/LoadingSpinner';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import ImageUpload from "../components/ImageUpload";
+import LoadingSpinner from "../components/LoadingSpinner";
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
 
-
 const CreateProduct = () => {
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    category: '',
-    stock: ''
+    title: "",
+    description: "",
+    price: "",
+    category: "",
+    stock: "",
   });
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
+  const [error, setError] = useState("");
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const categories = [
-    'Electronics',
-    'Clothing',
-    'Home & Garden',
-    'Sports & Outdoors',
-    'Books',
-    'Beauty & Health',
-    'Toys & Games',
-    'Food & Beverages'
+    "Electronics",
+    "Clothing",
+    "Home & Garden",
+    "Sports & Outdoors",
+    "Books",
+    "Beauty & Health",
+    "Toys & Games",
+    "Food & Beverages",
   ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
-      try {
+    try {
+      const uploadPromises = images.map(async (file) => {
+        // Resize/Compress the image
+        const compressedFile = await imageCompression(file, {
+          maxSizeMB: 0.5, // compress to under 0.5 MB
+          maxWidthOrHeight: 800, // resize to 800px max
+          useWebWorker: true,
+        });
 
-          //  CHANGED: Upload images to Firebase
-          const uploadPromises = images.map(async (file) => {
-              const imageRef = ref(storage, `products/${Date.now()}_${file.name}`); //  ADDED
-              await uploadBytes(imageRef, file); //  ADDED
-              return getDownloadURL(imageRef); //  ADDED
-          });
+        const imageRef = ref(storage, `products/${Date.now()}_${file.name}`);
+        await uploadBytes(imageRef, compressedFile);
+        return getDownloadURL(imageRef);
+      });
 
-          const imageUrls = await Promise.all(uploadPromises); //  ADDED
+      const imageUrls = await Promise.all(uploadPromises);
 
-          // Prepare JSON payload instead of FormData
-          const payload = {
-              title: formData.title,
-              description: formData.description,
-              price: formData.price,
-              category: formData.category,
-              stock: formData.stock,
-              images: imageUrls, // <-- send URLs here
-          };
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        price: formData.price,
+        category: formData.category,
+        stock: formData.stock,
+        images: imageUrls,
+      };
 
-          const response = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/products`,
-              {
-                  method: "POST",
-                  headers: {
-                      "Content-Type": "application/json", // <-- IMPORTANT
-                      Authorization: `Bearer ${localStorage.getItem("token")}`,
-                  },
-                  body: JSON.stringify(payload), // <-- send JSON string
-              }
-          );
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/products`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (response.ok) {
-        navigate('/dashboard');
+        navigate("/dashboard");
       } else {
         const data = await response.json();
-        setError(data.error || 'Failed to create product');
+        setError(data.error || "Failed to create product");
       }
     } catch (error) {
-      setError('Network error. Please try again.');
+      console.error(error);
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -88,16 +92,20 @@ const CreateProduct = () => {
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
-  if (!user || user.role !== 'store_owner') {
+  if (!user || user.role !== "store_owner") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h2>
-          <p className="text-gray-600">You need to be a store owner to create products</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Access Denied
+          </h2>
+          <p className="text-gray-600">
+            You need to be a store owner to create products
+          </p>
         </div>
       </div>
     );
@@ -108,8 +116,12 @@ const CreateProduct = () => {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Create New Product</h1>
-            <p className="text-gray-600 mt-2">Add a new product to your store</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Create New Product
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Add a new product to your store
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -223,7 +235,7 @@ const CreateProduct = () => {
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate("/dashboard")}
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -235,7 +247,7 @@ const CreateProduct = () => {
               >
                 <div className="flex items-center space-x-2">
                   {loading && <LoadingSpinner size="sm" />}
-                  <span>{loading ? 'Creating...' : 'Create Product'}</span>
+                  <span>{loading ? "Creating..." : "Create Product"}</span>
                 </div>
               </button>
             </div>
