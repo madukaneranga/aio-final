@@ -114,7 +114,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             userId: store.ownerId,
             title: `New order received`,
             userType: "store_owner",
-            body: `You have a new order with ID #${order._id.slice(-8)}`,
+            body: `You have a new order with ID #${order._id.toString().slice(-8)}`,
             type: "order_update",
             link: `/orders`,
           });
@@ -123,7 +123,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             userId: req.user._id,
             title: `⏳ Order Pending`,
             userType: "customer",
-            body: `Your order has been received and is awaiting processing. We’ll update you soon! Order ID  #${order._id.slice(
+            body: `Your order has been received and is awaiting processing. We’ll update you soon! Order ID  #${order._id.toString().slice(
               -8
             )}`,
             type: "order_update",
@@ -179,7 +179,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             userId: store.ownerId,
             title: `New Booking received`,
             userType: "store_owner",
-            body: `You have a new booking with ID #${booking._id.slice(-8)}`,
+            body: `You have a new booking with ID #${booking._id.toString().slice(-8)}`,
             type: "booking_update",
             link: `/bookings`,
           });
@@ -188,7 +188,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             userId: req.user._id,
             title: `⏳ booking Pending`,
             userType: "customer",
-            body: `Your booking is now pending. We’ll notify you once it gets confirmed! Booking ID  #${booking._id.slice(
+            body: `Your booking is now pending. We’ll notify you once it gets confirmed! Booking ID  #${booking._id.toString().slice(
               -8
             )}`,
             type: "booking_update",
