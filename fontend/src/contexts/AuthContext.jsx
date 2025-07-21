@@ -127,7 +127,7 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         localStorage.setItem("token", data.token);
         setUser(data.user);
-        initSocket(token);
+        initSocket(data.token);
         return { success: true };
       } else {
         // Optionally clean up Firebase user if backend registration fails
@@ -178,13 +178,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const value = {
-    user,
-    login,
-    register,
-    logout,
-    refreshUser,
-    loading,
-  };
+  user,
+  token: localStorage.getItem("token"), // ✅ Expose token to NotificationContext
+  login,
+  register,
+  logout,
+  refreshUser,
+  loading,
+};
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

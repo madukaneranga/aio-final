@@ -1,20 +1,21 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { getSocket } from "../utils/socket";
+import { getSocket, initSocket } from "../utils/socket";
+import { useAuth } from "./AuthContext";
 
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
+  const { token, user } = useAuth(); 
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // 1. Fetch initial notifications
   const fetchNotifications = async () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -22,6 +23,7 @@ export const NotificationProvider = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.notifications);
+
         const unread = data.notifications.filter(
           (n) => !n.isRead && !n.isDeleted
         ).length;
@@ -33,14 +35,16 @@ export const NotificationProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    if (!token || !user) return;
+
+    // ✅ Initialize socket if not already connected
+    initSocket(token);
+
     fetchNotifications();
 
     const socket = getSocket();
-
     if (!socket) {
-      console.log(
-        "Socket is not initialized. User might not be logged in yet."
-      );
+      console.log("Socket is not initialized.");
       return;
     }
 
@@ -52,16 +56,15 @@ export const NotificationProvider = ({ children }) => {
     return () => {
       socket.off("new-notification");
     };
-  }, []);
+  }, [token, user]);
 
-  // 3. Mark one as read
   const markAsRead = async (id) => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`,
         {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (res.ok) {
@@ -75,14 +78,13 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // 4. Mark all as read
   const markAllRead = async () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications/mark-all-read`,
         {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (res.ok) {
@@ -94,14 +96,13 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // 5. Soft delete
   const softDelete = async (id) => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications/${id}/delete`,
         {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (res.ok) {
