@@ -8,8 +8,7 @@ import Store from "../models/Store.js";
 import Commission from "../models/Commission.js";
 import Notification from "../models/Notification.js";
 import { authenticate } from "../middleware/auth.js";
-import { emitNotification } from "../index.js"
-
+import { emitNotification } from "../index.js";
 
 const router = express.Router();
 
@@ -111,16 +110,28 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         const store = await Store.findById(storeId);
 
         if (order) {
-          const notification = await Notification.create({
+          const storeNotification = await Notification.create({
             userId: store.ownerId,
             title: `New order received`,
-            userType:"store_owner",
-            body: `You have a new order with ID ${order._id}`,
+            userType: "store_owner",
+            body: `You have a new order with ID #${order._id.slice(-8)}`,
             type: "order_update",
-            link: `/store/orders`,
+            link: `/orders`,
           });
 
-          emitNotification(store.ownerId.toString(), notification);
+          const customerNotification = await Notification.create({
+            userId: req.user._id,
+            title: `⏳ Order Pending`,
+            userType: "customer",
+            body: `Your order has been received and is awaiting processing. We’ll update you soon! Order ID  #${order._id.slice(
+              -8
+            )}`,
+            type: "order_update",
+            link: `/orders`,
+          });
+
+          emitNotification(store.ownerId.toString(), storeNotification);
+          emitNotification(req.user._id.toString(), customerNotification);
         }
 
         createdEntities.order.push(order);
@@ -164,16 +175,28 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         const store = await Store.findById(service.storeId);
 
         if (booking) {
-          const notification = await Notification.create({
+          const storeNotification = await Notification.create({
             userId: store.ownerId,
             title: `New booking received`,
-            userType:"store_owner",
-            body: `You have a new booking with ID ${booking._id}`,
+            userType: "store_owner",
+            body: `You have a new booking with ID #${booking._id.slice(-8)}`,
             type: "booking_update",
-            link: `/store/bookings`,
+            link: `/bookings`,
           });
 
-          emitNotification(store.ownerId.toString(), notification);
+          const customerNotification = await Notification.create({
+            userId: req.user._id,
+            title: `⏳ booking Pending`,
+            userType: "customer",
+            body: `Your booking is now pending. We’ll notify you once it gets confirmed! Booking ID  #${booking._id.slice(
+              -8
+            )}`,
+            type: "booking_update",
+            link: `/bookings`,
+          });
+
+          emitNotification(store.ownerId.toString(), storeNotification);
+          emitNotification(req.user._id.toString(), customerNotification);
         }
 
         createdEntities.bookings.push(booking);
