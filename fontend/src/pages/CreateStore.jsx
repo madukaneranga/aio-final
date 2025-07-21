@@ -33,12 +33,6 @@ const CreateStore = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
 
-  const s = document.createElement("script");
-  s.src = "https://sandbox.payhere.lk/lib/payhere.js";
-  s.onload = () => console.log("Loaded");
-  s.onerror = () => console.log("Failed");
-  document.body.appendChild(s);
-
   useEffect(() => {
     if (!user) return; // Wait until user is loaded
 
@@ -52,7 +46,7 @@ const CreateStore = () => {
   useEffect(() => {
     if (!window.payhere) {
       const script = document.createElement("script");
-      script.src = "https://sandbox.payhere.lk/lib/payhere.js";
+      script.src = "https://payhere.lk/lib/payhere.js";
       script.async = true;
       script.onload = () => setPayhereLoaded(true);
       script.onerror = () => {
