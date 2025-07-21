@@ -1,11 +1,10 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { getSocket, initSocket } from "../utils/socket";
 import { useAuth } from "./AuthContext";
 
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
-  const { token, user } = useAuth(); 
+  const { token, user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -35,28 +34,10 @@ export const NotificationProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (!token || !user) return;
-
-    // ✅ Initialize socket if not already connected
-    initSocket(token);
+    if (!user) return;
 
     fetchNotifications();
-
-    const socket = getSocket();
-    if (!socket) {
-      console.log("Socket is not initialized.");
-      return;
-    }
-
-    socket.on("new-notification", (notification) => {
-      setNotifications((prev) => [notification, ...prev]);
-      setUnreadCount((prev) => prev + 1);
-    });
-
-    return () => {
-      socket.off("new-notification");
-    };
-  }, [token, user]);
+  }, [user]);
 
   const markAsRead = async (id) => {
     try {

@@ -5,7 +5,6 @@ import {
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth as firebaseAuth } from "../utils/firebase";
-import { initSocket, disconnectSocket } from "../utils/socket";
 
 const AuthContext = createContext();
 
@@ -44,15 +43,12 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
-        initSocket(token);
       } else {
         localStorage.removeItem("token");
-        disconnectSocket(); // <-- Disconnect socket if invalid token
       }
     } catch (error) {
       console.error("Error fetching user:", error);
       localStorage.removeItem("token");
-      disconnectSocket(); // <-- Disconnect socket on error
     } finally {
       setLoading(false);
     }
@@ -87,7 +83,6 @@ export const AuthProvider = ({ children }) => {
       // ✅ Then proceed only if Firebase login succeeds
       localStorage.setItem("token", data.token);
       setUser(data.user);
-      initSocket(data.token);
       return { success: true };
     } catch (error) {
       return { success: false, error: "Network error" };
@@ -127,7 +122,6 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         localStorage.setItem("token", data.token);
         setUser(data.user);
-        initSocket(data.token);
         return { success: true };
       } else {
         // Optionally clean up Firebase user if backend registration fails
@@ -174,7 +168,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     setUser(null);
     firebaseSignOut(firebaseAuth);
-    disconnectSocket();
   };
 
   const value = {
