@@ -8,8 +8,8 @@ import Service from "../models/Service.js";
 import User from "../models/User.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Console } from "console";
-import { checkFeatureLimit } from "../middlewares/featureLimit.js";
-import { checkImageLimit } from "../middleware/featureLimit.js";
+import { withPackage } from "../middleware/withPackage.js";
+import { checkImageLimit, checkFeatureLimit } from "../middleware/featureLimit.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
