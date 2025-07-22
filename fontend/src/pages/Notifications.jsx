@@ -102,7 +102,9 @@ export default function Notifications() {
                       className="flex-shrink-0 mt-1"
                       style={{ color: typeColors[n.type] }}
                     >
-                      {Icon && <Icon className="w-5 h-5" />}
+                      {typeof Icon === "function" && (
+                        <Icon className="w-5 h-5" />
+                      )}
                     </div>
                     <div className="flex-1">
                       <h2
