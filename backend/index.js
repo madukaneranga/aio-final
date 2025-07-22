@@ -38,7 +38,8 @@ io.use((socket, next) => {
 
   try {
     const decoded = jwt.verify(token, SECRET);
-    socket.userId = decoded.id || decoded._id; // Adjust if your JWT has a different field
+    socket.userId = decoded.id || decoded._id;
+    console.log("Decoded Id "+decoded) // Adjust if your JWT has a different field
     next();
   } catch (err) {
     console.log("Socket auth failed:", err.message);
@@ -53,6 +54,7 @@ io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id, "userId:", socket.userId);
 
   userSocketMap.set(socket.userId, socket.id);
+  console.log("User Id "+ socket.userId)
 
   socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);
