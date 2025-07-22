@@ -144,7 +144,14 @@ export const NotificationProvider = ({ children }) => {
           }}
         >
           <div className="flex items-start gap-3">
-            <div className="text-purple-600">{typeIcons[toast.type]}</div>
+            {/* ✅ FIXED: Icon rendered correctly */}
+            <div className="text-purple-600">
+              {(() => {
+                const ToastIcon = typeIcons[toast.type];
+                return ToastIcon ? <ToastIcon className="w-5 h-5" /> : null;
+              })()}
+            </div>
+
             <div className="flex-1">
               <p className="font-semibold text-sm">{toast.title}</p>
               <p className="text-xs text-gray-600 line-clamp-2">{toast.body}</p>
