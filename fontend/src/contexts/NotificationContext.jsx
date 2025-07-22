@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useAuth } from "./AuthContext";
 import { io } from "socket.io-client";
+import { typeIcons } from "../utils/notificationHelpers";
 
 const NotificationContext = createContext();
 
