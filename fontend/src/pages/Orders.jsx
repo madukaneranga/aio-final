@@ -423,8 +423,18 @@ const Orders = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Payment Status</p>
-                    <p className="font-medium text-green-600">
-                      {order.paymentDetails?.paymentStatus || "Paid"}
+                    <p
+                      className={`font-medium ${
+                        order.paymentDetails?.paymentStatus?.toLowerCase() ===
+                        "paid"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {order.paymentDetails?.paymentStatus?.toLowerCase() ===
+                      "paid"
+                        ? "Paid"
+                        : "Payment Pending"}
                     </p>
                   </div>
                 </div>
