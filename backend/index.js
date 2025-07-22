@@ -38,8 +38,16 @@ io.use((socket, next) => {
 
   try {
     const decoded = jwt.verify(token, SECRET);
-    socket.userId = decoded.id || decoded._id;
-    console.log("Decoded Id "+decoded) // Adjust if your JWT has a different field
+    console.log("Decoded token:", decoded); // print entire payload to inspect
+
+    // Adjust the field below based on your decoded token shape
+    socket.userId = decoded.id || decoded._id || decoded.userId;
+
+    if (!socket.userId) {
+      console.log("User ID not found in token payload");
+      return next(new Error("Authentication error"));
+    }
+
     next();
   } catch (err) {
     console.log("Socket auth failed:", err.message);
