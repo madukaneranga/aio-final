@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../contexts/NotificationContext";
-import { typeIcons } from "../utils/notificationHelpers";
+import { typeIcons } from "../utils/notificationHelpers.js";
 import { XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
