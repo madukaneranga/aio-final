@@ -1,14 +1,7 @@
 import React from "react";
-import {
-  CheckCircle,
-  XCircle,
-  Megaphone,
-  ShieldAlert,
-  Gift,
-} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../contexts/NotificationContext";
-
+import { typeIcons } from "../utils/notificationHelpers";
 const palette = {
   white: "#FFFFFF",
   purple3: "#7B2CBF",
@@ -29,14 +22,7 @@ const typeColors = {
   announcement: palette.purple6,
 };
 
-const typeIcons = {
-  order_update: <CheckCircle className="w-5 h-5" />,
-  booking_update: <CheckCircle className="w-5 h-5" />,
-  review_update: <CheckCircle className="w-5 h-5" />,
-  promotion: <Gift className="w-5 h-5" />,
-  warning: <ShieldAlert className="w-5 h-5" />,
-  announcement: <Megaphone className="w-5 h-5" />,
-};
+
 
 export default function Notifications() {
   const navigate = useNavigate();
