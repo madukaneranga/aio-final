@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
-import {useNotifications} from "../contexts/NotificationContext";
+import { useNotifications } from "../contexts/NotificationContext";
 import {
   Search,
   ShoppingCart,
@@ -20,16 +20,12 @@ import {
 const Header = () => {
   const { user, logout } = useAuth();
   const { orderItems, bookingItems } = useCart();
-  const { unreadCount, fetchNotifications } = useNotifications();
+  const { unreadCount } = useNotifications();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
-  
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
