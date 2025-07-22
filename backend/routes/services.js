@@ -5,8 +5,8 @@ import { fileURLToPath } from "url";
 import Service from "../models/Service.js";
 import Store from "../models/Store.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { checkFeatureLimit } from "../middlewares/featureLimit.js";
-import { checkImageLimit } from "../middleware/featureLimit.js";
+import { withPackage } from "../middleware/withPackage.js";
+import { checkImageLimit, checkFeatureLimit } from "../middleware/featureLimit.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
