@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
 import LoadingSpinner from "../components/LoadingSpinner";
-import imageCompression from 'browser-image-compression';
 
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -42,15 +41,8 @@ const CreateProduct = () => {
 
     try {
       const uploadPromises = images.map(async (file) => {
-        // Resize/Compress the image
-        const compressedFile = await imageCompression(file, {
-          maxSizeMB: 0.5, // compress to under 0.5 MB
-          maxWidthOrHeight: 800, // resize to 800px max
-          useWebWorker: true,
-        });
-
         const imageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, compressedFile);
+        await uploadBytes(imageRef, file);
         return getDownloadURL(imageRef);
       });
 
