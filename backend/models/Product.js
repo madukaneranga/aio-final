@@ -37,6 +37,11 @@ const productSchema = new mongoose.Schema({
     ref: 'Store',
     required: true
   },
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   isActive: {
     type: Boolean,
     default: true

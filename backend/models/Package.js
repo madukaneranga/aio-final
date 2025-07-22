@@ -16,15 +16,15 @@ const packageSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
-  maxItems: {
+  items: {
     type: Number,
     default: 8,
   },
-  maxHeaderImgs: {
+  headerImages: {
     type: Number,
     default: 2,
   },
-  maxItemImgs: {
+  itemImages: {
     type: Number,
     default: 3,
   },
