@@ -1,8 +1,15 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../contexts/NotificationContext";
-import { XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  CheckCircle,
+  Gift,
+  ShieldAlert,
+  Megaphone,
+  XCircle,
+} from "lucide-react";
+
 
 const palette = {
   white: "#FFFFFF",
@@ -17,13 +24,6 @@ const palette = {
   gray700: "#374151",
 };
 
-import {
-  CheckCircle,
-  Gift,
-  ShieldAlert,
-  Megaphone,
-  XCircle,
-} from "lucide-react";
 
 // Icon component to render based on notification type
 const NotificationIcon = ({ type }) => {
