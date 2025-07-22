@@ -19,7 +19,9 @@ const palette = {
 };
 
 const typeColors = {
-  order: palette.purple3,
+  order_update: palette.purple3,
+  booking_update: palette.purple3,
+  review_update: palette.purple5,
   promotion: palette.purple5,
   warning: palette.purple4,
   announcement: palette.purple6,
@@ -81,54 +83,59 @@ export default function Notifications() {
           <AnimatePresence>
             {notifications
               .filter((n) => !n.isDeleted)
-              .map((n) => (
-                <motion.li
-                  key={n._id}
-                  onClick={() => onNotificationClick(n)}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, height: 0, padding: 0, margin: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`cursor-pointer bg-white rounded-2xl p-5 flex items-start gap-4 shadow transition duration-300 hover:shadow-lg border ${
-                    n.isRead ? "border-gray-200" : "border-purple-300"
-                  }`}
-                  aria-label={`Notification: ${n.title}`}
-                >
-                  <div
-                    className="flex-shrink-0 mt-1"
-                    style={{ color: typeColors[n.type] }}
+              .map((n) => {
+                const Icon = typeIcons[n.type];
+                return (
+                  <motion.li
+                    key={n._id}
+                    onClick={() => onNotificationClick(n)}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, height: 0, padding: 0, margin: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={`cursor-pointer bg-white rounded-2xl p-5 flex items-start gap-4 shadow transition duration-300 hover:shadow-lg border ${
+                      n.isRead ? "border-gray-200" : "border-purple-300"
+                    }`}
+                    aria-label={`Notification: ${n.title}`}
                   >
-                    {typeIcons[n.type]}
-                  </div>
-                  <div className="flex-1">
-                    <h2
-                      className={`font-semibold text-lg truncate mb-1 ${
-                        n.isRead ? "text-gray-700" : "text-purple-700"
-                      }`}
+                    <div
+                      className="flex-shrink-0 mt-1"
+                      style={{ color: typeColors[n.type] }}
                     >
-                      {n.title}
-                    </h2>
-                    <p className="text-sm text-gray-600 line-clamp-2">{n.body}</p>
-                    <time
-                      className="block text-xs text-gray-500 mt-2"
-                      dateTime={n.createdAt}
+                      {Icon && <Icon className="w-5 h-5" />}
+                    </div>
+                    <div className="flex-1">
+                      <h2
+                        className={`font-semibold text-lg truncate mb-1 ${
+                          n.isRead ? "text-gray-700" : "text-purple-700"
+                        }`}
+                      >
+                        {n.title}
+                      </h2>
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {n.body}
+                      </p>
+                      <time
+                        className="block text-xs text-gray-500 mt-2"
+                        dateTime={n.createdAt}
+                      >
+                        {new Date(n.createdAt).toLocaleString()}
+                      </time>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        softDelete(n._id);
+                      }}
+                      title="Delete notification"
+                      className="text-gray-400 hover:text-red-500 transition"
+                      aria-label="Delete notification"
                     >
-                      {new Date(n.createdAt).toLocaleString()}
-                    </time>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      softDelete(n._id);
-                    }}
-                    title="Delete notification"
-                    className="text-gray-400 hover:text-red-500 transition"
-                    aria-label="Delete notification"
-                  >
-                    <XCircle className="w-6 h-6" />
-                  </button>
-                </motion.li>
-              ))}
+                      <XCircle className="w-6 h-6" />
+                    </button>
+                  </motion.li>
+                );
+              })}
           </AnimatePresence>
         </ul>
 
