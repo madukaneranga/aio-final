@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
 import { User, Mail, Phone, MapPin, Camera } from "lucide-react";
+import imageCompression from 'browser-image-compression';
+
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
