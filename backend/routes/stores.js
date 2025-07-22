@@ -8,6 +8,8 @@ import Service from "../models/Service.js";
 import User from "../models/User.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Console } from "console";
+import { checkFeatureLimit } from "../middlewares/featureLimit.js";
+import { checkImageLimit } from "../middleware/featureLimit.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,33 +142,44 @@ router.post(
 );
 
 // Update store
-router.put("/:id", authenticate, authorize("store_owner"), async (req, res) => {
-  try {
-    const store = await Store.findById(req.params.id);
+router.put(
+  "/:id",
+  authenticate,
+  authorize("store_owner"),
+  withPackage,
+  checkImageLimit("headerImages", "headerImages"),
+  async (req, res) => {
+    try {
+      const store = await Store.findById(req.params.id);
 
-    if (!store) {
-      return res.status(404).json({ error: "Store not found" });
+      if (!store) {
+        return res.status(404).json({ error: "Store not found" });
+      }
+
+      if (store.ownerId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updates = req.body;
+
+      //if (updates.contactInfo) {
+      //updates.contactInfo = JSON.parse(updates.contactInfo);
+      //}
+
+      const updatedStore = await Store.findByIdAndUpdate(
+        req.params.id,
+        updates,
+        {
+          new: true,
+        }
+      );
+
+      res.json(updatedStore);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
-
-    if (store.ownerId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    const updates = req.body;
-
-    //if (updates.contactInfo) {
-    //updates.contactInfo = JSON.parse(updates.contactInfo);
-    //}
-
-    const updatedStore = await Store.findByIdAndUpdate(req.params.id, updates, {
-      new: true,
-    });
-
-    res.json(updatedStore);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
-});
+);
 
 // Upload profile image for store
 router.put(
@@ -186,11 +199,10 @@ router.put(
       }
 
       const { profileImage } = req.body;
-      
+
       if (!profileImage) {
         return res.status(400).json({ error: "No image file provided" });
       }
-      
 
       const updatedStore = await Store.findByIdAndUpdate(
         req.params.id,
