@@ -51,8 +51,6 @@ export default function Notifications() {
     total = 0,
   } = useNotifications();
 
-
-
   const onLoadMore = () => {
     if (setPage) setPage((p) => p + 1);
   };
@@ -87,54 +85,58 @@ export default function Notifications() {
         )}
 
         {loading && (
-          <p className="text-center mt-10 text-gray-500">Loading notifications...</p>
+          <p className="text-center mt-10 text-gray-500">
+            Loading notifications...
+          </p>
         )}
 
         <ul className="space-y-4">
-          {notifications.map((n) => (
-            <li
-              key={n._id}
-              onClick={() => onNotificationClick(n)}
-              className={`cursor-pointer bg-white rounded-2xl p-5 flex items-start gap-4 shadow transition duration-300 hover:shadow-lg border ${
-                n.isRead ? "border-gray-200" : "border-purple-300"
-              }`}
-              aria-label={`Notification: ${n.title}`}
-            >
-              <div
-                className="flex-shrink-0 mt-1"
-                style={{ color: typeColors[n.type] }}
+          {notifications
+            .filter((n) => !n.isDeleted)
+            .map((n) => (
+              <li
+                key={n._id}
+                onClick={() => onNotificationClick(n)}
+                className={`cursor-pointer bg-white rounded-2xl p-5 flex items-start gap-4 shadow transition duration-300 hover:shadow-lg border ${
+                  n.isRead ? "border-gray-200" : "border-purple-300"
+                }`}
+                aria-label={`Notification: ${n.title}`}
               >
-                {typeIcons[n.type]}
-              </div>
-              <div className="flex-1">
-                <h2
-                  className={`font-semibold text-lg truncate mb-1 ${
-                    n.isRead ? "text-gray-700" : "text-purple-700"
-                  }`}
+                <div
+                  className="flex-shrink-0 mt-1"
+                  style={{ color: typeColors[n.type] }}
                 >
-                  {n.title}
-                </h2>
-                <p className="text-sm text-gray-600 line-clamp-2">{n.body}</p>
-                <time
-                  className="block text-xs text-gray-500 mt-2"
-                  dateTime={n.createdAt}
+                  {typeIcons[n.type]}
+                </div>
+                <div className="flex-1">
+                  <h2
+                    className={`font-semibold text-lg truncate mb-1 ${
+                      n.isRead ? "text-gray-700" : "text-purple-700"
+                    }`}
+                  >
+                    {n.title}
+                  </h2>
+                  <p className="text-sm text-gray-600 line-clamp-2">{n.body}</p>
+                  <time
+                    className="block text-xs text-gray-500 mt-2"
+                    dateTime={n.createdAt}
+                  >
+                    {new Date(n.createdAt).toLocaleString()}
+                  </time>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    softDelete(n._id);
+                  }}
+                  title="Delete notification"
+                  className="text-gray-400 hover:text-red-500 transition"
+                  aria-label="Delete notification"
                 >
-                  {new Date(n.createdAt).toLocaleString()}
-                </time>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  softDelete(n._id);
-                }}
-                title="Delete notification"
-                className="text-gray-400 hover:text-red-500 transition"
-                aria-label="Delete notification"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
-            </li>
-          ))}
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </li>
+            ))}
         </ul>
 
         {notifications.length < total && (
