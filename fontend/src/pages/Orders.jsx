@@ -335,9 +335,9 @@ const Orders = () => {
                       </span>
                     </div>
                     <StatusBadge status={order.status} />
-                    {user.role === "customer" && (
+                    {/*{user.role === "customer" && (
                       <CountdownTimer order={order} />
-                    )}
+                    )} */}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-500">Order Date</p>

@@ -4,7 +4,7 @@ import { Upload, X, Image } from 'lucide-react';
 const ImageUpload = ({ 
   images = [], 
   onImagesChange, 
-  maxImages = 10, 
+  maxImages = 5, 
   multiple = true,
   className = '' 
 }) => {
