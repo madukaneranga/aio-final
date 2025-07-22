@@ -6,7 +6,6 @@ import ColorThemeSelector from "../components/ColorThemeSelector";
 import TimeSlotManager from "../components/TimeSlotManager";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Store, Camera, Eye, EyeOff, MessageSquare, Star } from "lucide-react";
-import imageCompression from 'browser-image-compression';
 
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -123,13 +122,8 @@ const StoreManagement = () => {
       // If new images selected, upload and get URLs
       if (heroImages.length > 0) {
         const uploadPromises = heroImages.map(async (file) => {
-          const compressedFile = await imageCompression(file, {
-            maxSizeMB: 0.5, // compress to under 0.5 MB
-            maxWidthOrHeight: 800, // resize to 800px max
-            useWebWorker: true,
-          });
           const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-          await uploadBytes(imageRef, compressedFile);
+          await uploadBytes(imageRef, file);
           return getDownloadURL(imageRef);
         });
 

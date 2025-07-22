@@ -4,7 +4,6 @@ import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Plus, Trash2, Calendar, Clock, ArrowLeft } from "lucide-react";
-import imageCompression from 'browser-image-compression';
 
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -101,15 +100,8 @@ const CreateService = () => {
     try {
       //  CHANGED: Upload images to Firebase
       const uploadPromises = images.map(async (file) => {
-        // Resize/Compress the image
-        const compressedFile = await imageCompression(file, {
-          maxSizeMB: 0.5, // compress to under 0.5 MB
-          maxWidthOrHeight: 800, // resize to 800px max
-          useWebWorker: true,
-        });
-
         const imageRef = ref(storage, `services/${Date.now()}_${file.name}`); //  ADDED
-        await uploadBytes(imageRef, compressedFile); //  ADDED
+        await uploadBytes(imageRef, file); //  ADDED
         return getDownloadURL(imageRef); //  ADDED
       });
 
