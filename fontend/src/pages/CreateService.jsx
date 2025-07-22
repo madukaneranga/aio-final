@@ -4,6 +4,8 @@ import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Plus, Trash2, Calendar, Clock, ArrowLeft } from "lucide-react";
+import imageCompression from 'browser-image-compression';
+
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer

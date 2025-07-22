@@ -6,6 +6,8 @@ import ColorThemeSelector from "../components/ColorThemeSelector";
 import TimeSlotManager from "../components/TimeSlotManager";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Store, Camera, Eye, EyeOff, MessageSquare, Star } from "lucide-react";
+import imageCompression from 'browser-image-compression';
+
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
