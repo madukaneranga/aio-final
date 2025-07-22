@@ -12,41 +12,42 @@ export const NotificationProvider = ({ children }) => {
 
   const socketRef = useRef(null);
 
-  // Fetch notifications from API
   const fetchNotifications = async () => {
     try {
-      if (!token) return;
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/notifications`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data.notifications || []);
-      } else {
-        console.error("Failed to fetch notifications: HTTP " + res.status);
+        setNotifications(data.notifications);
+
+        const unread = data.notifications.filter(
+          (n) => !n.isRead && !n.isDeleted
+        ).length;
+        setUnreadCount(unread);
       }
     } catch (err) {
       console.error("Failed to fetch notifications:", err);
     }
   };
 
-  // Derive unreadCount from notifications state
-  useEffect(() => {
-    const unread = notifications.filter(n => !n.isRead && !n.isDeleted).length;
-    setUnreadCount(unread);
-  }, [notifications]);
-
-  // Socket initialization and fetching notifications on user/token change
   useEffect(() => {
     if (!user || !token) return;
 
+    // Fetch on first load
     fetchNotifications();
 
+    // Initialize socket
     socketRef.current = io(import.meta.env.VITE_API_URL, {
-      auth: { token },
+      auth: {
+        token: token,
+      },
       transports: ["websocket"],
     });
 
@@ -58,24 +59,24 @@ export const NotificationProvider = ({ children }) => {
       console.log("Disconnected from socket.io server");
     });
 
+    // Handle new notifications
     socketRef.current.on("new-notification", (notification) => {
       console.log("New notification via socket:", notification);
-      setNotifications(prev => [notification, ...prev]);
-      setToast(notification);
-      setTimeout(() => setToast(null), 5000);
-    });
+      setNotifications((prev) => [notification, ...prev]);
+      setUnreadCount((prev) => prev + 1);
 
-    // TODO: handle other socket events for updates/deletes if available
+      // Trigger toast
+      setToast(notification);
+      setTimeout(() => setToast(null), 5000); // Auto-hide after 5 seconds
+    });
 
     return () => {
       socketRef.current?.disconnect();
-      socketRef.current = null;
     };
   }, [user, token]);
 
   const markAsRead = async (id) => {
     try {
-      if (!token) return;
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`,
         {
@@ -84,9 +85,10 @@ export const NotificationProvider = ({ children }) => {
         }
       );
       if (res.ok) {
-        setNotifications(prev =>
-          prev.map(n => (n._id === id ? { ...n, isRead: true } : n))
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
         );
+        setUnreadCount((prev) => prev - 1);
       }
     } catch (e) {
       console.error("Mark read failed", e);
@@ -95,7 +97,6 @@ export const NotificationProvider = ({ children }) => {
 
   const markAllRead = async () => {
     try {
-      if (!token) return;
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications/mark-all-read`,
         {
@@ -104,7 +105,8 @@ export const NotificationProvider = ({ children }) => {
         }
       );
       if (res.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        setUnreadCount(0);
       }
     } catch (e) {
       console.error("Mark all read failed", e);
@@ -113,7 +115,6 @@ export const NotificationProvider = ({ children }) => {
 
   const softDelete = async (id) => {
     try {
-      if (!token) return;
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications/${id}/delete`,
         {
@@ -122,8 +123,8 @@ export const NotificationProvider = ({ children }) => {
         }
       );
       if (res.ok) {
-        setNotifications(prev =>
-          prev.map(n => (n._id === id ? { ...n, isDeleted: true } : n))
+        setNotifications((prev) =>
+          prev.map((n) => (n._id === id ? { ...n, isDeleted: true } : n))
         );
       }
     } catch (e) {
@@ -135,7 +136,7 @@ export const NotificationProvider = ({ children }) => {
     <>
       {toast && (
         <div
-          className="fixed bottom-6 right-4 z-50 bg-white border border-purple-300 rounded-xl shadow-lg p-4 w-80 max-w-full animate-slide-in cursor-pointer"
+          className="fixed bottom-6 right-4 z-50 bg-white border border-purple-300 rounded-xl shadow-lg p-4 w-80 max-w-full animate-slide-in"
           onClick={() => {
             if (toast.link) window.location.href = toast.link;
             setToast(null);
@@ -160,6 +161,7 @@ export const NotificationProvider = ({ children }) => {
           markAllRead,
           softDelete,
           setNotifications,
+          setUnreadCount,
         }}
       >
         {children}
