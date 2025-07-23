@@ -366,14 +366,14 @@ const StoreDashboard = () => {
     });
   };
 
-  const handleEdit = (product) => {
+  const handleEdit = (editingItem) => {
     setEditingProduct({
-      ...product,
-      price: product.price?.toString() || "",
-      stock: product.stock?.toString() || "",
+      ...editingItem,
+      price: editingItem.price?.toString() || "",
+      stock: editingItem.stock?.toString() || "",
       variants: {
-        colors: product.variants?.colors || [],
-        sizes: product.variants?.sizes || [],
+        colors: editingItem.variants?.colors || [],
+        sizes: editingItem.variants?.sizes || [],
       },
     });
 
@@ -393,9 +393,9 @@ const StoreDashboard = () => {
         ...(store?.type === "product"
           ? {
               stock: editingItem.stock,
-              ...(editingProduct.variants?.colors?.length > 0 ||
-              editingProduct.variants?.sizes?.length > 0
-                ? { variants: editingProduct.variants }
+              ...(editingItem.variants?.colors?.length > 0 ||
+              editingItem.variants?.sizes?.length > 0
+                ? { variants: editingItem.variants }
                 : {}),
             }
           : {
