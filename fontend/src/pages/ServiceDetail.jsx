@@ -1,20 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
-import ImageGallery from '../components/ImageGallery';
-import { formatLKR } from '../utils/currency';
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
-import { Calendar as CalendarIcon, Clock, Star, Store, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { useCart } from "../contexts/CartContext";
+import { useAuth } from "../contexts/AuthContext";
+import ImageGallery from "../components/ImageGallery";
+import { formatLKR } from "../utils/currency";
+import Calendar from "react-calendar";
+import "react-calendar/dist/Calendar.css";
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  Star,
+  Store,
+  ArrowLeft,
+} from "lucide-react";
 
 const ServiceDetail = () => {
   const { id } = useParams();
   const [service, setService] = useState(null);
+  const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedTime, setSelectedTime] = useState('');
-  const [notes, setNotes] = useState('');
+  const [selectedTime, setSelectedTime] = useState("");
+  const [notes, setNotes] = useState("");
   const { addToBooking } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -25,58 +32,74 @@ const ServiceDetail = () => {
 
   const fetchService = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services/${id}`);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/services/${id}`
+      );
       const data = await response.json();
       setService(data);
+      // Fetch store details separately
+      if (data.storeId) {
+        const storeResponse = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
+        );
+        const storeData = await storeResponse.json();
+        setStore(storeData);
+      }
     } catch (error) {
-      console.error('Error fetching service:', error);
+      console.error("Error fetching service:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const getAvailableTimeSlots = () => {
-  if (!service?.timeSlots || service.timeSlots.length === 0) {
-    return [
-      '09:00', '10:00', '11:00', '12:00',
-      '13:00', '14:00', '15:00', '16:00', '17:00'
-    ];
-  }
+    if (!service?.timeSlots || service.timeSlots.length === 0) {
+      return [
+        "09:00",
+        "10:00",
+        "11:00",
+        "12:00",
+        "13:00",
+        "14:00",
+        "15:00",
+        "16:00",
+        "17:00",
+      ];
+    }
 
-  return service.timeSlots.map(slot => slot.startTime);
-};
-
+    return service.timeSlots.map((slot) => slot.startTime);
+  };
 
   const handleBookNow = () => {
     if (!user) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
 
-    if (user.role !== 'customer') {
-      alert('Only customers can book services');
+    if (user.role !== "customer") {
+      alert("Only customers can book services");
       return;
     }
 
     if (!selectedTime) {
-      alert('Please select a time slot');
+      alert("Please select a time slot");
       return;
     }
 
     const bookingDetails = {
-      date: selectedDate.toISOString().split('T')[0],
+      date: selectedDate.toISOString().split("T")[0],
       time: selectedTime,
-      notes
+      notes,
     };
 
     // Ensure we pass the service with proper storeId
     const serviceWithStoreId = {
       ...service,
-      storeId: service.storeId?._id || service.storeId
+      storeId: service.storeId?._id || service.storeId,
     };
-    
+
     addToBooking(serviceWithStoreId, bookingDetails);
-    navigate('/booking-summary');
+    navigate("/booking-summary");
   };
 
   if (loading) {
@@ -91,7 +114,9 @@ const ServiceDetail = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Service not found</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Service not found
+          </h2>
           <Link to="/services" className="text-black hover:text-gray-700">
             Back to Services
           </Link>
@@ -125,19 +150,23 @@ const ServiceDetail = () => {
           {/* Service Details */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{service.title}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {service.title}
+              </h1>
               <div className="flex items-center space-x-4 mb-4">
                 <div className="flex items-center space-x-1">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   <span className="text-gray-600">4.5 (89 reviews)</span>
                 </div>
                 <span className="text-gray-400">|</span>
-                <span className="text-gray-600 capitalize">{service.category}</span>
+                <span className="text-gray-600 capitalize">
+                  {service.category}
+                </span>
               </div>
               <p className="text-4xl font-bold text-black mb-4">
                 {formatLKR(service.price)}
                 <span className="text-lg text-gray-500 ml-2">
-                  {service.priceType === 'hourly' ? '/hour' : ''}
+                  {service.priceType === "hourly" ? "/hour" : ""}
                 </span>
               </p>
             </div>
@@ -145,7 +174,22 @@ const ServiceDetail = () => {
             {/* Store Info */}
             <div className="bg-white rounded-lg p-4 border border-gray-200">
               <div className="flex items-center space-x-3">
-                <Store className="w-6 h-6 text-gray-400" />
+                {store?.profileImage ? (
+                  <img
+                    src={
+                      store.profileImage.startsWith("http")
+                        ? store.profileImage
+                        : `${import.meta.env.VITE_API_URL}${store.profileImage}`
+                    }
+                    alt={store.name}
+                    className="w-24 h-24 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center">
+                    <Store className="w-6 h-6 text-gray-600" />
+                  </div>
+                )}
+
                 <div>
                   <Link
                     to={`/store/${service.storeId._id}`}
@@ -161,7 +205,9 @@ const ServiceDetail = () => {
             {/* Service Description */}
             <div>
               <h3 className="text-lg font-semibold mb-3">Description</h3>
-              <p className="text-gray-700 leading-relaxed">{service.description}</p>
+              <p className="text-gray-700 leading-relaxed">
+                {service.description}
+              </p>
             </div>
 
             {/* Duration */}
@@ -202,8 +248,8 @@ const ServiceDetail = () => {
                       onClick={() => setSelectedTime(time)}
                       className={`p-2 text-sm rounded-lg border transition-colors ${
                         selectedTime === time
-                          ? 'bg-black text-white border-black'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-black'
+                          ? "bg-black text-white border-black"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-black"
                       }`}
                     >
                       {time}
