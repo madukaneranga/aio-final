@@ -367,7 +367,7 @@ const StoreDashboard = () => {
   };
 
   const handleEdit = (editingItem) => {
-    setEditingProduct({
+    setEditingItem({
       ...editingItem,
       price: editingItem.price?.toString() || "",
       stock: editingItem.stock?.toString() || "",
@@ -1327,7 +1327,7 @@ const StoreDashboard = () => {
                                   ...editingProduct.variants.colors,
                                 ];
                                 updated[index].name = e.target.value;
-                                setEditingProduct((prev) => ({
+                                setEditingItem((prev) => ({
                                   ...prev,
                                   variants: {
                                     ...prev.variants,
@@ -1345,7 +1345,7 @@ const StoreDashboard = () => {
                                   ...editingProduct.variants.colors,
                                 ];
                                 updated[index].hex = e.target.value;
-                                setEditingProduct((prev) => ({
+                                setEditingItem((prev) => ({
                                   ...prev,
                                   variants: {
                                     ...prev.variants,
@@ -1362,7 +1362,7 @@ const StoreDashboard = () => {
                                   editingProduct.variants.colors.filter(
                                     (_, i) => i !== index
                                   );
-                                setEditingProduct((prev) => ({
+                                setEditingItem((prev) => ({
                                   ...prev,
                                   variants: {
                                     ...prev.variants,
@@ -1380,7 +1380,7 @@ const StoreDashboard = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          setEditingProduct((prev) => ({
+                          setEditingItem((prev) => ({
                             ...prev,
                             variants: {
                               ...prev.variants,
@@ -1417,7 +1417,7 @@ const StoreDashboard = () => {
                                   ...editingProduct.variants.sizes,
                                 ];
                                 updated[index].name = e.target.value;
-                                setEditingProduct((prev) => ({
+                                setEditingItem((prev) => ({
                                   ...prev,
                                   variants: {
                                     ...prev.variants,
@@ -1435,7 +1435,7 @@ const StoreDashboard = () => {
                                 ];
                                 updated[index].inStock =
                                   e.target.value === "true";
-                                setEditingProduct((prev) => ({
+                                setEditingItem((prev) => ({
                                   ...prev,
                                   variants: {
                                     ...prev.variants,
@@ -1455,7 +1455,7 @@ const StoreDashboard = () => {
                                   editingProduct.variants.sizes.filter(
                                     (_, i) => i !== index
                                   );
-                                setEditingProduct((prev) => ({
+                                setEditingItem((prev) => ({
                                   ...prev,
                                   variants: {
                                     ...prev.variants,
@@ -1473,7 +1473,7 @@ const StoreDashboard = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          setEditingProduct((prev) => ({
+                          setEditingItem((prev) => ({
                             ...prev,
                             variants: {
                               ...prev.variants,
