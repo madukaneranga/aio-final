@@ -182,14 +182,11 @@ const ServiceDetail = () => {
                         : `${import.meta.env.VITE_API_URL}${store.profileImage}`
                     }
                     alt={store.name}
-                    className="w-6 h-6 rounded-full object-cover"
+                    className="w-6 h-6"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-                    <Store className="w-6 h-6 text-gray-600" />
-                  </div>
+                  <Store className="w-6 h-6 text-gray-600" />
                 )}
-
                 <div>
                   <Link
                     to={`/store/${service.storeId._id}`}
