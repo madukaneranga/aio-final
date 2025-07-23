@@ -1312,7 +1312,7 @@ const StoreDashboard = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Color Variants
                       </label>
-                      {(editingProduct?.variants?.colors || []).map(
+                      {(editingItem?.variants?.colors || []).map(
                         (color, index) => (
                           <div
                             key={index}
@@ -1324,7 +1324,7 @@ const StoreDashboard = () => {
                               value={color.name}
                               onChange={(e) => {
                                 const updated = [
-                                  ...editingProduct.variants.colors,
+                                  ...editingItem.variants.colors,
                                 ];
                                 updated[index].name = e.target.value;
                                 setEditingItem((prev) => ({
@@ -1342,7 +1342,7 @@ const StoreDashboard = () => {
                               value={color.hex}
                               onChange={(e) => {
                                 const updated = [
-                                  ...editingProduct.variants.colors,
+                                  ...editingItem.variants.colors,
                                 ];
                                 updated[index].hex = e.target.value;
                                 setEditingItem((prev) => ({
@@ -1359,7 +1359,7 @@ const StoreDashboard = () => {
                               type="button"
                               onClick={() => {
                                 const updated =
-                                  editingProduct.variants.colors.filter(
+                                  editingItem.variants.colors.filter(
                                     (_, i) => i !== index
                                   );
                                 setEditingItem((prev) => ({
@@ -1402,7 +1402,7 @@ const StoreDashboard = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Size Variants
                       </label>
-                      {(editingProduct?.variants?.sizes || []).map(
+                      {(editingItem?.variants?.sizes || []).map(
                         (size, index) => (
                           <div
                             key={index}
@@ -1414,7 +1414,7 @@ const StoreDashboard = () => {
                               value={size.name}
                               onChange={(e) => {
                                 const updated = [
-                                  ...editingProduct.variants.sizes,
+                                  ...editingItem.variants.sizes,
                                 ];
                                 updated[index].name = e.target.value;
                                 setEditingItem((prev) => ({
@@ -1431,7 +1431,7 @@ const StoreDashboard = () => {
                               value={size.inStock ? "true" : "false"}
                               onChange={(e) => {
                                 const updated = [
-                                  ...editingProduct.variants.sizes,
+                                  ...editingItem.variants.sizes,
                                 ];
                                 updated[index].inStock =
                                   e.target.value === "true";
@@ -1452,7 +1452,7 @@ const StoreDashboard = () => {
                               type="button"
                               onClick={() => {
                                 const updated =
-                                  editingProduct.variants.sizes.filter(
+                                  editingItem.variants.sizes.filter(
                                     (_, i) => i !== index
                                   );
                                 setEditingItem((prev) => ({
