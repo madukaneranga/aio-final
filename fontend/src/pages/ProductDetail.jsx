@@ -43,25 +43,26 @@ const ProductDetail = () => {
 
   // For development/testing only
   useEffect(() => {
-    if (product && import.meta.env.DEV) {
-      setProduct((prev) => ({
-        ...prev,
-        variants: {
-          colors: [
-            { name: "Red", hex: "#FF0000" },
-            { name: "Blue", hex: "#0000FF" },
-            { name: "White", hex: "#FFFFFF" },
-          ],
-          sizes: [
-            { name: "XS", inStock: true },
-            { name: "S", inStock: true },
-            { name: "M", inStock: false },
-            { name: "L", inStock: true },
-          ],
-        },
-      }));
-    }
-  }, [product]);
+  if (product) {
+    setProduct((prev) => ({
+      ...prev,
+      variants: {
+        colors: [
+          { name: "Red", hex: "#FF0000" },
+          { name: "Blue", hex: "#0000FF" },
+          { name: "White", hex: "#FFFFFF" },
+        ],
+        sizes: [
+          { name: "XS", inStock: true },
+          { name: "S", inStock: true },
+          { name: "M", inStock: false },
+          { name: "L", inStock: true },
+        ],
+      },
+    }));
+  }
+}, [product]);
+
 
   const fetchProduct = async () => {
     try {
