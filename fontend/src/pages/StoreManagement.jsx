@@ -173,14 +173,9 @@ const StoreManagement = () => {
     if (!profileImage) return;
 
     try {
-      const compressedFile = await imageCompression(profileImage, {
-        maxSizeMB: 0.5, // compress to under 0.5 MB
-        maxWidthOrHeight: 800, // resize to 800px max
-        useWebWorker: true,
-      });
       // Upload a single image to Firebase
       const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
-      await uploadBytes(imageRef, compressedFile);
+      await uploadBytes(imageRef, profileImage);
       const imageUrl = await getDownloadURL(imageRef);
 
       const payload = {
