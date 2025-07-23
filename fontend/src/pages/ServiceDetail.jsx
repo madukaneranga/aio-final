@@ -174,19 +174,10 @@ const ServiceDetail = () => {
             {/* Store Info */}
             <div className="bg-white rounded-lg p-4 border border-gray-200">
               <div className="flex items-center space-x-3">
-                {store?.profileImage ? (
-                  <img
-                    src={
-                      store.profileImage.startsWith("http")
-                        ? store.profileImage
-                        : `${import.meta.env.VITE_API_URL}${store.profileImage}`
-                    }
-                    alt={store.name}
-                    className="w-6 h-6"
-                  />
-                ) : (
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                   <Store className="w-6 h-6 text-gray-600" />
-                )}
+                </div>
+
                 <div>
                   <Link
                     to={`/store/${service.storeId._id}`}
