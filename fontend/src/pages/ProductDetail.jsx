@@ -17,6 +17,7 @@ import {
 const ProductDetail = () => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
+  const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedColor, setSelectedColor] = useState("");
@@ -41,28 +42,6 @@ const ProductDetail = () => {
     }
   }, [product]);
 
-  // For development/testing only
-  /*useEffect(() => {
-    if (product && import.meta.env.DEV) {
-      setProduct((prev) => ({
-        ...prev,
-        variants: {
-          colors: [
-            { name: "Red", hex: "#FF0000" },
-            { name: "Blue", hex: "#0000FF" },
-            { name: "White", hex: "#FFFFFF" },
-          ],
-          sizes: [
-            { name: "XS", inStock: true },
-            { name: "S", inStock: true },
-            { name: "M", inStock: false },
-            { name: "L", inStock: true },
-          ],
-        },
-      }));
-    }
-  }, [product]);*/
-
   const fetchProduct = async () => {
     try {
       const response = await fetch(
@@ -70,13 +49,21 @@ const ProductDetail = () => {
       );
       const data = await response.json();
       setProduct(data);
+
+      // Fetch store details separately
+      if (data.storeId) {
+        const storeResponse = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
+        );
+        const storeData = await storeResponse.json();
+        setStore(storeData);
+      }
     } catch (error) {
       console.error("Error fetching product:", error);
     } finally {
       setLoading(false);
     }
   };
-
 
   const getCurrentVariant = () => {
     if (!product?.variants) return null;
@@ -227,8 +214,25 @@ const ProductDetail = () => {
             <div className="bg-white rounded-xl p-6 border border-gray-200">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                  <Store className="w-6 h-6 text-gray-600" />
+                  {store?.profileImage ? (
+                    <img
+                      src={
+                        store.profileImage.startsWith("http")
+                          ? store.profileImage
+                          : `${import.meta.env.VITE_API_URL}${
+                              store.profileImage
+                            }`
+                      }
+                      alt={store.name}
+                      className="w-24 h-24 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Store className="w-6 h-6 text-gray-600" />
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <Link
                     to={`/store/${product.storeId._id}`}
@@ -239,6 +243,14 @@ const ProductDetail = () => {
                   <p className="text-sm text-gray-600">Visit Store</p>
                 </div>
               </div>
+            </div>
+
+            {/* Product Description */}
+            <div className="bg-white rounded-xl p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold mb-3">Description</h3>
+              <p className="text-gray-700 leading-relaxed">
+                {product.description}
+              </p>
             </div>
 
             {/* Product Variants */}
@@ -358,14 +370,6 @@ const ProductDetail = () => {
                   )}
                 </div>
               )}
-
-            {/* Product Description */}
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <h3 className="text-lg font-semibold mb-3">Description</h3>
-              <p className="text-gray-700 leading-relaxed">
-                {product.description}
-              </p>
-            </div>
 
             {/* Stock Status */}
             <div className="bg-white rounded-xl p-6 border border-gray-200">
