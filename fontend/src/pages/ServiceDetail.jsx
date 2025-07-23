@@ -43,7 +43,7 @@ const ServiceDetail = () => {
           `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
         );
         const storeData = await storeResponse.json();
-        setStore(storeData);
+        setStore(storeData.store);
       }
     } catch (error) {
       console.error("Error fetching service:", error);

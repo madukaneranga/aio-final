@@ -57,7 +57,7 @@ const ProductDetail = () => {
         );
         const storeData = await storeResponse.json();
         console.log("Fetched store data:", storeData); // ADD THIS
-        setStore(storeData);
+        setStore(storeData.store);
       }
     } catch (error) {
       console.error("Error fetching product:", error);
