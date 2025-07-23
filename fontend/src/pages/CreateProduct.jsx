@@ -4,9 +4,8 @@ import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
 import LoadingSpinner from "../components/LoadingSpinner";
 
-//  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+import { storage } from "../utils/firebase";
 
 const CreateProduct = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +14,10 @@ const CreateProduct = () => {
     price: "",
     category: "",
     stock: "",
+    variants: {
+      colors: [],
+      sizes: [],
+    },
   });
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +36,73 @@ const CreateProduct = () => {
     "Toys & Games",
     "Food & Beverages",
   ];
+
+  // Variant handlers
+  const addColor = () => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: {
+        ...prev.variants,
+        colors: [...prev.variants.colors, { name: "", hex: "#000000" }],
+      },
+    }));
+  };
+
+  const updateColor = (index, field, value) => {
+    const newColors = [...formData.variants.colors];
+    newColors[index][field] = value;
+    setFormData((prev) => ({
+      ...prev,
+      variants: {
+        ...prev.variants,
+        colors: newColors,
+      },
+    }));
+  };
+
+  const removeColor = (index) => {
+    const newColors = formData.variants.colors.filter((_, i) => i !== index);
+    setFormData((prev) => ({
+      ...prev,
+      variants: {
+        ...prev.variants,
+        colors: newColors,
+      },
+    }));
+  };
+
+  const addSize = () => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: {
+        ...prev.variants,
+        sizes: [...prev.variants.sizes, { name: "", inStock: true }],
+      },
+    }));
+  };
+
+  const updateSize = (index, field, value) => {
+    const newSizes = [...formData.variants.sizes];
+    newSizes[index][field] = field === "inStock" ? value === "true" : value;
+    setFormData((prev) => ({
+      ...prev,
+      variants: {
+        ...prev.variants,
+        sizes: newSizes,
+      },
+    }));
+  };
+
+  const removeSize = (index) => {
+    const newSizes = formData.variants.sizes.filter((_, i) => i !== index);
+    setFormData((prev) => ({
+      ...prev,
+      variants: {
+        ...prev.variants,
+        sizes: newSizes,
+      },
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,6 +125,10 @@ const CreateProduct = () => {
         category: formData.category,
         stock: formData.stock,
         images: imageUrls,
+        // Only send variants if any colors or sizes exist
+        ...(formData.variants.colors.length > 0 || formData.variants.sizes.length > 0
+          ? { variants: formData.variants }
+          : {}),
       };
 
       const response = await fetch(
@@ -113,9 +187,7 @@ const CreateProduct = () => {
             <h1 className="text-3xl font-bold text-gray-900">
               Create New Product
             </h1>
-            <p className="text-gray-600 mt-2">
-              Add a new product to your store
-            </p>
+            <p className="text-gray-600 mt-2">Add a new product to your store</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -224,6 +296,84 @@ const CreateProduct = () => {
                 maxImages={10}
                 multiple={true}
               />
+            </div>
+
+            {/* Variants Section */}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Color Variants
+              </label>
+              {formData.variants.colors.map((color, index) => (
+                <div key={index} className="flex items-center space-x-2 mb-2">
+                  <input
+                    type="text"
+                    placeholder="Color Name"
+                    value={color.name}
+                    onChange={(e) => updateColor(index, "name", e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1"
+                  />
+                  <input
+                    type="color"
+                    value={color.hex}
+                    onChange={(e) => updateColor(index, "hex", e.target.value)}
+                    className="w-10 h-10 border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeColor(index)}
+                    className="text-red-500 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addColor}
+                className="text-blue-500 hover:underline mt-2"
+              >
+                + Add Color
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Size Variants
+              </label>
+              {formData.variants.sizes.map((size, index) => (
+                <div key={index} className="flex items-center space-x-2 mb-2">
+                  <input
+                    type="text"
+                    placeholder="Size Name"
+                    value={size.name}
+                    onChange={(e) => updateSize(index, "name", e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1"
+                  />
+                  <select
+                    value={size.inStock ? "true" : "false"}
+                    onChange={(e) => updateSize(index, "inStock", e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1"
+                  >
+                    <option value="true">In Stock</option>
+                    <option value="false">Out of Stock</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeSize(index)}
+                    className="text-red-500 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addSize}
+                className="text-blue-500 hover:underline mt-2"
+              >
+                + Add Size
+              </button>
             </div>
 
             <div className="flex justify-end space-x-4">
