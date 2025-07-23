@@ -7,7 +7,10 @@ import Store from "../models/Store.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Console } from "console";
 import { withPackage } from "../middleware/withPackage.js";
-import { checkImageLimit, checkFeatureLimit } from "../middleware/featureLimit.js";
+import {
+  checkImageLimit,
+  checkFeatureLimit,
+} from "../middleware/featureLimit.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,61 +87,48 @@ router.get("/:id", async (req, res) => {
 });
 
 // Create product
-router.post(
-  "/",
-  authenticate,
-  authorize("store_owner"),
-  withPackage,
-  checkFeatureLimit("items", async (req) => {
-    return await Product.countDocuments({
+router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      price,
+      category,
+      stock,
+      images,
+      variants, // <--- add this line
+    } = req.body;
+
+    // Verify store ownership
+    const store = await Store.findOne({
       ownerId: req.user._id,
+      type: "product",
     });
-  }),
-  checkImageLimit("itemImages"),
-  async (req, res) => {
-    try {
-      const {
-        title,
-        description,
-        price,
-        category,
-        stock,
-        images,
-        variants, // <--- add this line
-      } = req.body;
-
-      // Verify store ownership
-      const store = await Store.findOne({
-        ownerId: req.user._id,
-        type: "product",
+    if (!store) {
+      return res.status(403).json({
+        error:
+          "Product store not found. You need a product store to create products.",
       });
-      if (!store) {
-        return res.status(403).json({
-          error:
-            "Product store not found. You need a product store to create products.",
-        });
-      }
-
-      const product = new Product({
-        title,
-        description,
-        price: parseFloat(price),
-        images,
-        category,
-        stock: parseInt(stock),
-        storeId: store._id,
-        ownerId: req.user._id,
-        variants, // <--- add variants here
-      });
-
-      await product.save();
-      res.status(201).json(product);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
     }
-  }
-);
 
+    const product = new Product({
+      title,
+      description,
+      price: parseFloat(price),
+      images,
+      category,
+      stock: parseInt(stock),
+      storeId: store._id,
+      ownerId: req.user._id,
+      variants, // <--- add variants here
+    });
+
+    await product.save();
+    res.status(201).json(product);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Update product
 router.put("/:id", authenticate, authorize("store_owner"), async (req, res) => {
