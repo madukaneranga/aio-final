@@ -30,7 +30,7 @@ const productSchema = new mongoose.Schema({
   isPreorder: {
     type: Boolean,
     required: true,
-    default:false,
+    default: false,
   },
   storeId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -49,6 +49,21 @@ const productSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+
+  variants: {
+    colors: [
+      {
+        name: { type: String, trim: true },
+        hex: { type: String }
+      }
+    ],
+    sizes: [
+      {
+        name: { type: String, trim: true },
+        inStock: { type: Boolean }
+      }
+    ]
   }
 });
 
