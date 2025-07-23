@@ -224,10 +224,10 @@ const ProductDetail = () => {
                             }`
                       }
                       alt={store.name}
-                      className="w-24 h-24 rounded-full object-cover"
+                      className="w-6 h-6 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
                       <Store className="w-6 h-6 text-gray-600" />
                     </div>
                   )}
