@@ -94,7 +94,6 @@ const ManageProducts = () => {
         sizes: product.variants?.sizes || [],
       },
     });
-    console.log("Editing product variants:", product.variants);
 
     setShowEditModal(true);
   };
