@@ -56,6 +56,7 @@ const ProductDetail = () => {
           `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
         );
         const storeData = await storeResponse.json();
+        console.log("Fetched store data:", storeData); // ADD THIS
         setStore(storeData);
       }
     } catch (error) {
