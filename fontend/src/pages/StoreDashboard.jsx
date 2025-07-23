@@ -366,13 +366,17 @@ const StoreDashboard = () => {
     });
   };
 
-  const handleEdit = (item) => {
-    setEditingItem({
-      ...item,
-      price: item.price.toString(),
-      stock: item.stock?.toString() || "",
-      duration: item.duration?.toString() || "",
+  const handleEdit = (product) => {
+    setEditingProduct({
+      ...product,
+      price: product.price?.toString() || "",
+      stock: product.stock?.toString() || "",
+      variants: {
+        colors: product.variants?.colors || [],
+        sizes: product.variants?.sizes || [],
+      },
     });
+
     setShowEditModal(true);
   };
 
@@ -386,14 +390,19 @@ const StoreDashboard = () => {
         description: editingItem.description,
         price: editingItem.price,
         category: editingItem.category,
+        ...(store?.type === "product"
+          ? {
+              stock: editingItem.stock,
+              ...(editingProduct.variants?.colors?.length > 0 ||
+              editingProduct.variants?.sizes?.length > 0
+                ? { variants: editingProduct.variants }
+                : {}),
+            }
+          : {
+              duration: editingItem.duration,
+              priceType: editingItem.priceType || "fixed",
+            }),
       };
-
-      if (store?.type === "product") {
-        updates.stock = editingItem.stock;
-      } else {
-        updates.duration = editingItem.duration;
-        updates.priceType = editingItem.priceType || "fixed";
-      }
 
       const endpoint = store?.type === "product" ? "products" : "services";
 
@@ -1296,6 +1305,189 @@ const StoreDashboard = () => {
                         <option value="fixed">Fixed Price</option>
                         <option value="hourly">Hourly Rate</option>
                       </select>
+                    </div>
+                  )}
+                  {store?.type === "product" && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Color Variants
+                      </label>
+                      {(editingProduct?.variants?.colors || []).map(
+                        (color, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center space-x-2 mb-2"
+                          >
+                            <input
+                              type="text"
+                              placeholder="Color Name"
+                              value={color.name}
+                              onChange={(e) => {
+                                const updated = [
+                                  ...editingProduct.variants.colors,
+                                ];
+                                updated[index].name = e.target.value;
+                                setEditingProduct((prev) => ({
+                                  ...prev,
+                                  variants: {
+                                    ...prev.variants,
+                                    colors: updated,
+                                  },
+                                }));
+                              }}
+                              className="border border-gray-300 rounded px-2 py-1"
+                            />
+                            <input
+                              type="color"
+                              value={color.hex}
+                              onChange={(e) => {
+                                const updated = [
+                                  ...editingProduct.variants.colors,
+                                ];
+                                updated[index].hex = e.target.value;
+                                setEditingProduct((prev) => ({
+                                  ...prev,
+                                  variants: {
+                                    ...prev.variants,
+                                    colors: updated,
+                                  },
+                                }));
+                              }}
+                              className="w-10 h-10 border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated =
+                                  editingProduct.variants.colors.filter(
+                                    (_, i) => i !== index
+                                  );
+                                setEditingProduct((prev) => ({
+                                  ...prev,
+                                  variants: {
+                                    ...prev.variants,
+                                    colors: updated,
+                                  },
+                                }));
+                              }}
+                              className="text-red-500 hover:underline"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingProduct((prev) => ({
+                            ...prev,
+                            variants: {
+                              ...prev.variants,
+                              colors: [
+                                ...(prev.variants.colors || []),
+                                { name: "", hex: "#000000" },
+                              ],
+                            },
+                          }));
+                        }}
+                        className="text-blue-500 hover:underline mt-2"
+                      >
+                        + Add Color
+                      </button>
+                    </div>
+                  )}
+                  {store?.type === "product" && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Size Variants
+                      </label>
+                      {(editingProduct?.variants?.sizes || []).map(
+                        (size, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center space-x-2 mb-2"
+                          >
+                            <input
+                              type="text"
+                              placeholder="Size Name"
+                              value={size.name}
+                              onChange={(e) => {
+                                const updated = [
+                                  ...editingProduct.variants.sizes,
+                                ];
+                                updated[index].name = e.target.value;
+                                setEditingProduct((prev) => ({
+                                  ...prev,
+                                  variants: {
+                                    ...prev.variants,
+                                    sizes: updated,
+                                  },
+                                }));
+                              }}
+                              className="border border-gray-300 rounded px-2 py-1"
+                            />
+                            <select
+                              value={size.inStock ? "true" : "false"}
+                              onChange={(e) => {
+                                const updated = [
+                                  ...editingProduct.variants.sizes,
+                                ];
+                                updated[index].inStock =
+                                  e.target.value === "true";
+                                setEditingProduct((prev) => ({
+                                  ...prev,
+                                  variants: {
+                                    ...prev.variants,
+                                    sizes: updated,
+                                  },
+                                }));
+                              }}
+                              className="border border-gray-300 rounded px-2 py-1"
+                            >
+                              <option value="true">In Stock</option>
+                              <option value="false">Out of Stock</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated =
+                                  editingProduct.variants.sizes.filter(
+                                    (_, i) => i !== index
+                                  );
+                                setEditingProduct((prev) => ({
+                                  ...prev,
+                                  variants: {
+                                    ...prev.variants,
+                                    sizes: updated,
+                                  },
+                                }));
+                              }}
+                              className="text-red-500 hover:underline"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingProduct((prev) => ({
+                            ...prev,
+                            variants: {
+                              ...prev.variants,
+                              sizes: [
+                                ...(prev.variants.sizes || []),
+                                { name: "", inStock: true },
+                              ],
+                            },
+                          }));
+                        }}
+                        className="text-blue-500 hover:underline mt-2"
+                      >
+                        + Add Size
+                      </button>
                     </div>
                   )}
 
