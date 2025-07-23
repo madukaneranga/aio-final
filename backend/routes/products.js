@@ -89,7 +89,7 @@ router.post(
   authenticate,
   authorize("store_owner"),
   withPackage,
-  checkFeatureLimit("items",async (req) => {
+  checkFeatureLimit("items", async (req) => {
     return await Product.countDocuments({
       ownerId: req.user._id,
     });
@@ -97,7 +97,15 @@ router.post(
   checkImageLimit("itemImages"),
   async (req, res) => {
     try {
-      const { title, description, price, category, stock, images } = req.body;
+      const {
+        title,
+        description,
+        price,
+        category,
+        stock,
+        images,
+        variants, // <--- add this line
+      } = req.body;
 
       // Verify store ownership
       const store = await Store.findOne({
@@ -120,6 +128,7 @@ router.post(
         stock: parseInt(stock),
         storeId: store._id,
         ownerId: req.user._id,
+        variants, // <--- add variants here
       });
 
       await product.save();
@@ -129,6 +138,7 @@ router.post(
     }
   }
 );
+
 
 // Update product
 router.put("/:id", authenticate, authorize("store_owner"), async (req, res) => {
