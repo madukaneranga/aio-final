@@ -5,8 +5,7 @@ import { fileURLToPath } from "url";
 import Service from "../models/Service.js";
 import Store from "../models/Store.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { withPackage } from "../middleware/withPackage.js";
-import { checkImageLimit, checkFeatureLimit } from "../middleware/featureLimit.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,66 +82,54 @@ router.get("/:id", async (req, res) => {
 });
 
 // Create service
-router.post(
-  "/",
-  authenticate,
-  authorize("store_owner"),
-  withPackage,
-  checkFeatureLimit("items", async (req) => {
-    return await Service.countDocuments({
+router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      price,
+      priceType,
+      category,
+      duration,
+      availability,
+      images,
+    } = req.body;
+
+    // Verify store ownership
+    const store = await Store.findOne({
       ownerId: req.user._id,
+      type: "service",
     });
-  }),
-  checkImageLimit("itemImages"),
-  async (req, res) => {
-    try {
-      const {
-        title,
-        description,
-        price,
-        priceType,
-        category,
-        duration,
-        availability,
-        images,
-      } = req.body;
-
-      // Verify store ownership
-      const store = await Store.findOne({
-        ownerId: req.user._id,
-        type: "service",
+    if (!store) {
+      return res.status(403).json({
+        error:
+          "Service store not found. You need a service store to create services.",
       });
-      if (!store) {
-        return res.status(403).json({
-          error:
-            "Service store not found. You need a service store to create services.",
-        });
-      }
-
-      // Parse timeSlots if provided
-      const timeSlots = Array.isArray(req.body.timeSlots)
-        ? req.body.timeSlots
-        : [];
-
-      const service = new Service({
-        title,
-        description,
-        price: parseFloat(price),
-        priceType,
-        images,
-        category,
-        duration: parseInt(duration),
-        timeSlots,
-        storeId: store._id,
-      });
-
-      await service.save();
-      res.status(201).json(service);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
     }
+
+    // Parse timeSlots if provided
+    const timeSlots = Array.isArray(req.body.timeSlots)
+      ? req.body.timeSlots
+      : [];
+
+    const service = new Service({
+      title,
+      description,
+      price: parseFloat(price),
+      priceType,
+      images,
+      category,
+      duration: parseInt(duration),
+      timeSlots,
+      storeId: store._id,
+    });
+
+    await service.save();
+    res.status(201).json(service);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-);
+});
 
 // Update service
 router.put("/:id", authenticate, authorize("store_owner"), async (req, res) => {
