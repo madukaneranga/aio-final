@@ -62,7 +62,7 @@ io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id, "userId:", socket.userId);
 
   userSocketMap.set(socket.userId, socket.id);
-  console.log("User Id "+ socket.userId)
+  console.log("User Id " + socket.userId);
 
   socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);
@@ -108,6 +108,8 @@ import platformSettingsRoutes from "./routes/platformSettings.js";
 import packageRoutes from "./routes/packages.js";
 import sitemapRoutes from "./routes/sitemap.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
+import walletRoutes from "./routes/wallet.js";
+import adminRoutes from "./routes/admin.js";
 
 console.log("Registering API routes");
 app.use("/api/auth", authRoutes);
@@ -125,6 +127,8 @@ app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/sitemap.xml", sitemapRoutes);
+app.use("/api/wallet", walletRoutes);
+app.use("/api/admin", adminRoutes);
 
 // --- React frontend serving ---
 const distPath = path.resolve(__dirname, "../dist");

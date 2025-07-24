@@ -15,6 +15,7 @@ import {
   Package,
   Calendar,
   TrendingUp,
+  Wallet,
 } from "lucide-react";
 
 const Header = () => {
@@ -130,6 +131,15 @@ const Header = () => {
                     {totalItems}
                   </span>
                 )}
+              </Link>
+            )}
+
+            {user?.role === "store_owner" && (
+              <Link
+                to="/wallet-dashboard"
+                className="relative p-2 text-gray-700 hover:text-black transition-colors"
+              >
+                <Wallet className="w-6 h-6" />
               </Link>
             )}
 
