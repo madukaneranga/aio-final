@@ -118,10 +118,17 @@ router.get(
   authorize("store_owner"),
   async (req, res) => {
     try {
+      console.log("Authenticated user:", req.user);
+
       const userId = req.user._id;
 
+      console.log("Getting wallet balance...");
       const balance = await getWalletBalance(userId);
+
+      console.log("Getting pending withdrawals...");
       const pendingWithdrawals = await getPendingWithdrawals(userId);
+
+      console.log("Getting monthly withdrawal count...");
       const monthlyWithdrawals = await getMonthlyWithdrawalCount(userId);
 
       res.json({
