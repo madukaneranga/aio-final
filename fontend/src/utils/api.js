@@ -20,7 +20,7 @@ const handleResponse = async (response) => {
 
 export const walletAPI = {
   getSummary: async () => {
-    const response = await fetch(`${API_BASE_URL}api/wallet/summary`, {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/summary`, {
       headers: getAuthHeaders()
     });
     return handleResponse(response);
@@ -28,14 +28,14 @@ export const walletAPI = {
 
   getTransactions: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}api//wallet/transactions?${queryString}`, {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/transactions?${queryString}`, {
       headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
 
   requestWithdrawal: async (data) => {
-    const response = await fetch(`${API_BASE_URL}api//wallet/withdraw`, {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/withdraw`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
@@ -44,14 +44,14 @@ export const walletAPI = {
   },
 
   getBankDetails: async () => {
-    const response = await fetch(`${API_BASE_URL}api//wallet/bank-details`, {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/bank-details`, {
       headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
 
   updateBankDetails: async (data) => {
-    const response = await fetch(`${API_BASE_URL}api//wallet/bank-details`, {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/bank-details`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
@@ -63,7 +63,7 @@ export const walletAPI = {
 export const adminAPI = {
   getPendingWithdrawals: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}api//admin/withdrawals/pending?${queryString}`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/withdrawals/pending?${queryString}`, {
       headers: getAuthHeaders()
     });
     return handleResponse(response);
@@ -71,14 +71,14 @@ export const adminAPI = {
 
   getAllWithdrawals: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}api//admin/withdrawals?${queryString}`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/withdrawals?${queryString}`, {
       headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
 
   processWithdrawal: async (id, data) => {
-    const response = await fetch(`${API_BASE_URL}api//admin/withdrawals/${id}/process`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/withdrawals/${id}/process`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data)
@@ -88,7 +88,7 @@ export const adminAPI = {
 
   getAnalytics: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}api//admin/analytics?${queryString}`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/analytics?${queryString}`, {
       headers: getAuthHeaders()
     });
     return handleResponse(response);
