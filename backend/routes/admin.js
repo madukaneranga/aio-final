@@ -12,7 +12,7 @@ const validateAdminAction = (data) => {
   // Updated to include all workflow statuses
   if (
     !data.action ||
-    !["approve", "reject", "processing", "completed"].includes(data.action)
+    !["approved", "rejected", "processing", "completed"].includes(data.action)
   ) {
     errors.push(
       "Action must be one of: approve, reject, processing, completed"
