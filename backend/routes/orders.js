@@ -2,7 +2,7 @@ import express from "express";
 import Order from "../models/Order.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import Notification from "../models/Notification.js";
-import { emitNotification } from "../index.js";
+import { emitNotification } from "../utils/socketUtils.js";
 
 const router = express.Router();
 
