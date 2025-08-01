@@ -4,7 +4,7 @@ import WalletTransaction from "../models/WalletTransaction.js";
 import BankDetails from "../models/BankDetails.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { v4 as uuidv4 } from "uuid";
-import { emitNotification } from "../index.js";
+import { emitNotification } from "../utils/socketUtils.js";
 import Notification from "../models/Notification.js";
 
 // Custom validation functions

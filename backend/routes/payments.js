@@ -8,7 +8,7 @@ import Store from "../models/Store.js";
 import Commission from "../models/Commission.js";
 import Notification from "../models/Notification.js";
 import { authenticate } from "../middleware/auth.js";
-import { emitNotification } from "../index.js";
+import { emitNotification } from "../utils/socketUtils.js";
 import { v4 as uuidv4 } from "uuid";
 import WalletTransaction from "../models/WalletTransaction.js";
 
