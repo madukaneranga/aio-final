@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
-import ColorThemeSelector from "../components/ColorThemeSelector";
-import TimeSlotManager from "../components/TimeSlotManager";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Store, Package, Calendar, MapPin, Phone, Mail } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -65,51 +63,7 @@ const CreateStore = () => {
     setError("");
 
     try {
-      // 🔄 Upload hero images to Firebase
-      const uploadPromises = heroImages.map(async (file) => {
-        // Resize/Compress the image
-        const compressedFile = await imageCompression(file, {
-          maxSizeMB: 0.5, // compress to under 0.5 MB
-          maxWidthOrHeight: 800, // resize to 800px max
-          useWebWorker: true,
-        });
-
-        const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, compressedFile);
-        return getDownloadURL(imageRef);
-      });
-
-      const imageUrls = await Promise.all(uploadPromises);
-
-      // 🏪 Create the store
-      const payload = {
-        name: formData.name,
-        type: formData.type,
-        description: formData.description,
-        themeColor: formData.themeColor,
-        contactInfo: formData.contactInfo,
-        timeSlots: timeSlots,
-        heroImages: imageUrls,
-      };
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to create store");
-      }
-
-      // 💳 Start subscription
+      // 💳 Start subscription payment FIRST (before any uploads)
       const subResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
         {
@@ -125,31 +79,87 @@ const CreateStore = () => {
       );
 
       if (!subResponse.ok) {
-        alert(
-          "Store created, but failed to start subscription. Please contact support."
-        );
-        await refreshUser();
-        return navigate("/dashboard");
+        throw new Error("Failed to initialize subscription");
       }
 
       const { paymentParams } = await subResponse.json();
 
-      // 🚀 Start PayHere modal payment
+      // 🚀 Wait for payment completion
       await startPayHerePayment(paymentParams);
 
-      // Optional post-payment action
-      alert("Subscription payment successful!");
+      // 🔄 Upload images ONLY after successful payment
+      const uploadPromises = heroImages.map(async (file) => {
+        const compressedFile = await imageCompression(file, {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 800,
+          useWebWorker: true,
+        });
+
+        const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
+        await uploadBytes(imageRef, compressedFile);
+        return getDownloadURL(imageRef);
+      });
+
+      const imageUrls = await Promise.all(uploadPromises);
+
+      // 🏪 Create store with uploaded images
+      const storePayload = {
+        name: formData.name,
+        type: formData.type,
+        description: formData.description,
+        themeColor: formData.themeColor,
+        contactInfo: formData.contactInfo,
+        timeSlots: timeSlots,
+        heroImages: imageUrls,
+      };
+
+      const storeResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stores`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify(storePayload),
+        }
+      );
+
+      if (!storeResponse.ok) {
+        const data = await storeResponse.json();
+        throw new Error(data.error || "Failed to create store after payment");
+      }
+
+      // ✅ Success! Both payment and store creation completed
+      alert("Payment successful and store created!");
       await refreshUser();
       navigate("/dashboard");
     } catch (error) {
       console.error("Error:", error);
-      setError(error.message || "Something went wrong. Please try again.");
+
+      // Handle different error scenarios
+      if (error.message.includes("Payment")) {
+        setError("Payment failed. No store or images were created.");
+      } else if (error.message.includes("store")) {
+        setError(
+          "Payment successful but store creation failed. Please contact support."
+        );
+      } else if (
+        error.message.includes("upload") ||
+        error.message.includes("Firebase")
+      ) {
+        setError(
+          "Payment successful but image upload failed. Please contact support."
+        );
+      } else {
+        setError(error.message || "Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // 💳 Start PayHere Payment with JS SDK
+  // 💳 PayHere Payment Handler (unchanged)
   const startPayHerePayment = (paymentParams) => {
     return new Promise((resolve, reject) => {
       if (!window.payhere) {
@@ -353,37 +363,6 @@ const CreateStore = () => {
                 />
               </div>
 
-              {/*
-  <ColorThemeSelector
-    selectedColor={formData.themeColor}
-    onColorChange={(color) =>
-      setFormData({ ...formData, themeColor: color })
-    }
-  />
-
-  {formData.type === "service" && (
-    <TimeSlotManager
-      timeSlots={timeSlots}
-      onTimeSlotsChange={setTimeSlots}
-    />
-  )}
-
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-2">
-      Store Hero Images (up to 5)
-    </label>
-    <p className="text-sm text-gray-500 mb-3">
-      Upload high-quality images that represent your store
-    </p>
-    <ImageUpload
-      images={heroImages}
-      onImagesChange={setHeroImages}
-      maxImages={5}
-      multiple={true}
-    />
-  </div>
-*/}
-
               {/* Contact Information */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
@@ -439,23 +418,7 @@ const CreateStore = () => {
               </div>
               <Pricing subPackage={subPackage} setSubPackage={setSubPackage} />
               {/* Subscription Info */}
-              {/*<div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h4 className="font-semibold text-blue-900 mb-2">
-                  Monthly Subscription
-                </h4>
-                <p className="text-blue-800 mb-2">LKR 1,500 per month</p>
-                <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• Unlimited product/service listings</li>
-                  <li>• Advanced analytics and reports</li>
-                  <li>• Customer management tools</li>
-                  <li>• 24/7 support</li>
-                  <li>
-                    • You can cancel your subscription anytime after 6 days from
-                    the date of activation.
-                  </li>
-                </ul>
-              </div>
-*/}
+
               <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"
