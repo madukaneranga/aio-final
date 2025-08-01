@@ -23,16 +23,16 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       # Frontend steps
-      - name: Install frontend dependencies
-        working-directory: ./frontend
+      - name: Install fontend dependencies
+        working-directory: ./fontend
         run: npm ci
 
-      - name: Build frontend
-        working-directory: ./frontend
+      - name: Build fontend
+        working-directory: ./fontend
         run: npm run build
 
-      - name: Run frontend tests
-        working-directory: ./frontend
+      - name: Run fontend tests
+        working-directory: ./fontend
         run: npm test --if-present
 
       # Backend steps
