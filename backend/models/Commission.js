@@ -21,7 +21,7 @@ const commissionSchema = new mongoose.Schema({
   commissionRate: {
     type: Number,
     required: true,
-    default: 0.07 // 7%
+    default: 0.05 // 5%
   },
   commissionAmount: {
     type: Number,

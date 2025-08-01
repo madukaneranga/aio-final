@@ -38,7 +38,7 @@ io.use((socket, next) => {
 
   try {
     const decoded = jwt.verify(token, SECRET);
-    console.log("Decoded token:", decoded); // print entire payload to inspect
+    //console.log("Decoded token:", decoded); // print entire payload to inspect
 
     // Adjust the field below based on your decoded token shape
     socket.userId = decoded.id || decoded._id || decoded.userId;

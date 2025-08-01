@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
 
-const walletTransactionSchema = new mongoose.Schema(
+const { Schema } = mongoose;
+
+const walletTransactionSchema = new Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
@@ -12,6 +14,7 @@ const walletTransactionSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      trim: true,
     },
     type: {
       type: String,
@@ -26,55 +29,75 @@ const walletTransactionSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["completed", "pending", "approved", "rejected", "processing"],
-      default: "completed",
+      default: "pending",
     },
     description: {
       type: String,
       required: true,
+      trim: true,
     },
     orderId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Order",
     },
     withdrawalDetails: {
       requestedAt: Date,
       processedAt: Date,
+      completedAt: Date, 
       bankAccountId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: "BankDetails",
       },
       adminNotes: String,
       processedBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Admin",
+        type: Schema.Types.ObjectId,
+        ref: "User", 
+      },
+      completedBy: {
+        // 🆕 ADD THIS FIELD
+        type: Schema.Types.ObjectId,
+        ref: "User", 
       },
     },
     metadata: {
       paymentMethod: String,
       paymentId: String,
-      fees: Number,
-      netAmount: Number,
+      fees: {
+        type: Number,
+        min: 0,
+      },
+      netAmount: {
+        type: Number,
+        min: 0,
+      },
     },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// Indexes for better query performance
+// Indexes for optimized queries
 walletTransactionSchema.index({ userId: 1, type: 1 });
 walletTransactionSchema.index({ userId: 1, createdAt: -1 });
 walletTransactionSchema.index({ status: 1, type: 1 });
 
-// Virtual for formatted amount
+// Virtual: formatted amount
 walletTransactionSchema.virtual("formattedAmount").get(function () {
   return `Rs. ${this.amount.toFixed(2)}`;
 });
 
-// Static method to get wallet balance
+//Wallet balance
 walletTransactionSchema.statics.getWalletBalance = async function (userId) {
   const result = await this.aggregate([
-    { $match: { userId: Types.ObjectId(userId) } },
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        status: "completed",
+      },
+    },
     {
       $group: {
         _id: "$type",
@@ -91,10 +114,14 @@ walletTransactionSchema.statics.getWalletBalance = async function (userId) {
     if (item._id === "sale") {
       totalEarnings += item.total;
       balance += item.total;
-    } else if (item._id === "withdrawal" || item._id === "refund") {
+    } else if (item._id === "withdrawal") {
       totalWithdrawals += item.total;
       balance -= item.total;
+    } else if (item._id === "refund") {
+      // Refunds typically add back to balance
+      balance += item.total;
     }
+    // Handle "adjustment" type as needed
   });
 
   return {
@@ -104,32 +131,32 @@ walletTransactionSchema.statics.getWalletBalance = async function (userId) {
   };
 };
 
-// Static method to get pending withdrawals
-walletTransactionSchema.statics.getPendingWithdrawals = async function (userId) {
+// Static method: pending withdrawals
+walletTransactionSchema.statics.getPendingWithdrawals = async function (
+  userId
+) {
   const pending = await this.find({
     userId,
     type: "withdrawal",
     status: { $in: ["pending", "approved"] },
   });
 
-  return pending.reduce((sum, transaction) => sum + transaction.amount, 0);
+  return pending.reduce((sum, tx) => sum + tx.amount, 0);
 };
 
-// Static method to check monthly withdrawal limit
+// Static method: monthly withdrawal count
 walletTransactionSchema.statics.getMonthlyWithdrawalCount = async function (
   userId
 ) {
   const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
+  startOfMonth.setUTCDate(1);
+  startOfMonth.setUTCHours(0, 0, 0, 0);
 
-  const count = await this.countDocuments({
+  return await this.countDocuments({
     userId,
     type: "withdrawal",
     createdAt: { $gte: startOfMonth },
   });
-
-  return count;
 };
 
 export default mongoose.model("WalletTransaction", walletTransactionSchema);

@@ -25,6 +25,7 @@ const typeColors = {
   promotion: palette.purple5,
   warning: palette.purple4,
   announcement: palette.purple6,
+  withdrawal_update: palette.purple6,
 };
 
 export default function Notifications() {

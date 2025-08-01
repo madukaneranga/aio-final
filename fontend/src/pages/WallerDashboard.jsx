@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '../hooks/useWallet';
 import { useSocket } from '../hooks/useSocket';
 import WalletSummary from '../components/WalletSummary';
@@ -8,30 +9,32 @@ import BankDetailsForm from '../components/BankDetailsFrom';
 import WalletNotifications from '../components/WalletNotifications';
 
 const WalletDashboard = () => {
+  const { user } = useAuth(); // assuming user contains _id or storeId
   const { summary, transactions, loading, error, fetchSummary, fetchTransactions } = useWallet();
   const socket = useSocket();
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    if (socket) {
-      // Join wallet room for real-time updates
-      socket.emit('join-wallet-room', 'STORE_ID'); // Replace with actual store ID
-      
-      // Listen for wallet updates
-      socket.on('wallet-update', (data) => {
-        console.log('Wallet update received:', data);
-        fetchSummary();
-        if (data.type !== 'withdrawal_requested') {
-          fetchTransactions();
-        }
-      });
+  if (socket && user?._id) {
+    const userId = user._id;
 
-      return () => {
-        socket.emit('leave-wallet-room', 'STORE_ID');
-        socket.off('wallet-update');
-      };
-    }
-  }, [socket, fetchSummary, fetchTransactions]);
+    socket.emit('join-wallet-room', userId);
+
+    socket.on('wallet-update', (data) => {
+      console.log('Wallet update received:', data);
+      fetchSummary();
+      if (data.type !== 'withdrawal_requested') {
+        fetchTransactions();
+      }
+    });
+
+    return () => {
+      socket.emit('leave-wallet-room', userId);
+      socket.off('wallet-update');
+    };
+  }
+}, [socket, fetchSummary, fetchTransactions]);
+
 
   const handleFilterChange = (filters) => {
     fetchTransactions(filters);

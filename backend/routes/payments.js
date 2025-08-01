@@ -9,6 +9,8 @@ import Commission from "../models/Commission.js";
 import Notification from "../models/Notification.js";
 import { authenticate } from "../middleware/auth.js";
 import { emitNotification } from "../index.js";
+import { v4 as uuidv4 } from "uuid";
+import WalletTransaction from "../models/WalletTransaction.js";
 
 const router = express.Router();
 
@@ -36,8 +38,12 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
       return res.status(400).json({ error: "Unsupported payment method" });
     }
 
-    const combinedId = `CMB_${Date.now()}_${req.user._id}`;
+    const generateTransactionId = (prefix = "TX", userId = "") =>
+      `${prefix}-${Date.now()}-${userId}-${uuidv4()}`;
+
+    const combinedId = generateTransactionId("SALE", req.user._id);
     let totalAmount = 0;
+    let totalTransactionAmount = 0;
 
     const createdEntities = {
       order: [],
@@ -88,7 +94,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
 
       // Create one Order per store group
       for (const [storeId, storeData] of storeOrderMap.entries()) {
-        const commissionRate = 0.07;
+        const commissionRate = 0.05;
         const commissionAmount = storeData.totalAmount * commissionRate;
         const storeAmount = storeData.totalAmount - commissionAmount;
 
@@ -106,15 +112,32 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
 
         await order.save();
 
-        // Notify store owner about the order creation
         const store = await Store.findById(storeId);
 
         if (order) {
+          // Create sales transaction
+          const transaction = new WalletTransaction({
+            userId: store.ownerId,
+            transactionId: combinedId,
+            type: "sale",
+            amount: storeAmount.toFixed(2),
+            status: "pending",
+            description: `Product payment of ${combinedId}`,
+            withdrawalDetails: {
+              processedAt: new Date(),
+            },
+          });
+
+          await transaction.save();
+
+          // Notify store owner about the order creation
           const storeNotification = await Notification.create({
             userId: store.ownerId,
             title: `New order received`,
             userType: "store_owner",
-            body: `You have a new order with ID #${order._id.toString().slice(-8)}`,
+            body: `You have a new order with ID #${order._id
+              .toString()
+              .slice(-8)}`,
             type: "order_update",
             link: `/orders`,
           });
@@ -123,9 +146,9 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             userId: req.user._id,
             title: `⏳ Order Pending`,
             userType: "customer",
-            body: `Your order has been received and is awaiting processing. We’ll update you soon! Order ID  #${order._id.toString().slice(
-              -8
-            )}`,
+            body: `Your order has been received and is awaiting processing. We’ll update you soon! Order ID  #${order._id
+              .toString()
+              .slice(-8)}`,
             type: "order_update",
             link: `/orders`,
           });
@@ -171,15 +194,32 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
 
         await booking.save();
 
-        // Notify store owner about the order creation
         const store = await Store.findById(service.storeId);
 
         if (booking) {
+          // Create sales transaction
+          const transaction = new WalletTransaction({
+            userId: store.ownerId,
+            transactionId: combinedId,
+            type: "sale",
+            amount: storeAmount.toFixed(2),
+            status: "pending",
+            description: `Product payment of ${combinedId}`,
+            withdrawalDetails: {
+              processedAt: new Date(),
+            },
+          });
+
+          await transaction.save();
+
+          // Notify store owner about the order creation
           const storeNotification = await Notification.create({
             userId: store.ownerId,
             title: `New Booking received`,
             userType: "store_owner",
-            body: `You have a new booking with ID #${booking._id.toString().slice(-8)}`,
+            body: `You have a new booking with ID #${booking._id
+              .toString()
+              .slice(-8)}`,
             type: "booking_update",
             link: `/bookings`,
           });
@@ -188,9 +228,9 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             userId: req.user._id,
             title: `⏳ booking Pending`,
             userType: "customer",
-            body: `Your booking is now pending. We’ll notify you once it gets confirmed! Booking ID  #${booking._id.toString().slice(
-              -8
-            )}`,
+            body: `Your booking is now pending. We’ll notify you once it gets confirmed! Booking ID  #${booking._id
+              .toString()
+              .slice(-8)}`,
             type: "booking_update",
             link: `/bookings`,
           });
@@ -363,6 +403,28 @@ router.post(
           "paymentDetails.paymentStatus": { $ne: "paid" },
         });
 
+        const sales = await WalletTransaction.find({
+          transactionId: data.order_id,
+          type: "sale",
+          status: "pending",
+        }).populate("userId");
+
+        if (sales.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: "Payment not found or already completed",
+          });
+        }
+
+        // Bulk update for better performance
+        const salesIds = sales.map((item) => item._id);
+        await WalletTransaction.updateMany(
+          { _id: { $in: salesIds } },
+          {
+            status: "completed",
+          }
+        );
+
         if (orders.length > 0) {
           // Process all orders
           for (const order of orders) {
@@ -386,11 +448,13 @@ router.post(
               orderId: order._id,
               storeId: order.storeId,
               totalAmount: order.totalAmount,
-              commissionRate: 0.07,
+              commissionRate: 0.05,
               commissionAmount: order.platformFee,
               storeAmount: order.storeAmount,
               currency: "LKR",
               type: "order",
+              status: "paid",
+              createdAt: Date.now(),
             });
             await commission.save();
 
@@ -416,11 +480,13 @@ router.post(
               bookingId: booking._id,
               storeId: booking.storeId,
               totalAmount: booking.totalAmount,
-              commissionRate: 0.07,
+              commissionRate: 0.05,
               commissionAmount: booking.platformFee,
               storeAmount: booking.storeAmount,
               currency: "LKR",
               type: "booking",
+              status: "paid",
+              createdAt: Date.now(),
             });
             await commission.save();
 
@@ -484,110 +550,6 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-// Main Cancel Route
-router.put("/:id/cancel", authenticate, async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id);
-    if (!order) {
-      console.error("Order not found for ID:", req.params.id);
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    if (order.customerId.toString() !== req.user._id.toString()) {
-      console.error("User ID mismatch:", req.user._id, order.customerId);
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    if (order.status !== "pending") {
-      console.error("Order status not pending:", order.status);
-      return res.status(400).json({ error: "Order cannot be cancelled" });
-    }
-
-    const orderTime = new Date(order.createdAt);
-    const now = new Date();
-    const timeDiff = (now - orderTime) / (1000 * 60);
-
-    if (timeDiff > 5) {
-      console.error("Cancellation window expired, timeDiff:", timeDiff);
-      return res.status(400).json({ error: "Cancellation window has expired" });
-    }
-
-    let notes = "Cancelled by customer";
-
-    if (order.paymentDetails?.paymentMethod === "payhere") {
-      const paymentId = order.paymentDetails.transactionId;
-      if (!paymentId) {
-        console.error(
-          "No PayHere payment ID found in order.paymentDetails:",
-          order.paymentDetails
-        );
-        return res
-          .status(400)
-          .json({ error: "No PayHere payment ID found for refund" });
-      }
-
-      // Get Access Token
-      const accessToken = await getAccessToken().catch((err) => {
-        console.error("Failed to get PayHere access token:", err);
-        throw err; // re-throw to be caught by outer catch
-      });
-      console.log(accessToken);
-
-      // Prepare refund request body
-      const refundBody = {
-        payment_id: paymentId,
-        description: "User cancelled order",
-      };
-
-      console.log(refundBody);
-
-      // Call PayHere Refund API
-      const refundResponse = await fetch(PAYHERE_REFUND_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(refundBody),
-      });
-
-      if (!refundResponse.ok) {
-        const text = await refundResponse.text();
-        console.error(
-          "PayHere refund API failed, status:",
-          refundResponse.status,
-          "body:",
-          text
-        );
-        return res.status(500).json({ error: "Refund API call failed" });
-      }
-
-      const refundResult = await refundResponse.json();
-
-      if (refundResult.status !== 1) {
-        console.error("Refund failed with message:", refundResult.msg);
-        return res
-          .status(500)
-          .json({ error: "Refund failed: " + refundResult.msg });
-      }
-
-      notes += " and refunded via PayHere";
-    }
-
-    // Update order status
-    const updatedOrder = await Order.findByIdAndUpdate(
-      order._id,
-      { status: "cancelled", notes },
-      { new: true }
-    );
-
-    res.json(updatedOrder);
-  } catch (error) {
-    console.error("Cancel error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Get payment methods available in Sri Lanka
 router.get("/payment-methods", (req, res) => {
   const paymentMethods = [
@@ -601,6 +563,182 @@ router.get("/payment-methods", (req, res) => {
   ];
 
   res.json(paymentMethods);
+});
+
+// Main Cancel Route
+router.put("/:id/cancel", authenticate, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // Try finding either an order or a booking
+    let item = await Order.findById(id).populate("storeId");
+    let itemType = "order";
+
+    if (!item) {
+      item = await Booking.findById(id).populate("storeId");
+      itemType = "booking";
+    }
+
+    if (!item) {
+      console.error("Item not found for ID:", id);
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    // Check if the user is authorized
+    const isStoreOwner =
+      item.storeId.ownerId.toString() === req.user._id.toString();
+    const isCustomer = item.customerId.toString() === req.user._id.toString();
+
+    if (!isStoreOwner && !isCustomer) {
+      console.error("Unauthorized user:", req.user._id);
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (item.status !== "pending") {
+      console.error("Status not pending:", item.status);
+      return res.status(400).json({ error: "Item cannot be cancelled" });
+    }
+
+    // Prepare cancellation details
+    let notes = isStoreOwner ? "Cancelled by seller" : "Cancelled by customer";
+    let sellerNote = isStoreOwner
+      ? `You have cancelled this ${itemType}`
+      : `The customer has cancelled this ${itemType}`;
+
+    let customerNote = isStoreOwner
+      ? `The seller has cancelled your ${itemType}`
+      : `You have cancelled this ${itemType}`;
+
+    // Handle refund logic
+    if (item.paymentDetails?.paymentMethod === "payhere") {
+      const paymentId = item.paymentDetails.transactionId;
+
+      if (!paymentId) {
+        console.error("No PayHere transaction ID:", item.paymentDetails);
+        return res
+          .status(400)
+          .json({ error: "No PayHere payment ID found for refund" });
+      }
+
+      try {
+        const accessToken = await getAccessToken();
+        const refundResponse = await fetch(PAYHERE_REFUND_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            payment_id: paymentId,
+            description: `${
+              isStoreOwner ? "Seller" : "Customer"
+            } cancelled ${itemType}`,
+          }),
+        });
+
+        if (!refundResponse.ok) {
+          const text = await refundResponse.text();
+          console.error("Refund API error:", refundResponse.status, text);
+          return res.status(500).json({ error: "Refund API call failed" });
+        }
+
+        const result = await refundResponse.json();
+        if (result.status !== 1) {
+          console.error("Refund failed:", result.msg);
+          return res
+            .status(500)
+            .json({ error: "Refund failed: " + result.msg });
+        }
+
+        notes += " and refunded via PayHere";
+
+        // Restore stock for orders (not bookings) and non-preorder products
+        if (itemType === "order" && item.items) {
+          for (const orderItem of item.items) {
+            const product = await Product.findById(orderItem.productId);
+            if (product && !product.isPreorder) {
+              await Product.findByIdAndUpdate(orderItem.productId, {
+                $inc: { stock: +orderItem.quantity },
+              });
+            }
+          }
+        }
+
+        // Update store total sales
+        await Store.findByIdAndUpdate(item.storeId, {
+          $inc: { totalSales: -item.storeAmount },
+        });
+
+        // Create refund transaction
+        const transaction = new WalletTransaction({
+          userId: item.storeId.ownerId,
+          transactionId: item.combinedId || item._id.toString(),
+          type: "refund",
+          amount: item.storeAmount,
+          status: "completed",
+          description: `Refund for ${itemType} #${item._id
+            .toString()
+            .slice(-8)}`,
+        });
+
+        await transaction.save();
+      } catch (err) {
+        console.error("Refund error:", err);
+        return res.status(500).json({ error: "Refund process failed" });
+      }
+    }
+
+    // Update item status to cancelled
+    const updateData = {
+      status: "cancelled",
+      notes: notes,
+    };
+
+    let updatedItem;
+    if (itemType === "order") {
+      updatedItem = await Order.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
+    } else {
+      updatedItem = await Booking.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
+    }
+
+    // Create notifications
+    const storeNotification = await Notification.create({
+      userId: item.storeId.ownerId,
+      title: `${itemType} cancellation`,
+      userType: "store_owner",
+      body: `#${item._id.toString().slice(-8)} ${sellerNote}`,
+      type: `${itemType}_update`,
+      link: `/${itemType}s`,
+    });
+
+    const customerNotification = await Notification.create({
+      userId: item.customerId,
+      title: `${itemType} cancellation`,
+      userType: "customer",
+      body: `#${item._id.toString().slice(-8)} ${customerNote}`,
+      type: `${itemType}_update`,
+      link: `/${itemType}s`,
+    });
+
+    // Emit notifications
+    emitNotification(item.storeId.ownerId.toString(), storeNotification);
+    emitNotification(item.customerId.toString(), customerNotification);
+
+    // Send success response
+    return res.status(200).json({
+      success: true,
+      message: `${itemType} cancelled successfully`,
+      item: updatedItem,
+      refunded: item.paymentDetails?.paymentMethod === "payhere",
+    });
+  } catch (error) {
+    console.error("Cancel route error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

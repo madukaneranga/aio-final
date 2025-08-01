@@ -3,6 +3,9 @@ const router = express.Router();
 import WalletTransaction from "../models/WalletTransaction.js";
 import BankDetails from "../models/BankDetails.js";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { v4 as uuidv4 } from "uuid";
+import { emitNotification } from "../index.js";
+import Notification from "../models/Notification.js";
 
 // Custom validation functions
 const validateWithdrawalRequest = (data) => {
@@ -11,10 +14,10 @@ const validateWithdrawalRequest = (data) => {
   if (
     !data.amount ||
     typeof data.amount !== "number" ||
-    data.amount < 100 ||
-    data.amount > 100000
+    data.amount < 2000 ||
+    data.amount > 150000
   ) {
-    errors.push("Amount must be a number between 100 and 100000");
+    errors.push("Amount must be a number between 2000 and 150000");
   }
 
   if (!data.bankAccountId || typeof data.bankAccountId !== "string") {
@@ -96,20 +99,8 @@ const validateBankDetails = (data) => {
 };
 
 // Generate unique transaction ID
-const generateTransactionId = () => {
-  return `WD-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-};
-
-// Middleware to check if user is a store owner
-const requireStoreOwner = (req, res, next) => {
-  if (!req.user.storeId) {
-    return res.status(403).json({
-      success: false,
-      message: "Access denied. Store owner required.",
-    });
-  }
-  next();
-};
+const generateTransactionId = (prefix = "TX", userId = "") =>
+  `${prefix}-${Date.now()}-${userId}-${uuidv4()}`;
 
 // Get wallet summary
 router.get(
@@ -123,13 +114,16 @@ router.get(
       const userId = req.user._id;
 
       console.log("Getting wallet balance...");
-      const balance = await getWalletBalance(userId);
+      const balance = await WalletTransaction.getWalletBalance(userId);
 
       console.log("Getting pending withdrawals...");
-      const pendingWithdrawals = await getPendingWithdrawals(userId);
+      const pendingWithdrawals = await WalletTransaction.getPendingWithdrawals(
+        userId
+      );
 
       console.log("Getting monthly withdrawal count...");
-      const monthlyWithdrawals = await getMonthlyWithdrawalCount(userId);
+      const monthlyWithdrawals =
+        await WalletTransaction.getMonthlyWithdrawalCount(userId);
 
       res.json({
         success: true,
@@ -137,7 +131,7 @@ router.get(
           ...balance,
           pendingWithdrawals,
           monthlyWithdrawals,
-          monthlyLimit: 2,
+          monthlyLimit: 4,
         },
       });
     } catch (error) {
@@ -177,7 +171,7 @@ router.get(
         if (endDate) query.createdAt.$lte = new Date(endDate);
       }
 
-      const transactions = await find(query)
+      const transactions = await WalletTransaction.find(query)
         .populate("withdrawalDetails.bankAccountId")
         .populate("withdrawalDetails.processedBy", "name")
         .sort({ createdAt: -1 })
@@ -226,17 +220,34 @@ router.post(
       const userId = req.user._id;
       const { amount, bankAccountId } = req.body;
 
-      // Check monthly withdrawal limit
-      const monthlyCount = await getMonthlyWithdrawalCount(userId);
-      if (monthlyCount >= 2) {
+      // Check if there's already a pending withdrawal request
+      const pendingWithdrawal = await WalletTransaction.findOne({
+        userId,
+        type: "withdrawal",
+        status: { $in: ["pending", "approved", "processing"] },
+      });
+
+      if (pendingWithdrawal) {
         return res.status(400).json({
           success: false,
-          message: "Monthly withdrawal limit (2) exceeded",
+          message:
+            "You already have a pending withdrawal request. Please wait for it to be processed.",
+        });
+      }
+
+      // Check monthly withdrawal limit
+      const monthlyCount = await WalletTransaction.getMonthlyWithdrawalCount(
+        userId
+      );
+      if (monthlyCount >= 4) {
+        return res.status(400).json({
+          success: false,
+          message: "Monthly withdrawal limit (4) exceeded",
         });
       }
 
       // Check available balance
-      const balance = await getWalletBalance(userId);
+      const balance = await WalletTransaction.getWalletBalance(userId);
       if (balance.availableBalance < amount) {
         return res.status(400).json({
           success: false,
@@ -245,7 +256,7 @@ router.post(
       }
 
       // Verify bank account exists and belongs to store
-      const bankAccount = await findOne({
+      const bankAccount = await BankDetails.findOne({
         _id: bankAccountId,
         userId,
         isActive: true,
@@ -258,10 +269,11 @@ router.post(
         });
       }
 
+      const withdrawId = generateTransactionId("WD", req.user._id);
       // Create withdrawal transaction
       const transaction = new WalletTransaction({
         userId,
-        transactionId: generateTransactionId(),
+        transactionId: withdrawId,
         type: "withdrawal",
         amount,
         status: "pending",
@@ -274,19 +286,18 @@ router.post(
 
       await transaction.save();
 
-      // Emit real-time notification
-      req.io.emit(`wallet-update-${userId}`, {
-        type: "withdrawal_requested",
-        transaction: transaction,
+      // Notify store owner about the withdrawal request
+      const storeNotification = await Notification.create({
+        userId: req.user._id,
+        title: `Withdrawal Requested`,
+        userType: "store_owner",
+        body: `You have submitted a new withdrawal request with ID #${withdrawId
+          .toString()
+          .slice(-8)}`,
+        type: "withdrawal_update",
       });
 
-      // Notify admins
-      req.io.emit("admin-notification", {
-        type: "new_withdrawal_request",
-        userId,
-        amount,
-        transactionId: transaction._id,
-      });
+      emitNotification(req.user._id.toString(), storeNotification);
 
       res.status(201).json({
         success: true,
@@ -311,7 +322,7 @@ router.get(
   async (req, res) => {
     try {
       const userId = req.user._id;
-      const bankDetails = await findOne({ userId, isActive: true });
+      const bankDetails = await BankDetails.findOne({ userId, isActive: true });
 
       res.json({
         success: true,
@@ -353,7 +364,7 @@ router.put(
         accountType: req.body.accountType || "savings",
       };
 
-      const bankDetails = await findOneAndUpdate(
+      const bankDetails = await BankDetails.findOneAndUpdate(
         { userId },
         { ...bankData, userId, isVerified: false },
         { new: true, upsert: true }

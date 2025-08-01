@@ -6,6 +6,7 @@ import {
   Gift,
   ShieldAlert,
   Megaphone,
+  Wallet,
 } from "lucide-react";
 
 export const typeIcons = {
@@ -15,4 +16,5 @@ export const typeIcons = {
   promotion: Gift,
   warning: ShieldAlert,
   announcement: Megaphone,
+  withdrawal_update: Wallet,
 };
