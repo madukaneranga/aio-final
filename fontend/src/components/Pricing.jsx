@@ -31,7 +31,7 @@ const Pricing = ({ subPackage, setSubPackage }) => {
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        const packageResponse = await fetch(
+        const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/packages`,
           {
             headers: {
@@ -39,40 +39,41 @@ const Pricing = ({ subPackage, setSubPackage }) => {
             },
           }
         );
-
-        if (!packageResponse.ok) {
-          throw new Error("Failed to fetch packages");
-        }
-
-        const packageData = await packageResponse.json();
-        setPackages(packageData);
-      } catch (error) {
-        console.error("Error fetching packages:", error);
+        if (!res.ok) throw new Error("Failed to fetch packages");
+        const data = await res.json();
+        setPackages(data);
+      } catch (err) {
+        console.error("Error:", err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchPackages();
   }, []);
 
   if (loading) {
     return (
       <section className="py-12 px-4 flex justify-center items-center min-h-[200px] bg-white">
-        <div className="w-12 h-12 border-4 border-t-transparent border-black rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-t-transparent border-black rounded-full animate-spin"></div>
       </section>
     );
   }
 
   return (
-    <section className="py-16 px-4 bg-white">
-      <div className="max-w-7xl mx-auto text-center">
-        <h2 className="text-5xl font-light mb-6 text-black tracking-tight">Choose Your Package</h2>
-        <p className="text-xl mb-16 text-gray-600 font-light">Elegant solutions for every business need</p>
+    <section className="py-14 px-4 bg-white">
+      <div className="max-w-6xl mx-auto text-center">
+        <h2 className="text-4xl md:text-5xl font-light text-black mb-4">
+          Choose Your Package
+        </h2>
+        <p className="text-lg md:text-xl text-gray-600 mb-12 font-light">
+          Elegant solutions for every business need
+        </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {packages.length === 0 ? (
-            <p className="text-gray-500 col-span-3">No packages available.</p>
+            <p className="col-span-3 text-gray-500 text-center">
+              No packages available.
+            </p>
           ) : (
             packages.map((pkg, idx) => {
               const meta = packageMeta[pkg.name] || {
@@ -86,50 +87,60 @@ const Pricing = ({ subPackage, setSubPackage }) => {
               return (
                 <div key={idx} className="relative">
                   {isPopular && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-black text-white text-sm font-medium px-6 py-2 rounded-full shadow-lg z-10 select-none">
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs md:text-sm font-medium px-4 py-1.5 rounded-full shadow-md z-10 select-none">
                       ★ Most Popular
                     </div>
                   )}
 
                   <div
                     onClick={() => setSubPackage(pkg.name)}
-                    className={`cursor-pointer h-full ${meta.bg} ${meta.textColor} transition-all duration-300 transform hover:scale-105 hover:shadow-2xl p-8 flex flex-col justify-between border-2 ${
-                      isSelected ? "border-black shadow-2xl scale-105" : meta.border
-                    } rounded-3xl ${isPopular ? "shadow-xl" : "shadow-lg"}`}
+                    className={`cursor-pointer ${meta.bg} ${
+                      meta.textColor
+                    } border-2 rounded-2xl px-6 py-8 flex flex-col justify-between transition-all duration-300 hover:shadow-xl ${
+                      isSelected
+                        ? "border-black scale-[1.02] shadow-2xl"
+                        : meta.border
+                    }`}
                   >
-                    <div className="flex-grow">
-                      <h3 className="text-2xl font-light mb-4 tracking-wide">
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-light mb-3 tracking-wide">
                         {meta.label ?? pkg.name}
                       </h3>
-                      <div className="mb-8">
-                        <p className="text-4xl font-thin mb-2">
-                          {meta.priceText ? meta.priceText(pkg.amount) : pkg.amount}
-                        </p>
-                      </div>
-                      <ul className="text-sm space-y-4 text-left">
+                      <p className="text-3xl font-thin mb-6">
+                        {meta.priceText
+                          ? meta.priceText(pkg.amount)
+                          : pkg.amount}
+                      </p>
+                      <ul className="text-sm space-y-3 text-left">
                         {(pkg.features || []).map((feature, index) => (
                           <li key={index} className="flex items-start">
-                            <span className={`mr-3 mt-0.5 ${pkg.name === 'basic' ? 'text-gray-600' : 'text-white'}`}>
+                            <span
+                              className={`mr-2 mt-0.5 ${
+                                pkg.name === "basic"
+                                  ? "text-gray-600"
+                                  : "text-white"
+                              }`}
+                            >
                               ✓
                             </span>
-                            <span className="font-light leading-relaxed">{feature}</span>
+                            <span className="font-light leading-relaxed">
+                              {feature}
+                            </span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                    
+
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSubPackage(pkg.name);
                       }}
-                      className={`mt-8 font-medium py-3 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                      className={`mt-8 w-full font-medium py-2.5 rounded-lg text-sm transition-all duration-200 ${
                         isSelected
-                          ? pkg.name === 'basic'
-                            ? "bg-black text-white shadow-lg"
-                            : "bg-white text-black shadow-lg"
-                          : pkg.name === 'basic'
+                          ? "bg-black text-white"
+                          : pkg.name === "basic"
                           ? "bg-black text-white hover:bg-gray-800"
                           : "bg-white text-black hover:bg-gray-100 border border-gray-300"
                       }`}
