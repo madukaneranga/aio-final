@@ -7,17 +7,23 @@ const Pricing = ({ subPackage, setSubPackage }) => {
   const packageMeta = {
     basic: {
       label: "Basic",
-      bg: "bg-[#10002B]",
+      bg: "bg-white",
+      border: "border-gray-200",
+      textColor: "text-gray-700",
       priceText: (amount) => `LKR ${amount.toLocaleString()}/month`,
     },
     standard: {
       label: "Standard",
-      bg: "bg-[#3C096C]",
+      bg: "bg-black",
+      border: "border-black",
+      textColor: "text-white",
       priceText: (amount) => `LKR ${amount.toLocaleString()}/month`,
     },
     premium: {
       label: "Premium",
-      bg: "bg-[#7B2CBF]",
+      bg: "bg-gradient-to-br from-gray-900 to-black",
+      border: "border-gray-800",
+      textColor: "text-white",
       priceText: (amount) => `LKR ${amount.toLocaleString()}/month`,
     },
   };
@@ -52,64 +58,80 @@ const Pricing = ({ subPackage, setSubPackage }) => {
 
   if (loading) {
     return (
-      <section className="py-12 px-4 flex justify-center items-center min-h-[200px]">
-        {/* Simple Tailwind CSS spinner */}
-        <div className="w-12 h-12 border-4 border-t-transparent border-white rounded-full animate-spin"></div>
+      <section className="py-12 px-4 flex justify-center items-center min-h-[200px] bg-white">
+        <div className="w-12 h-12 border-4 border-t-transparent border-black rounded-full animate-spin"></div>
       </section>
     );
   }
 
   return (
-    <section className="py-12 px-4 bg-gradient-to-br from-[#10002B] via-[#5A189A] to-[#E0AAFF] text-white rounded-3xl">
+    <section className="py-16 px-4 bg-white">
       <div className="max-w-7xl mx-auto text-center">
-        <h2 className="text-4xl font-bold mb-4">Choose Your Package</h2>
-        <p className="text-lg mb-12 text-[#E0AAFF]">Flexible plans for every seller stage</p>
+        <h2 className="text-5xl font-light mb-6 text-black tracking-tight">Choose Your Package</h2>
+        <p className="text-xl mb-16 text-gray-600 font-light">Elegant solutions for every business need</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {packages.length === 0 ? (
-            <p>No packages available.</p>
+            <p className="text-gray-500 col-span-3">No packages available.</p>
           ) : (
             packages.map((pkg, idx) => {
-              const meta = packageMeta[pkg.name] || {};
+              const meta = packageMeta[pkg.name] || {
+                bg: "bg-white",
+                border: "border-gray-200",
+                textColor: "text-gray-700",
+              };
               const isSelected = subPackage === pkg.name;
               const isPopular = pkg.name === "standard";
 
               return (
-                <div key={idx} className="relative rounded-2xl">
+                <div key={idx} className="relative">
                   {isPopular && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-[#7B2CBF] text-[#E0AAFF] text-xs font-bold px-4 py-1 rounded-full shadow-md z-10 select-none">
-                      ★ Popular
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-black text-white text-sm font-medium px-6 py-2 rounded-full shadow-lg z-10 select-none">
+                      ★ Most Popular
                     </div>
                   )}
 
                   <div
                     onClick={() => setSubPackage(pkg.name)}
-                    className={`cursor-pointer shadow-lg ${meta.bg ?? "bg-[#10002B]"} transition-transform transform hover:scale-105 p-6 flex flex-col justify-between border-4 ${
-                      isSelected ? "border-white" : "border-transparent"
-                    } rounded-2xl`}
+                    className={`cursor-pointer h-full ${meta.bg} ${meta.textColor} transition-all duration-300 transform hover:scale-105 hover:shadow-2xl p-8 flex flex-col justify-between border-2 ${
+                      isSelected ? "border-black shadow-2xl scale-105" : meta.border
+                    } rounded-3xl ${isPopular ? "shadow-xl" : "shadow-lg"}`}
                   >
-                    <div>
-                      <h3 className="text-2xl font-semibold mb-2">{meta.label ?? pkg.name} Package</h3>
-                      <p className="text-xl font-bold mb-4">{meta.priceText ? meta.priceText(pkg.amount) : pkg.amount}</p>
-                      <ul className="text-sm space-y-2 text-[#E0AAFF]">
+                    <div className="flex-grow">
+                      <h3 className="text-2xl font-light mb-4 tracking-wide">
+                        {meta.label ?? pkg.name}
+                      </h3>
+                      <div className="mb-8">
+                        <p className="text-4xl font-thin mb-2">
+                          {meta.priceText ? meta.priceText(pkg.amount) : pkg.amount}
+                        </p>
+                      </div>
+                      <ul className="text-sm space-y-4 text-left">
                         {(pkg.features || []).map((feature, index) => (
                           <li key={index} className="flex items-start">
-                            <span className="text-white mr-2">✔</span>
-                            <span>{feature}</span>
+                            <span className={`mr-3 mt-0.5 ${pkg.name === 'basic' ? 'text-gray-600' : 'text-white'}`}>
+                              ✓
+                            </span>
+                            <span className="font-light leading-relaxed">{feature}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
+                    
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSubPackage(pkg.name);
                       }}
-                      className={`mt-6 font-semibold py-2 px-4 rounded-xl transition ${
+                      className={`mt-8 font-medium py-3 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 ${
                         isSelected
-                          ? "bg-white text-[#10002B]"
-                          : "bg-white text-[#5A189A] hover:bg-[#E0AAFF] hover:text-[#10002B]"
+                          ? pkg.name === 'basic'
+                            ? "bg-black text-white shadow-lg"
+                            : "bg-white text-black shadow-lg"
+                          : pkg.name === 'basic'
+                          ? "bg-black text-white hover:bg-gray-800"
+                          : "bg-white text-black hover:bg-gray-100 border border-gray-300"
                       }`}
                     >
                       {isSelected ? "Selected" : "Get Started"}
