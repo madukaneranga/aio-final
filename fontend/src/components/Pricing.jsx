@@ -85,33 +85,38 @@ const Pricing = ({ subPackage, setSubPackage }) => {
               const isPopular = pkg.name === "standard";
 
               return (
-                <div key={idx} className="relative">
+                <div key={idx} className="relative pt-6">
+                  {" "}
+                  {/* ⬅️ Add top padding to prevent overlap */}
                   {isPopular && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs md:text-sm font-medium px-4 py-1.5 rounded-full shadow-md z-10 select-none">
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-black text-white text-xs md:text-sm font-medium px-4 py-1.5 rounded-full shadow-md z-10 select-none">
                       ★ Most Popular
                     </div>
                   )}
-
                   <div
                     onClick={() => setSubPackage(pkg.name)}
                     className={`cursor-pointer ${meta.bg} ${
                       meta.textColor
-                    } border-2 rounded-2xl px-6 py-8 flex flex-col justify-between transition-all duration-300 hover:shadow-xl ${
+                    } border-2 rounded-2xl px-6 py-6 flex flex-col justify-between transition-all duration-300 hover:shadow-xl ${
                       isSelected
                         ? "border-black scale-[1.02] shadow-2xl"
                         : meta.border
                     }`}
                   >
                     <div>
-                      <h3 className="text-xl md:text-2xl font-light mb-3 tracking-wide">
+                      <h3 className="text-lg md:text-xl font-light mb-2 tracking-wide text-center">
                         {meta.label ?? pkg.name}
                       </h3>
-                      <p className="text-3xl font-thin mb-6">
+
+                      <p className="text-2xl font-thin mb-4 text-center break-words">
                         {meta.priceText
                           ? meta.priceText(pkg.amount)
                           : pkg.amount}
                       </p>
-                      <ul className="text-sm space-y-3 text-left">
+
+                      <ul className="text-sm space-y-2 text-left">
+                        {" "}
+                        {/* ⬅️ Less vertical space */}
                         {(pkg.features || []).map((feature, index) => (
                           <li key={index} className="flex items-start">
                             <span
@@ -123,7 +128,7 @@ const Pricing = ({ subPackage, setSubPackage }) => {
                             >
                               ✓
                             </span>
-                            <span className="font-light leading-relaxed">
+                            <span className="font-light leading-snug">
                               {feature}
                             </span>
                           </li>
@@ -137,7 +142,7 @@ const Pricing = ({ subPackage, setSubPackage }) => {
                         e.stopPropagation();
                         setSubPackage(pkg.name);
                       }}
-                      className={`mt-8 w-full font-medium py-2.5 rounded-lg text-sm transition-all duration-200 ${
+                      className={`mt-6 w-full font-medium py-2.5 rounded-lg text-sm transition-all duration-200 ${
                         isSelected
                           ? "bg-black text-white"
                           : pkg.name === "basic"
