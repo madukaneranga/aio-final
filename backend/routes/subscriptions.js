@@ -1,4 +1,5 @@
 import express from "express";
+const router = express.Router();
 import crypto from "crypto";
 import Subscription from "../models/Subscription.js";
 import Store from "../models/Store.js";
@@ -6,7 +7,7 @@ import { authenticate, authorize } from "../middleware/auth.js";
 import User from "../models/User.js";
 import Package from "../models/Package.js";
 
-const router = express.Router();
+
 
 // =================== 🔐 PAYHERE CONFIG ===================
 const PAYHERE_BASE_URL = "https://sandbox.payhere.lk";

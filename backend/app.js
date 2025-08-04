@@ -86,10 +86,8 @@ app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-
 app.get("/ping", (req, res) => {
   res.send("pong");
 });
-
 
 export default app;
