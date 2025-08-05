@@ -104,4 +104,5 @@ router.put('/profile', authenticate, upload.single('profileImage'), async (req, 
   }
 });
 
+
 export default router;

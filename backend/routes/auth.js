@@ -156,4 +156,36 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
+// Switch user role between customer and store_owner
+router.put('/switch-role', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Toggle between roles
+    if (user.role === 'customer') {
+      user.role = 'store_owner';
+    } else if (user.role === 'store_owner') {
+      user.role = 'customer';
+    } else {
+      return res.status(400).json({ error: 'Role cannot be switched' });
+    }
+
+    await user.save();
+
+    res.json({
+      message: `Role switched to ${user.role}`,
+      role: user.role
+    });
+  } catch (error) {
+    console.error('Role switch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
 export default router;
