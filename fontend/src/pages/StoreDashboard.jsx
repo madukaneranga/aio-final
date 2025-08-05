@@ -130,131 +130,120 @@ const StoreDashboard = () => {
 
   const fetchDashboardData = async () => {
     setLoading(true);
+
+    const authHeader = {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    };
+
     try {
-      // Fetch store data first
+      // --- Store ---
       if (user.storeId) {
         const storeResponse = await fetch(
           `${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
+          { headers: authHeader }
         );
-        if (!storeResponse.ok) {
-          throw new Error("Failed to fetch store data");
-        }
-        const storeData = await storeResponse.json();
-        setStore(storeData.store);
 
-        // Fetch products only if store type is 'product'
-        if (storeData.store?.type === "product") {
-          const productsResponse = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/products?storeId=${
-              user.storeId
-            }`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
+        if (storeResponse.ok) {
+          const storeData = await storeResponse.json();
+          setStore(storeData.store);
+
+          // --- Products or Services ---
+          if (storeData.store?.type === "product") {
+            const productsResponse = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/products?storeId=${
+                user.storeId
+              }`,
+              { headers: authHeader }
+            );
+            if (productsResponse.ok) {
+              const productsData = await productsResponse.json();
+              setProducts(productsData);
+              setStats((prev) => ({
+                ...prev,
+                totalProducts: productsData.length,
+              }));
+            } else {
+              setProducts([]);
             }
-          );
-          if (!productsResponse.ok) {
-            throw new Error("Failed to fetch products");
-          }
-          const productsData = await productsResponse.json();
-          setProducts(productsData);
-          setStats((prev) => ({ ...prev, totalProducts: productsData.length }));
-        } else if (storeData.store?.type === "service") {
-          const servicesResponse = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/services?storeId=${
-              user.storeId
-            }`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
+          } else if (storeData.store?.type === "service") {
+            const servicesResponse = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/services?storeId=${
+                user.storeId
+              }`,
+              { headers: authHeader }
+            );
+            if (servicesResponse.ok) {
+              const servicesData = await servicesResponse.json();
+              setServices(servicesData);
+              setStats((prev) => ({
+                ...prev,
+                totalServices: servicesData.length,
+              }));
+            } else {
+              setServices([]);
             }
-          );
-          if (!servicesResponse.ok) {
-            throw new Error("Failed to fetch services");
           }
-          const servicesData = await servicesResponse.json();
-          setServices(servicesData);
-          setStats((prev) => ({ ...prev, totalServices: servicesData.length }));
+        } else {
+          setStore(null);
         }
+      } else {
+        setStore(null);
       }
 
-      // Fetch orders
+      // --- Orders ---
       const ordersResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/orders/store`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+        { headers: authHeader }
       );
-      if (!ordersResponse.ok) {
-        throw new Error("Failed to fetch orders");
+      if (ordersResponse.ok) {
+        const orders = await ordersResponse.json();
+        setRecentOrders(orders.slice(0, 5));
+        setStats((prev) => ({ ...prev, totalOrders: orders.length }));
+      } else {
+        setRecentOrders([]);
       }
-      const orders = await ordersResponse.json();
-      setRecentOrders(orders.slice(0, 5));
-      setStats((prev) => ({ ...prev, totalOrders: orders.length }));
 
-      // Fetch bookings
+      // --- Bookings ---
       const bookingsResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/bookings/store`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+        { headers: authHeader }
       );
-      if (!bookingsResponse.ok) {
-        throw new Error("Failed to fetch bookings");
+      if (bookingsResponse.ok) {
+        const bookings = await bookingsResponse.json();
+        setRecentBookings(bookings.slice(0, 5));
+        setStats((prev) => ({ ...prev, totalBookings: bookings.length }));
+      } else {
+        setRecentBookings([]);
       }
-      const bookings = await bookingsResponse.json();
-      setRecentBookings(bookings.slice(0, 5));
-      setStats((prev) => ({ ...prev, totalBookings: bookings.length }));
 
-      // Fetch subscription
+      // --- Subscription ---
       const subscriptionResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+        { headers: authHeader }
       );
-      if (!subscriptionResponse.ok) {
-        throw new Error("Failed to fetch subscription");
-      }
-      const subscriptionData = await subscriptionResponse.json();
-      setSubscription(subscriptionData);
-      if (subscriptionData) {
-        setSubPackage(subscriptionData.package);
+      if (subscriptionResponse.ok) {
+        const subscriptionData = await subscriptionResponse.json();
+        setSubscription(subscriptionData);
+        setSubPackage(subscriptionData?.package || null);
+      } else {
+        setSubscription(null);
+        setSubPackage(null);
       }
 
-      // Fetch all packages
+      // --- Packages ---
       const packageResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/packages`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+        { headers: authHeader }
       );
-      if (!packageResponse.ok) {
-        throw new Error("Failed to fetch packages");
+      if (packageResponse.ok) {
+        const packageData = await packageResponse.json();
+        setPackages(packageData);
+      } else {
+        setPackages([]);
       }
-      const packageData = await packageResponse.json();
-      console.log(packageData);
-
-      setPackages(packageData);
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      // Optionally show an error message to the user
-      alert("Failed to load dashboard data. Please try again.");
+      console.error("Unexpected error fetching dashboard data:", error);
+      // Optional: show toast only for unexpected issues
     } finally {
       setLoading(false);
     }
@@ -620,133 +609,94 @@ const StoreDashboard = () => {
           </Link>
         </div>
 
-        {/* Subscription Status */}
-        {subscription && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Subscription Status
-                </h3>
-                <p className="text-gray-600">
-                  Status:{" "}
-                  <span
-                    className={`font-medium ${
-                      subscription.status === "active"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {subscription.status.toUpperCase()}
-                  </span>
-                </p>
+        {/* Subscription Management Card */}
+        <div className="relative w-full rounded-3xl px-8 py-6 mb-6 bg-gradient-to-br from-gray-50 via-white to-gray-100 border-2 border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+          {/* Subtle accent line */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-black via-gray-600 to-black"></div>
 
-                <p className="text-gray-600">
-                  Expires: {new Date(subscription.endDate).toLocaleDateString()}
-                </p>
-                <p className="text-gray-600">
-                  Monthly Fee: {formatLKR(subscription.amount)}
-                </p>
+          {/* Decorative corner element */}
+          <div className="absolute top-4 right-4 w-12 h-12 border-2 border-gray-300 rounded-full opacity-20"></div>
+          <div className="absolute top-6 right-6 w-8 h-8 border-2 border-gray-400 rounded-full opacity-30"></div>
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-2 h-2 bg-black rounded-full"></div>
+                <h3 className="text-xl font-light text-black tracking-wide">
+                  {subscription
+                    ? "Package Management"
+                    : "Subscription Required"}
+                </h3>
               </div>
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-                {subscription.status === "cancelled" && (
-                  <button
-                    onClick={createSubscription}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
-                  >
-                    Re-Subscribe
-                  </button>
+
+              <div className="space-y-2 text-gray-700">
+                {subscription ? (
+                  <>
+                    <p className="flex items-center gap-2">
+                      <span className="text-gray-600 font-light">
+                        Current Plan:
+                      </span>
+                      <span className="font-medium text-black bg-gray-200 px-3 py-1 rounded-full text-sm tracking-wide">
+                        {subscription.package.toUpperCase()}
+                      </span>
+                    </p>
+
+                    <p className="flex items-center gap-2">
+                      <span className="text-gray-600 font-light">Status:</span>
+                      <span
+                        className={`font-medium text-sm tracking-wide ${
+                          subscription.status === "active"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {subscription.status.toUpperCase()}
+                      </span>
+                    </p>
+
+                    <p className="text-gray-600 font-light">
+                      <span className="font-medium text-black">Expires:</span>{" "}
+                      {new Date(subscription.endDate).toLocaleDateString()}
+                    </p>
+
+                    <p className="text-gray-600 font-light">
+                      <span className="font-medium text-black">
+                        Monthly Fee:
+                      </span>{" "}
+                      {formatLKR(subscription.amount)}
+                    </p>
+
+                    <p className="text-gray-600 font-light leading-relaxed max-w-md">
+                      Upgrade anytime to unlock more features. Downgrades are
+                      available after one month from your last update.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="flex items-center gap-2">
+                      <span className="text-gray-600 font-light">
+                        Subscription Status:
+                      </span>
+                      <span className="font-medium text-red-600 text-sm tracking-wide">
+                        PENDING
+                      </span>
+                    </p>
+
+                    <p className="text-gray-600 font-light leading-relaxed max-w-md">
+                      A subscription is required to sell your products or
+                      services on AIO.
+                    </p>
+                  </>
                 )}
-                {subscription.status !== "cancelled" &&
-                  new Date(subscription.startdate).getTime() +
-                    6 * 24 * 60 * 60 * 1000 <
-                    new Date().getTime() && (
-                    <button
-                      onClick={cancelSubscription}
-                      className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors w-full sm:w-auto"
-                    >
-                      Cancel Subscription
-                    </button>
-                  )}
               </div>
             </div>
-          </div>
-        )}
 
-        {!subscription && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Subscription Status
-                </h3>
-                <p className="text-gray-600">
-                  Status: <span className="text-red-600">PENDING</span>
-                </p>
-                <p className="text-red-600">
-                  A subscription is required to sell your products or services
-                  on AIO.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-                <button
-                  onClick={createSubscription}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors w-full sm:w-auto"
-                >
-                  Subscribe
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Upgrade Package Invitation */}
-        {subscription && (
-          <div className="relative w-full rounded-3xl px-8 py-6 mb-6 bg-gradient-to-br from-gray-50 via-white to-gray-100 border-2 border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-            {/* Subtle accent line */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-black via-gray-600 to-black"></div>
-
-            {/* Decorative corner element */}
-            <div className="absolute top-4 right-4 w-12 h-12 border-2 border-gray-300 rounded-full opacity-20"></div>
-            <div className="absolute top-6 right-6 w-8 h-8 border-2 border-gray-400 rounded-full opacity-30"></div>
-
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-2 h-2 bg-black rounded-full"></div>
-                  <h3 className="text-xl font-light text-black tracking-wide">
-                    Package Management
-                  </h3>
-                </div>
-
-                <div className="space-y-2 text-gray-700">
-                  <p className="flex items-center gap-2">
-                    <span className="text-gray-600 font-light">
-                      Current Plan:
-                    </span>
-                    <span className="font-medium text-black bg-gray-200 px-3 py-1 rounded-full text-sm tracking-wide">
-                      {subscription?.package.toUpperCase() || "BASIC"}
-                    </span>
-                  </p>
-
-                  <p className="text-gray-600 font-light leading-relaxed max-w-md">
-                    Upgrade anytime to unlock more features. Downgrades are
-                    available after one month from your last update.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-2">
-                <button
-                  onClick={() => {
-                    if (packages.length > 0) {
-                      setSubPackage(subscription?.package || packages[0].name);
-                      setShowUpgradeModal(true);
-                    }
-                  }}
-                  className="bg-black text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2 group"
-                >
-                  <span>Manage Plan</span>
+            <div className="flex flex-col items-end gap-2">
+              <Link to="/sub-management">
+                <button className="bg-black text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2 group">
+                  <span>
+                    {subscription ? "Manage Plan" : "Get Subscription"}
+                  </span>
                   <svg
                     className="w-4 h-4 transition-transform group-hover:translate-x-1"
                     fill="none"
@@ -761,126 +711,14 @@ const StoreDashboard = () => {
                     />
                   </svg>
                 </button>
+              </Link>
 
-                <span className="text-xs text-gray-500 font-light">
-                  Instant activation
-                </span>
-              </div>
+              <span className="text-xs text-gray-500 font-light">
+                {subscription ? "Instant activation" : "Quick setup"}
+              </span>
             </div>
           </div>
-        )}
-
-        {showUpgradeModal && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center p-6 z-50"
-            style={{ animation: "fadeIn 0.4s ease forwards" }}
-          >
-            <div
-              className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-gray-200 shadow-2xl"
-              style={{ animation: "slideUp 0.4s ease forwards" }}
-            >
-              <div className="p-10">
-                {!packages.length || !subPackage ? (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="w-12 h-12 border-4 border-t-transparent border-black rounded-full animate-spin mb-6"></div>
-                    <p className="text-center text-gray-500 text-xl font-light">
-                      Loading packages...
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-center mb-8">
-                      <h2 className="text-3xl font-light text-black mb-2 tracking-tight">
-                        Update Your Package
-                      </h2>
-                      <p className="text-gray-600 font-light">
-                        Choose the perfect plan for your needs
-                      </p>
-                    </div>
-
-                    <Pricing
-                      subPackage={subPackage}
-                      setSubPackage={setSubPackage}
-                    />
-
-                    {/* Downgrade Warning */}
-                    {packages.find((pkg) => pkg.name === subPackage)?.amount <
-                      subscription?.amount && (
-                      <div className="mt-8 mb-8 p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-l-4 border-gray-800 rounded-r-2xl text-gray-800 shadow-sm">
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0 mr-4">
-                            <svg
-                              className="w-6 h-6 text-gray-700 mt-0.5"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-1">
-                              Important Notice
-                            </h4>
-                            <p className="text-gray-700 font-light leading-relaxed">
-                              Downgrading may limit your current features or
-                              product/service capacity. This could affect your
-                              business performance. Please review the changes
-                              carefully.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Buttons */}
-                    <div className="flex justify-end space-x-4 mt-10 pt-6 border-t border-gray-100">
-                      <button
-                        onClick={() => setShowUpgradeModal(false)}
-                        className="px-8 py-3 border-2 border-gray-300 rounded-xl text-gray-700 font-medium hover:border-gray-400 hover:text-gray-900 transition-all duration-300 transform hover:scale-105"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          handlePackageUpgrade();
-                          setShowUpgradeModal(false);
-                        }}
-                        className="px-8 py-3 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                      >
-                        Confirm Change
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <style jsx>{`
-              @keyframes fadeIn {
-                from {
-                  opacity: 0;
-                }
-                to {
-                  opacity: 1;
-                }
-              }
-              @keyframes slideUp {
-                from {
-                  transform: translateY(30px);
-                  opacity: 0;
-                }
-                to {
-                  transform: translateY(0);
-                  opacity: 1;
-                }
-              }
-            `}</style>
-          </div>
-        )}
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
