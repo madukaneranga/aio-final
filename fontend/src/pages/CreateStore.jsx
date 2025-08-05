@@ -63,7 +63,51 @@ const CreateStore = () => {
     setError("");
 
     try {
-      // 💳 Start subscription payment FIRST (before any uploads)
+      // 🔄 Upload hero images to Firebase
+      const uploadPromises = heroImages.map(async (file) => {
+        // Resize/Compress the image
+        const compressedFile = await imageCompression(file, {
+          maxSizeMB: 0.5, // compress to under 0.5 MB
+          maxWidthOrHeight: 800, // resize to 800px max
+          useWebWorker: true,
+        });
+
+        const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
+        await uploadBytes(imageRef, compressedFile);
+        return getDownloadURL(imageRef);
+      });
+
+      const imageUrls = await Promise.all(uploadPromises);
+
+      // 🏪 Create the store
+      const payload = {
+        name: formData.name,
+        type: formData.type,
+        description: formData.description,
+        themeColor: formData.themeColor,
+        contactInfo: formData.contactInfo,
+        timeSlots: timeSlots,
+        heroImages: imageUrls,
+      };
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stores`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to create store");
+      }
+
+      // 💳 Start subscription
       const subResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
         {
@@ -79,87 +123,31 @@ const CreateStore = () => {
       );
 
       if (!subResponse.ok) {
-        throw new Error("Failed to initialize subscription");
+        alert(
+          "Store created, but failed to start subscription. Please contact support."
+        );
+        await refreshUser();
+        return navigate("/dashboard");
       }
 
       const { paymentParams } = await subResponse.json();
 
-      // 🚀 Wait for payment completion
+      // 🚀 Start PayHere modal payment
       await startPayHerePayment(paymentParams);
 
-      // 🔄 Upload images ONLY after successful payment
-      const uploadPromises = heroImages.map(async (file) => {
-        const compressedFile = await imageCompression(file, {
-          maxSizeMB: 0.5,
-          maxWidthOrHeight: 800,
-          useWebWorker: true,
-        });
-
-        const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, compressedFile);
-        return getDownloadURL(imageRef);
-      });
-
-      const imageUrls = await Promise.all(uploadPromises);
-
-      // 🏪 Create store with uploaded images
-      const storePayload = {
-        name: formData.name,
-        type: formData.type,
-        description: formData.description,
-        themeColor: formData.themeColor,
-        contactInfo: formData.contactInfo,
-        timeSlots: timeSlots,
-        heroImages: imageUrls,
-      };
-
-      const storeResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(storePayload),
-        }
-      );
-
-      if (!storeResponse.ok) {
-        const data = await storeResponse.json();
-        throw new Error(data.error || "Failed to create store after payment");
-      }
-
-      // ✅ Success! Both payment and store creation completed
-      alert("Payment successful and store created!");
+      // Optional post-payment action
+      alert("Subscription payment successful!");
       await refreshUser();
       navigate("/dashboard");
     } catch (error) {
       console.error("Error:", error);
-
-      // Handle different error scenarios
-      if (error.message.includes("Payment")) {
-        setError("Payment failed. No store or images were created.");
-      } else if (error.message.includes("store")) {
-        setError(
-          "Payment successful but store creation failed. Please contact support."
-        );
-      } else if (
-        error.message.includes("upload") ||
-        error.message.includes("Firebase")
-      ) {
-        setError(
-          "Payment successful but image upload failed. Please contact support."
-        );
-      } else {
-        setError(error.message || "Something went wrong. Please try again.");
-      }
+      setError(error.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // 💳 PayHere Payment Handler (unchanged)
+  // 💳 Start PayHere Payment with JS SDK
   const startPayHerePayment = (paymentParams) => {
     return new Promise((resolve, reject) => {
       if (!window.payhere) {
@@ -187,7 +175,7 @@ const CreateStore = () => {
       window.payhere.startPayment(paymentParams);
     });
   };
-
+  
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name.startsWith("contactInfo.")) {

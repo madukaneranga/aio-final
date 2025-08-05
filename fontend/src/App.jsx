@@ -39,6 +39,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import AdminWithdrawals from "./pages/AdminWithdrawals";
 import WalletDashboard from "./pages/WallerDashboard";
+import SubscriptionManagement from "./pages/SubscriptionManagement";
 
 import "./App.css";
 
@@ -106,6 +107,7 @@ function App() {
                     <Route path="/notifications" element={<Notifications />} />
                     <Route path="/admin-withdrawals" element={<AdminWithdrawals />} />
                     <Route path="/wallet-dashboard" element={<WalletDashboard />} />
+                    <Route path="/sub-management" element={<SubscriptionManagement />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </main>
