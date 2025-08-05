@@ -40,6 +40,7 @@ import TermsOfService from "./pages/TermsOfService";
 import AdminWithdrawals from "./pages/AdminWithdrawals";
 import WalletDashboard from "./pages/WallerDashboard";
 import SubscriptionManagement from "./pages/SubscriptionManagement";
+import ScrollToTop from "./components/ScrollToTop";
 
 import "./App.css";
 
@@ -53,6 +54,7 @@ function App() {
               <div className="min-h-screen bg-white flex flex-col">
                 <Header />
                 <main className="flex-1">
+                  <ScrollToTop />
                   <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/stores" element={<StoreList />} />
