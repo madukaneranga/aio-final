@@ -37,6 +37,10 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  reviewed: {
+    type: Boolean,
+    default: false,
+  },
   storeAmount: {
     type: Number,
     required: true,

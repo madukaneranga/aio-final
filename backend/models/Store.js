@@ -23,6 +23,17 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
+  idImages: [
+    {
+      type: String,
+    },
+  ],
+  addressVerificationImages: [
+    {
+      type: String,
+    },
+  ],
+
   profileImage: {
     type: String,
     default: "",

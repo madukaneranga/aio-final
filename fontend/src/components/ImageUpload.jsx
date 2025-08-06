@@ -1,19 +1,22 @@
-import React, { useState } from 'react';
-import { Upload, X, Image } from 'lucide-react';
+import React, { useState } from "react";
+import { Upload, X } from "lucide-react";
 
-const ImageUpload = ({ 
-  images = [], 
-  onImagesChange, 
-  maxImages = 5, 
+const ImageUpload = ({
+  images = [],
+  onImagesChange,
+  maxImages = 5,
   multiple = true,
-  className = '' 
+  className = "",
+  idPrefix = "upload", // ✨ Added: unique prefix for input id
 }) => {
   const [dragOver, setDragOver] = useState(false);
 
   const handleFileSelect = (files) => {
     const fileArray = Array.from(files);
-    const imageFiles = fileArray.filter(file => file.type.startsWith('image/'));
-    
+    const imageFiles = fileArray.filter((file) =>
+      file.type.startsWith("image/")
+    );
+
     if (multiple) {
       const newImages = [...images, ...imageFiles].slice(0, maxImages);
       onImagesChange(newImages);
@@ -43,6 +46,8 @@ const ImageUpload = ({
     onImagesChange(newImages);
   };
 
+  const inputId = `${idPrefix}-image-upload`; // ✨ unique id
+
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Upload Area */}
@@ -51,9 +56,9 @@ const ImageUpload = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-          dragOver 
-            ? 'border-black bg-gray-50' 
-            : 'border-gray-300 hover:border-gray-400'
+          dragOver
+            ? "border-black bg-gray-50"
+            : "border-gray-300 hover:border-gray-400"
         }`}
       >
         <input
@@ -62,13 +67,11 @@ const ImageUpload = ({
           accept="image/*"
           onChange={(e) => handleFileSelect(e.target.files)}
           className="hidden"
-          id="image-upload"
+          id={inputId} // ✨ unique id
         />
-        <label htmlFor="image-upload" className="cursor-pointer">
+        <label htmlFor={inputId} className="cursor-pointer">
           <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-600 mb-1">
-            Click to upload or drag and drop
-          </p>
+          <p className="text-gray-600 mb-1">Click to upload or drag and drop</p>
           <p className="text-sm text-gray-500">
             PNG, JPG, GIF up to 10MB {multiple && `(max ${maxImages})`}
           </p>
@@ -81,11 +84,14 @@ const ImageUpload = ({
           {images.map((image, index) => (
             <div key={index} className="relative group">
               <img
-                src={typeof image === 'string' ? image : URL.createObjectURL(image)}
+                src={
+                  typeof image === "string" ? image : URL.createObjectURL(image)
+                }
                 alt={`Upload ${index + 1}`}
                 className="w-full h-32 object-cover rounded-lg"
               />
               <button
+                type="button"
                 onClick={() => removeImage(index)}
                 className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
               >
@@ -97,7 +103,7 @@ const ImageUpload = ({
       )}
 
       {/* Upload Status */}
-      {multiple && (
+      {(
         <p className="text-sm text-gray-500">
           {images.length} of {maxImages} images uploaded
         </p>

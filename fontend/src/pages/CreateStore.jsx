@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
+import imageCompression from "browser-image-compression";
+
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Store, Package, Calendar, MapPin, Phone, Mail } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -20,7 +22,8 @@ const CreateStore = () => {
       address: "",
     },
   });
-  const [heroImages, setHeroImages] = useState([]);
+  const [idImages, setIdImages] = useState([]);
+  const [addressImages, setAddressImages] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -63,33 +66,68 @@ const CreateStore = () => {
     setError("");
 
     try {
-      // 🔄 Upload hero images to Firebase
-      const uploadPromises = heroImages.map(async (file) => {
-        // Resize/Compress the image
-        const compressedFile = await imageCompression(file, {
-          maxSizeMB: 0.5, // compress to under 0.5 MB
-          maxWidthOrHeight: 800, // resize to 800px max
-          useWebWorker: true,
-        });
+      // 🛡 Validate required images
+      if (idImages.length < 2) {
+        throw new Error(
+          "Please upload both front and back of your identity card."
+        );
+      }
+      if (addressImages.length < 1) {
+        throw new Error("Please upload your address verification document.");
+      }
 
-        const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, compressedFile);
-        return getDownloadURL(imageRef);
-      });
+      // Common compression options
+      const compressionOptions = {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 800,
+        useWebWorker: true,
+      };
 
-      const imageUrls = await Promise.all(uploadPromises);
+      // 🔄 Upload ID images
+      const idImageUrls = await Promise.all(
+        idImages.map(async (file) => {
+          const compressedFile = await imageCompression(
+            file,
+            compressionOptions
+          );
+          const imageRef = ref(
+            storage,
+            `documents/id_${Date.now()}_${file.name}`
+          );
+          await uploadBytes(imageRef, compressedFile);
+          return getDownloadURL(imageRef);
+        })
+      );
 
-      // 🏪 Create the store
+      // 🔄 Upload Address verification image(s)
+      const addressImageUrls = await Promise.all(
+        addressImages.map(async (file) => {
+          const compressedFile = await imageCompression(
+            file,
+            compressionOptions
+          );
+          const imageRef = ref(
+            storage,
+            `documents/address_${Date.now()}_${file.name}`
+          );
+          await uploadBytes(imageRef, compressedFile);
+          return getDownloadURL(imageRef);
+        })
+      );
+
+      // 🏪 Prepare store payload
       const payload = {
         name: formData.name,
         type: formData.type,
         description: formData.description,
         themeColor: formData.themeColor,
         contactInfo: formData.contactInfo,
-        timeSlots: timeSlots,
-        heroImages: imageUrls,
+        timeSlots,
+        idImages: idImageUrls,
+        addressVerificationImages: addressImageUrls,
       };
 
+      // 📤 Create store
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/stores`,
         {
@@ -131,11 +169,8 @@ const CreateStore = () => {
       }
 
       const { paymentParams } = await subResponse.json();
-
-      // 🚀 Start PayHere modal payment
       await startPayHerePayment(paymentParams);
 
-      // Optional post-payment action
       alert("Subscription payment successful!");
       await refreshUser();
       navigate("/dashboard");
@@ -175,7 +210,7 @@ const CreateStore = () => {
       window.payhere.startPayment(paymentParams);
     });
   };
-  
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name.startsWith("contactInfo.")) {
@@ -404,6 +439,42 @@ const CreateStore = () => {
                   />
                 </div>
               </div>
+              {/* ✨ Identity Verification */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Identity Verification *
+                </h3>
+                <ImageUpload
+                  images={idImages}
+                  onImagesChange={setIdImages}
+                  maxImages={2}
+                  multiple={true}
+                  className="mb-6"
+                  idPrefix="id"
+                />
+                <p className="text-sm text-gray-500">
+                  Upload both front and back of your identity card (max 2
+                  images).
+                </p>
+              </div>
+
+              {/* ✨ Address Verification */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Address Verification Document *
+                </h3>
+                <ImageUpload
+                  images={addressImages}
+                  onImagesChange={setAddressImages}
+                  maxImages={1}
+                  multiple={false}
+                  idPrefix="address"
+                />
+                <p className="text-sm text-gray-500">
+                  Upload a utility bill or document that verifies your address.
+                </p>
+              </div>
+
               <Pricing subPackage={subPackage} setSubPackage={setSubPackage} />
               {/* Subscription Info */}
 

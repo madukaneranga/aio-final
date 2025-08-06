@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
 import LoadingSpinner from "../components/LoadingSpinner";
-
+import imageCompression from "browser-image-compression";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase";
 
@@ -110,13 +110,21 @@ const CreateProduct = () => {
     setError("");
 
     try {
-      const uploadPromises = images.map(async (file) => {
-        const imageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, file);
-        return getDownloadURL(imageRef);
-      });
-
-      const imageUrls = await Promise.all(uploadPromises);
+      // 🔄 Upload Product images
+      const imageUrls = await Promise.all(
+        images.map(async (file) => {
+          const compressedFile = await imageCompression(
+            file,
+            compressionOptions
+          );
+          const imageRef = ref(
+            storage,
+            `products/id_${Date.now()}_${file.name}`
+          );
+          await uploadBytes(imageRef, compressedFile);
+          return getDownloadURL(imageRef);
+        })
+      );
 
       const payload = {
         title: formData.title,
@@ -126,7 +134,8 @@ const CreateProduct = () => {
         stock: formData.stock,
         images: imageUrls,
         // Only send variants if any colors or sizes exist
-        ...(formData.variants.colors.length > 0 || formData.variants.sizes.length > 0
+        ...(formData.variants.colors.length > 0 ||
+        formData.variants.sizes.length > 0
           ? { variants: formData.variants }
           : {}),
       };
@@ -187,7 +196,9 @@ const CreateProduct = () => {
             <h1 className="text-3xl font-bold text-gray-900">
               Create New Product
             </h1>
-            <p className="text-gray-600 mt-2">Add a new product to your store</p>
+            <p className="text-gray-600 mt-2">
+              Add a new product to your store
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -352,7 +363,9 @@ const CreateProduct = () => {
                   />
                   <select
                     value={size.inStock ? "true" : "false"}
-                    onChange={(e) => updateSize(index, "inStock", e.target.value)}
+                    onChange={(e) =>
+                      updateSize(index, "inStock", e.target.value)
+                    }
                     className="border border-gray-300 rounded px-2 py-1"
                   >
                     <option value="true">In Stock</option>

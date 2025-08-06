@@ -22,12 +22,14 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
+  const [reviews, setReviews] = useState([]);
   const { addToOrder } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchProduct();
+    fetchReviews()
   }, [id]);
 
   useEffect(() => {
@@ -56,13 +58,28 @@ const ProductDetail = () => {
           `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId._id}`
         );
         const storeData = await storeResponse.json();
-        console.log("Fetched store data:", storeData); // ADD THIS
+        //console.log("Fetched store data:", storeData); // ADD THIS
         setStore(storeData.store);
       }
     } catch (error) {
       console.error("Error fetching product:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/reviews/store/${id}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setReviews(data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      setReviews([]);
     }
   };
 
@@ -201,7 +218,7 @@ const ProductDetail = () => {
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-1">
                     <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    <span className="text-gray-600">4.5 (125 reviews)</span>
+                    <span className="text-gray-600">{product.rating || 0} ({reviews.length} reviews)</span>
                   </div>
                   <span className="text-gray-400">|</span>
                   <span className="text-gray-600 capitalize bg-gray-100 px-3 py-1 rounded-full text-sm">
@@ -461,6 +478,177 @@ const ProductDetail = () => {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Reviews Section */}
+      <div className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Customer Reviews
+            </h2>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-5 h-5 ${
+                        i < Math.floor(store.rating || 0)
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-gray-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-lg font-semibold">
+                  {store.rating || 0}
+                </span>
+                <span className="text-gray-600">
+                  ({reviews.length} reviews)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {reviews.length === 0 ? (
+            <div className="text-center py-12">
+              <Star className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                No Reviews Yet
+              </h3>
+              <p className="text-gray-600">
+                Be the first to review this store!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Review Summary */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold mb-4">Review Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-gray-900 mb-2">
+                        {store.rating || 0}
+                      </div>
+                      <div className="flex justify-center mb-2">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-5 h-5 ${
+                              i < Math.floor(store.rating || 0)
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-gray-600">
+                        {reviews.length} total reviews
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {[5, 4, 3, 2, 1].map((rating) => {
+                      const count = reviews.filter(
+                        (r) => r.rating === rating
+                      ).length;
+                      const percentage =
+                        reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                      return (
+                        <div
+                          key={rating}
+                          className="flex items-center space-x-2"
+                        >
+                          <span className="text-sm w-8">{rating}★</span>
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-yellow-400 h-2 rounded-full"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-600 w-8">
+                            {count}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Individual Reviews */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {reviews.map((review) => (
+                  <div
+                    key={review._id}
+                    className="bg-white rounded-lg shadow-sm p-6"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          {maskCustomerName(
+                            review.customerId?.name || "Anonymous"
+                          )}
+                        </p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <div className="flex items-center">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-4 h-4 ${
+                                  i < review.rating
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "text-gray-300"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {new Date(review.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {review.orderId && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                            Product Order
+                          </span>
+                        )}
+                        {review.bookingId && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            Service Booking
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="text-gray-700 mb-4">{review.comment}</p>
+
+                    {review.response && (
+                      <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-black">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="text-sm font-medium text-gray-700">
+                            Store Response
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {new Date(
+                              review.response.respondedAt
+                            ).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-700">
+                          {review.response.message}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

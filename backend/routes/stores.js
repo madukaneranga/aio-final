@@ -110,7 +110,7 @@ router.post(
           .json({ error: "You can only create one store per account" });
       }
 
-      const { name, type, description, themeColor, contactInfo, heroImages } =
+      const { name, type, description, themeColor, contactInfo, heroImages, idImages, addressVerificationImages } =
         req.body;
       const timeSlots = req.body.timeSlots || [];
 
@@ -120,6 +120,8 @@ router.post(
         description,
         themeColor,
         heroImages,
+        idImages,
+        addressVerificationImages,
         ownerId: req.user._id,
         contactInfo: contactInfo || "{}",
         timeSlots,
@@ -215,6 +217,16 @@ router.get("/featured/list", async (req, res) => {
     res.json(stores);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/:storeId/product-count", async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    const count = await Product.countDocuments({ storeId, isActive: true });
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get active product count" });
   }
 });
 

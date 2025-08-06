@@ -117,18 +117,21 @@ const StoreManagement = () => {
     setSuccess("");
 
     try {
-      let imageUrls = [];
-
-      // If new images selected, upload and get URLs
-      if (heroImages.length > 0) {
-        const uploadPromises = heroImages.map(async (file) => {
-          const imageRef = ref(storage, `stores/${Date.now()}_${file.name}`);
-          await uploadBytes(imageRef, file);
+       // 🔄 Upload Hero images
+      let imageUrls = await Promise.all(
+        images.map(async (file) => {
+          const compressedFile = await imageCompression(
+            file,
+            compressionOptions
+          );
+          const imageRef = ref(
+            storage,
+            `stores/id_${Date.now()}_${file.name}`
+          );
+          await uploadBytes(imageRef, compressedFile);
           return getDownloadURL(imageRef);
-        });
-
-        imageUrls = await Promise.all(uploadPromises);
-      }
+        })
+      );
 
       // Use existing images if no new ones are uploaded
       const finalImages = imageUrls.length > 0 ? imageUrls : store.heroImages;
