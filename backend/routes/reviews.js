@@ -278,21 +278,5 @@ router.put(
   }
 );
 
-// Helper function to update store rating
-async function updateStoreRating(storeId) {
-  const reviews = await Review.find({ storeId, isVisible: true });
-
-  if (reviews.length === 0) {
-    await Store.findByIdAndUpdate(storeId, { rating: 0 });
-    return;
-  }
-
-  const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-  const averageRating = totalRating / reviews.length;
-
-  await Store.findByIdAndUpdate(storeId, {
-    rating: Math.round(averageRating * 10) / 10,
-  });
-}
 
 export default router;
