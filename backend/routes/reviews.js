@@ -10,7 +10,7 @@ import {
   updateStoreRating,
   updateProductRating,
   updateServiceRating,
-} from "../helpers/updateRatings.js";
+} from "../helpers/updateratings.js";
 
 const router = express.Router();
 
