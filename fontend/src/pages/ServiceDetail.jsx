@@ -22,12 +22,14 @@ const ServiceDetail = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [notes, setNotes] = useState("");
+  const [reviews, setReviews] = useState([]);
   const { addToBooking } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchService();
+    fetchReviews();
   }, [id]);
 
   const fetchService = async () => {
@@ -40,15 +42,28 @@ const ServiceDetail = () => {
       // Fetch store details separately
       if (data.storeId) {
         const storeResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
+          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId._id}`
         );
         const storeData = await storeResponse.json();
         setStore(storeData.store);
+        //console.log("Fetched store data:", storeData); // ADD THIS
       }
     } catch (error) {
       console.error("Error fetching service:", error);
     } finally {
       setLoading(false);
+    }
+  };
+  const fetchReviews = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/reviews/store/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setReviews(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      setReviews([]);
     }
   };
 
@@ -156,7 +171,7 @@ const ServiceDetail = () => {
               <div className="flex items-center space-x-4 mb-4">
                 <div className="flex items-center space-x-1">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-gray-600">4.5 (89 reviews)</span>
+                  <span className="text-gray-600">{service.rating || 0} ({reviews.length} reviews)</span>
                 </div>
                 <span className="text-gray-400">|</span>
                 <span className="text-gray-600 capitalize">

@@ -4,6 +4,8 @@ import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { Plus, Trash2, Calendar, Clock, ArrowLeft } from "lucide-react";
+import imageCompression from "browser-image-compression";
+
 
 //  ADDED: Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -98,14 +100,21 @@ const CreateService = () => {
       return;
     }
     try {
-      //  CHANGED: Upload images to Firebase
-      const uploadPromises = images.map(async (file) => {
-        const imageRef = ref(storage, `services/${Date.now()}_${file.name}`); //  ADDED
-        await uploadBytes(imageRef, file); //  ADDED
-        return getDownloadURL(imageRef); //  ADDED
-      });
-
-      const imageUrls = await Promise.all(uploadPromises); //  ADDED
+      // 🔄 Upload Product images
+      const imageUrls = await Promise.all(
+        images.map(async (file) => {
+          const compressedFile = await imageCompression(
+            file,
+            compressionOptions
+          );
+          const imageRef = ref(
+            storage,
+            `services/id_${Date.now()}_${file.name}`
+          );
+          await uploadBytes(imageRef, compressedFile);
+          return getDownloadURL(imageRef);
+        })
+      );
 
       const payload = {
         title: formData.title,

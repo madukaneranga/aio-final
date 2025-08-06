@@ -15,6 +15,11 @@ const productSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  oldPrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
   images: [{
     type: String,
     required: true
@@ -36,6 +41,12 @@ const productSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Store',
     required: true
+  },
+  rating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5,
   },
   ownerId: {
     type: mongoose.Schema.Types.ObjectId,

@@ -27,7 +27,7 @@ const Home = () => {
       if (productsRes.ok) {
         try {
           const products = await productsRes.json();
-          setFeaturedProducts(products.slice(0, 8));
+          setFeaturedProducts(products.slice(0, 12));
         } catch (error) {
           console.error('Error parsing products JSON:', error);
           setFeaturedProducts([]);
@@ -70,6 +70,8 @@ const Home = () => {
       </div>
     );
   }
+
+  
 
   return (
     <div>

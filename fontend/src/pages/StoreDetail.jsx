@@ -218,7 +218,7 @@ const StoreDetail = () => {
                     <div className="flex items-center space-x-1">
                       <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                       <span style={{ color: isLightTheme ? '#666' : '#ccc' }}>
-                        {store.rating || 4.5} ({reviews.length} reviews)
+                        {store.rating || 0} ({reviews.length} reviews)
                       </span>
                     </div>
                     <span style={{ color: isLightTheme ? '#999' : '#666' }}>|</span>

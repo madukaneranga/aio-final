@@ -6,6 +6,11 @@ import Store from "../models/Store.js";
 import Notification from "../models/Notification.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { emitNotification } from "../utils/socketUtils.js";
+import {
+  updateStoreRating,
+  updateProductRating,
+  updateServiceRating,
+} from "../helpers/updateRatings.js";
 
 const router = express.Router();
 
@@ -24,6 +29,52 @@ router.get("/store/:storeId", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Get reviews for a product
+router.get("/product/:productId", async (req, res) => {
+  try {
+    const productId = req.params.productId;
+
+    // Find orders containing productId inside items array
+    const orders = await Order.find({ "items.productId": productId }, { _id: 1 });
+    const orderIds = orders.map(order => order._id);
+
+    // Find reviews linked to those orders
+    const reviews = await Review.find({ orderId: { $in: orderIds } })
+      .populate("customerId", "name")
+      .populate("storeId", "name")
+      .populate("orderId", "createdAt");
+
+    res.json(reviews);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+router.get("/reviews/:serviceId", async (req, res) => {
+  try {
+    const serviceId = req.params.serviceId;
+
+    // Find all bookings with this service
+    const bookings = await Booking.find({ serviceId }, { _id: 1 });
+    const bookingIds = bookings.map(b => b._id);
+
+    // Find reviews linked to those bookings (and service)
+    const reviews = await Review.find({ 
+        bookingId: { $in: bookingIds },
+        serviceId // optionally also check serviceId matches
+      })
+      .populate("customerId", "name")
+      .populate("storeId", "name")
+      .populate("bookingId", "date");
+
+    res.json(reviews);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // Get reviews for store owner
 router.get(
@@ -45,30 +96,37 @@ router.get(
   }
 );
 
-// Create review (customer only)
 router.post("/", authenticate, authorize("customer"), async (req, res) => {
   try {
     const { storeId, orderId, bookingId, rating, comment } = req.body;
 
-    // Verify customer has completed order/booking
     let hasCompletedTransaction = false;
+    let isReviewed = false;
+    let order = null;
+    let booking = null;
 
+    // ====== If review is for an order ======
     if (orderId) {
-      const order = await Order.findOne({
+      order = await Order.findOne({
         _id: orderId,
         customerId: req.user._id,
         status: "delivered",
-      });
+      }).populate("items.productId");
+
       hasCompletedTransaction = !!order;
+      isReviewed = !!order?.reviewed;
     }
 
+    // ====== If review is for a booking ======
     if (bookingId) {
-      const booking = await Booking.findOne({
+      booking = await Booking.findOne({
         _id: bookingId,
         customerId: req.user._id,
         status: "completed",
       });
+
       hasCompletedTransaction = !!booking;
+      isReviewed = !!booking?.reviewed;
     }
 
     if (!hasCompletedTransaction) {
@@ -77,19 +135,13 @@ router.post("/", authenticate, authorize("customer"), async (req, res) => {
       });
     }
 
-    // Check if review already exists
-    const existingReview = await Review.findOne({
-      customerId: req.user._id,
-      storeId,
-      $or: [{ orderId: orderId || null }, { bookingId: bookingId || null }],
-    });
-
-    if (existingReview) {
-      return res
-        .status(400)
-        .json({ error: "You have already reviewed this transaction" });
+    if (isReviewed) {
+      return res.status(400).json({
+        error: "You have already reviewed this transaction",
+      });
     }
 
+    // ====== Create ONE review ======
     const review = new Review({
       customerId: req.user._id,
       storeId,
@@ -98,26 +150,43 @@ router.post("/", authenticate, authorize("customer"), async (req, res) => {
       rating,
       comment,
     });
-
     await review.save();
 
-    // Notify store owner about the order creation
-    const store = await Store.findById(storeId);
-
-    const notification = await Notification.create({
-      userId: store.ownerId,
-      title: "New Review Received",
-      userType: "store_owner",
-      body: "Your store has received a new customer review. Please respond to maintain excellent customer engagement.",
-      type: "review_update",
-      link: `/store/${store._id}`,
-    });
-
-    emitNotification(store.ownerId.toString(), notification);
-
-    // Update store rating
+    // ====== Update store rating ======
     await updateStoreRating(storeId);
 
+    // ====== If order: update each product's rating field only ======
+    if (order && order.items?.length) {
+      for (const item of order.items) {
+        await updateProductRating(item.productId);
+      }
+      order.reviewed = true;
+      await order.save();
+    }
+
+    // ====== If booking: update service rating field only ======
+    if (booking && booking.serviceId) {
+      await updateServiceRating(booking.serviceId);
+      booking.reviewed = true;
+      await booking.save();
+    }
+
+    // ====== Notify store owner ======
+    const store = await Store.findById(storeId);
+    if (store) {
+      const notification = await Notification.create({
+        userId: store.ownerId,
+        title: "New Review Received",
+        userType: "store_owner",
+        body: "Your store has received a new customer review. Please respond to maintain excellent customer engagement.",
+        type: "review_update",
+        link: `/store/${store._id}`,
+      });
+
+      emitNotification(store.ownerId.toString(), notification);
+    }
+
+    // ====== Return populated review ======
     const populatedReview = await Review.findById(review._id)
       .populate("customerId", "name")
       .populate("orderId", "totalAmount")

@@ -391,15 +391,23 @@ const Orders = () => {
                     <h4 className="font-medium text-green-900 mb-2">
                       Order Completed
                     </h4>
-                    <p className="text-sm text-green-700 mb-3">
-                      How was your experience with this order?
-                    </p>
-                    <button
-                      onClick={() => openReviewModal(order)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                    >
-                      Write a Review
-                    </button>
+                    {order.reviewed ? (
+                      <p className="text-sm text-green-700">
+                        ✅ Thank you! You have already reviewed this order.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-sm text-green-700 mb-3">
+                          How was your experience with this order?
+                        </p>
+                        <button
+                          onClick={() => openReviewModal(order)}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+                        >
+                          Write a Review
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
 

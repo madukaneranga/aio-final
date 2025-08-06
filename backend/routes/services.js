@@ -121,6 +121,7 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       category,
       duration: parseInt(duration),
       timeSlots,
+      ownerId: req.user._id,
       storeId: store._id,
     });
 

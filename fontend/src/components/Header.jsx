@@ -67,6 +67,9 @@ const Header = () => {
       const data = await response.json();
       throw new Error(data.error || "Failed to switch role");
     }
+
+    refreshUser();
+
     return response.json();
   };
 
@@ -78,13 +81,17 @@ const Header = () => {
         if (result.role === "customer") {
           navigate("/");
         } else {
-          navigate("/dashboard");
+          if (user?.storeId) {
+            navigate("/dashboard");
+          } else {
+            navigate("/create-store");
+          }
         }
       } catch (err) {
         console.error(err.message);
       } finally {
         setIsSwitching(false);
-        refreshUser();
+        
       }
     }, 4000); // wait 4s before switching
   };

@@ -20,9 +20,19 @@ const bookingSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+   reviewed: {
+    type: Boolean,
+    default: false,
+  },
   startTime: {
     type: String,
     required: true
+  },
+  rating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5,
   },
   endTime: {
     type: String,
