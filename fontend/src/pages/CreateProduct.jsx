@@ -109,6 +109,12 @@ const CreateProduct = () => {
     setLoading(true);
     setError("");
 
+    const compressionOptions = {
+      maxSizeMB: 0.5, 
+      maxWidthOrHeight: 1000, 
+      useWebWorker: true,
+    };
+
     try {
       // 🔄 Upload Product images
       const imageUrls = await Promise.all(

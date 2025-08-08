@@ -9,7 +9,6 @@ import User from "../models/User.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Console } from "console";
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -39,23 +38,37 @@ const upload = multer({
 // Get all stores
 router.get("/", async (req, res) => {
   try {
-    const { type, search, category } = req.query;
-    let query = { isActive: true };
+    const stores = await Product.find({ isActive: true })
+      .populate("ownerId", "name type")
+      .sort({ createdAt: -1 });
 
-    if (type) query.type = type;
+    res.json(stores);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Search/filter stores via POST
+router.post("/listing", async (req, res) => {
+  try {
+    const { search } = req.body;
+    const query = { isActive: true };
+
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
       ];
     }
+    
 
     const stores = await Store.find(query)
-      .populate("ownerId", "name")
-      .sort({ rating: -1, totalSales: -1 });
+      .populate("ownerId", "name type")
+      .sort({ createdAt: -1 });
 
     res.json(stores);
   } catch (error) {
+    console.error("Search error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -110,8 +123,16 @@ router.post(
           .json({ error: "You can only create one store per account" });
       }
 
-      const { name, type, description, themeColor, contactInfo, heroImages, idImages, addressVerificationImages } =
-        req.body;
+      const {
+        name,
+        type,
+        description,
+        themeColor,
+        contactInfo,
+        heroImages,
+        idImages,
+        addressVerificationImages,
+      } = req.body;
       const timeSlots = req.body.timeSlots || [];
 
       const store = new Store({

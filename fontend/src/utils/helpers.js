@@ -134,3 +134,34 @@ export const defaultImages = {
   store: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop',
   user: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop'
 };
+
+//violations  check
+export const getUsageViolations = (usage, newLimits) => {
+  const violations = {};
+
+  if (usage.products?.count > newLimits.items) {
+    violations.violatedProducts = usage.products.count - newLimits.items;
+  }
+
+  if (usage.services?.count > newLimits.items) {
+    violations.violatedServices = usage.services.count - newLimits.items;
+  }
+
+  if (usage.products?.images > newLimits.itemImages) {
+    violations.violatedProductImages = usage.products.images - newLimits.itemImages;
+  }
+
+  if (usage.services?.images > newLimits.itemImages) {
+    violations.violatedServiceImages = usage.services.images - newLimits.itemImages;
+  }
+
+  if (usage.headerImages?.count > newLimits.headerImages) {
+    violations.violatedHeaderImages = usage.headerImages.count - newLimits.headerImages;
+  }
+
+  if (usage.variants?.used && !newLimits.itemVariants) {
+    violations.violatedVariants = true;
+  }
+
+  return violations;
+};

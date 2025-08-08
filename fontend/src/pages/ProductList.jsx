@@ -1,61 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import ProductCard from '../components/ProductCard';
-import SearchFilters from '../components/SearchFilters';
-import LoadingSpinner from '../components/LoadingSpinner';
-import EmptyState from '../components/EmptyState';
-import { Package } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import ProductCard from "../components/ProductCard";
+import SearchFilters from "../components/SearchFilters";
+import LoadingSpinner from "../components/LoadingSpinner";
+import EmptyState from "../components/EmptyState";
+import { Package } from "lucide-react";
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const location = useLocation();
-
-  const categories = [
-    'Electronics',
-    'Clothing',
-    'Home & Garden',
-    'Sports & Outdoors',
-    'Books',
-    'Beauty & Health',
-    'Toys & Games',
-    'Food & Beverages'
-  ];
+  const [error, setError] = useState("");
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    fetchProducts(searchParams.toString());
-  }, [location.search]);
+    fetchProducts(); // No filters on initial load
+  }, []);
 
-  const fetchProducts = async (queryString = '') => {
+  const fetchProducts = async (filters = {}) => {
     try {
       setLoading(true);
-      setError('');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products?${queryString}`);
-      
+      setError("");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/products/listing`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(filters),
+        }
+      );
+
       if (response.ok) {
         const data = await response.json();
         setProducts(data);
       } else {
-        setError('Failed to fetch products');
+        setError("Failed to fetch products");
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
-      setError('Network error. Please try again.');
+      console.error("Error fetching products:", error);
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (filters) => {
-    const params = new URLSearchParams();
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
+  const loadCategories = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      const data = await res.json();
+      setCategories(data);
+    } catch (err) {
+      console.error("Error loading categories:", err);
+    }
+  };
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
-    fetchProducts(params.toString());
+  const handleSearch = (filters) => {
+    fetchProducts(filters);
   };
 
   if (loading) {
@@ -72,7 +77,7 @@ const ProductList = () => {
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Products</h1>
-          
+
           <SearchFilters
             onSearch={handleSearch}
             categories={categories}
@@ -90,10 +95,10 @@ const ProductList = () => {
 
         <div className="mb-6">
           <p className="text-gray-600">
-            {products.length} product{products.length !== 1 ? 's' : ''} found
+            {products.length} product{products.length !== 1 ? "s" : ""} found
           </p>
         </div>
-        
+
         {products.length === 0 ? (
           <EmptyState
             icon={Package}

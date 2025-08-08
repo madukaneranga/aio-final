@@ -88,7 +88,7 @@ const storeSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: true,
+    default: false,
   },
   createdAt: {
     type: Date,

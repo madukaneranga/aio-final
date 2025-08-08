@@ -29,7 +29,8 @@ const CreateStore = () => {
   const [error, setError] = useState("");
   const [checkingStore, setCheckingStore] = useState(true);
   const [payhereLoaded, setPayhereLoaded] = useState(false);
-  const [subPackage, setSubPackage] = useState("basic");
+  const [selectedPackage, setSelectedPackage] = useState("basic");
+  const [packages, setPackages] = useState({});
 
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -59,6 +60,8 @@ const CreateStore = () => {
       setPayhereLoaded(true);
     }
   }, []);
+
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -155,7 +158,7 @@ const CreateStore = () => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
-            packageName: subPackage,
+            packageName: selectedPackage.name,
           }),
         }
       );
@@ -475,7 +478,10 @@ const CreateStore = () => {
                 </p>
               </div>
 
-              <Pricing subPackage={subPackage} setSubPackage={setSubPackage} />
+              <Pricing
+                selectedPackage={selectedPackage}
+                setSelectedPackage={setSelectedPackage}
+              />
               {/* Subscription Info */}
 
               <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">

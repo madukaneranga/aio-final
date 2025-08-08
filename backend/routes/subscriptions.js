@@ -326,6 +326,7 @@ router.post("/retry", authenticate, async (req, res) => {
   }
 });
 
+
 // GET /api/subscriptions/my-subscription
 router.get(
   "/my-subscription",
@@ -338,12 +339,24 @@ router.get(
         status: "active",
       }).populate("storeId", "name");
 
-      res.json(subscription);
+      if (!subscription) {
+        return res.status(404).json({ error: "Active subscription not found" });
+      }
+
+      const pkg = await Package.findOne({ name: subscription.package });
+
+      const response = {
+        subscription,
+        package: pkg,
+      };
+
+      res.json(response);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }
 );
+
 
 // PUT /api/subscriptions/upgrade
 router.put("/upgrade", authenticate, async (req, res) => {

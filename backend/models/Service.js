@@ -25,10 +25,28 @@ const serviceSchema = new mongoose.Schema({
       type: String,
     },
   ],
+  // Updated category structure
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
+    required: true,
+  },
   category: {
     type: String,
     required: true,
+    trim: true,
   },
+  subcategory: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  childCategory: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
   duration: {
     type: Number, // in minutes
     required: true,
@@ -57,6 +75,13 @@ const serviceSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+});
+
+serviceSchema.index({
+  categoryId: 1,
+  category: 1,
+  subcategory: 1,
+  childCategory: 1,
 });
 
 export default mongoose.model("Service", serviceSchema);

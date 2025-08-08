@@ -2,6 +2,7 @@
 import express from "express";
 import Package from "../models/Package.js";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { getUserPackage } from '../utils/getUserPackage.js';
 
 const router = express.Router();
 
@@ -14,5 +15,20 @@ router.get("/", authenticate, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch packages" });
   }
 });
+
+router.get(
+  "/user-package",
+  authenticate,
+  authorize("store_owner"),
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const pkg = await getUserPackage(userId);
+      res.json(pkg);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
 
 export default router;

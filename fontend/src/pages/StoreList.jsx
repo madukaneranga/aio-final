@@ -1,50 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import StoreCard from '../components/StoreCard';
-import SearchFilters from '../components/SearchFilters';
-import LoadingSpinner from '../components/LoadingSpinner';
-import EmptyState from '../components/EmptyState';
-import { Store } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import StoreCard from "../components/StoreCard";
+import SearchFilters from "../components/SearchFilters";
+import LoadingSpinner from "../components/LoadingSpinner";
+import EmptyState from "../components/EmptyState";
+import { Store } from "lucide-react";
 
 const StoreList = () => {
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const location = useLocation();
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    fetchStores(searchParams.toString());
-  }, [location.search]);
+    fetchStores({}); // No filters on initial load
+  }, []);
 
-  const fetchStores = async (queryString = '') => {
+  const fetchStores = async (filters = {}) => {
     try {
       setLoading(true);
-      setError('');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores?${queryString}`);
-      
+      setError("");
+
+      const validFilters =
+        typeof filters === "object" && filters !== null ? filters : {};
+
+      console.log("Valid Filters:", validFilters);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stores/listing`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(validFilters),
+        }
+      );
+
       if (response.ok) {
         const data = await response.json();
         setStores(data);
       } else {
-        setError('Failed to fetch stores');
+        setError("Failed to fetch stores");
       }
     } catch (error) {
-      console.error('Error fetching stores:', error);
-      setError('Network error. Please try again.');
+      console.error("Error fetching stores:", error);
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSearch = (filters) => {
-    const params = new URLSearchParams();
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-
-    fetchStores(params.toString());
+    fetchStores(filters);
   };
 
   if (loading) {
@@ -61,7 +67,7 @@ const StoreList = () => {
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">All Stores</h1>
-          
+
           <SearchFilters
             onSearch={handleSearch}
             placeholder="Search stores..."
@@ -79,10 +85,10 @@ const StoreList = () => {
 
         <div className="mb-6">
           <p className="text-gray-600">
-            {stores.length} store{stores.length !== 1 ? 's' : ''} found
+            {stores.length} store{stores.length !== 1 ? "s" : ""} found
           </p>
         </div>
-        
+
         {stores.length === 0 ? (
           <EmptyState
             icon={Store}

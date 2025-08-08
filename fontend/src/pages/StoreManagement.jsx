@@ -5,6 +5,7 @@ import ImageUpload from "../components/ImageUpload";
 import ColorThemeSelector from "../components/ColorThemeSelector";
 import TimeSlotManager from "../components/TimeSlotManager";
 import LoadingSpinner from "../components/LoadingSpinner";
+import imageCompression from "browser-image-compression";
 import { Store, Camera, Eye, EyeOff, MessageSquare, Star } from "lucide-react";
 
 //  ADDED: Firebase storage imports
@@ -116,23 +117,25 @@ const StoreManagement = () => {
     setError("");
     setSuccess("");
 
+    const compressionOptions = {
+      maxSizeMB: 0.5,
+      maxWidthOrHeight: 2000,
+      useWebWorker: true,
+    };
+
     try {
-       // 🔄 Upload Hero images
+      // 🔄 Upload Hero images
       let imageUrls = await Promise.all(
-        images.map(async (file) => {
+        heroImages.map(async (file) => {
           const compressedFile = await imageCompression(
             file,
             compressionOptions
           );
-          const imageRef = ref(
-            storage,
-            `stores/id_${Date.now()}_${file.name}`
-          );
+          const imageRef = ref(storage, `stores/id_${Date.now()}_${file.name}`);
           await uploadBytes(imageRef, compressedFile);
           return getDownloadURL(imageRef);
         })
       );
-
       // Use existing images if no new ones are uploaded
       const finalImages = imageUrls.length > 0 ? imageUrls : store.heroImages;
 
@@ -156,6 +159,7 @@ const StoreManagement = () => {
         }
       );
 
+
       if (response.ok) {
         const updatedStore = await response.json();
         setStore(updatedStore);
@@ -166,7 +170,7 @@ const StoreManagement = () => {
         setError(errorData.error || "Failed to update store");
       }
     } catch (error) {
-      setError("Network error. Please try again.");
+      setError("Network error. Please try again." + error);
     } finally {
       setSaving(false);
     }
@@ -175,10 +179,19 @@ const StoreManagement = () => {
   const handleProfileImageUpload = async () => {
     if (!profileImage) return;
 
+    const compressionOptionsProfile = {
+      maxSizeMB: 0.2,
+      maxWidthOrHeight: 400,
+      useWebWorker: true,
+    };
     try {
+      const compressedFile = await imageCompression(
+        profileImage,
+        compressionOptionsProfile
+      );
       // Upload a single image to Firebase
       const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
-      await uploadBytes(imageRef, profileImage);
+      await uploadBytes(imageRef, compressedFile);
       const imageUrl = await getDownloadURL(imageRef);
 
       const payload = {
@@ -207,7 +220,7 @@ const StoreManagement = () => {
         setError(errorData.error || "Failed to update profile image");
       }
     } catch (error) {
-      setError("Network error. Please try again.");
+      setError("Network error. Please try again." + error);
     }
   };
 
