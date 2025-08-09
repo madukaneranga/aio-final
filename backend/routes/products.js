@@ -6,7 +6,7 @@ import Product from "../models/Product.js";
 import Store from "../models/Store.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Console } from "console";
-
+import { getUserPackage } from "../utils/getUserPackage.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,20 +34,56 @@ const upload = multer({
   },
 });
 
-// Get all products
+// Get all active products (no filters)
 router.get("/", async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice, storeId } = req.query;
-    let query = { isActive: true };
+    const products = await Product.find({ isActive: true })
+      .populate("storeId", "name type")
+      .sort({ createdAt: -1 });
+
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Search/filter products via POST
+router.post("/listing", async (req, res) => {
+  try {
+    const {
+      category,
+      categoryId,
+      subcategory,
+      childCategory,
+      search,
+      minPrice,
+      maxPrice,
+    } = req.body;
+
+    const query = { isActive: true };
+
+    console.log("Received search request:", {
+      category,
+      categoryId,
+      subcategory,
+      childCategory,
+      search,
+      minPrice,
+      maxPrice,
+    });
 
     if (category) query.category = category;
-    if (storeId) query.storeId = storeId;
+    if (categoryId) query.categoryId = categoryId;
+    if (subcategory) query.subcategory = subcategory;
+    if (childCategory) query.childCategory = childCategory;
+
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
       ];
     }
+
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = parseFloat(minPrice);
@@ -60,6 +96,7 @@ router.get("/", async (req, res) => {
 
     res.json(products);
   } catch (error) {
+    console.error("Search error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -99,7 +136,9 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
     const store = await Store.findOne({
       ownerId: req.user._id,
       type: "product",
+      isActive: true,
     });
+
     if (!store) {
       return res.status(403).json({
         error:
@@ -107,6 +146,28 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       });
     }
 
+    //Check Limits
+    const userId = req.user._id;
+    const userPackage = await getUserPackage(userId);
+
+    const currentItemCount = await Product.countDocuments({
+      ownerId: userId,
+      isActive: true,
+    });
+
+    if (currentItemCount >= userPackage.items) {
+      return res.status(403).json({
+        error: `Item limit reached for your ${userPackage.name} plan`,
+      });
+    }
+
+    if (variants && !userPackage.itemVariants) {
+      return res
+        .status(403)
+        .json({ error: "Your current plan does not allow item variants" });
+    }
+
+    //Create Product
     const product = new Product({
       title,
       description,

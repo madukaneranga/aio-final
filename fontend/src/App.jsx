@@ -42,6 +42,9 @@ import WalletDashboard from "./pages/WallerDashboard";
 import SubscriptionManagement from "./pages/SubscriptionManagement";
 import ScrollToTop from "./components/ScrollToTop";
 import Maintenance from "./pages/Maintenance";
+import ScrollToTopButton from "./components/ScrollToTopButton";
+import NfcCardCustomizer from "./pages/NfcCardCustomizer";
+import Test from "./pages/Test";
 
 import "./App.css";
 
@@ -63,6 +66,7 @@ function App() {
                     <Header />
                     <main className="flex-1">
                       <ScrollToTop />
+                      <ScrollToTopButton />
                       <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/stores" element={<StoreList />} />
@@ -144,6 +148,14 @@ function App() {
                         <Route
                           path="/sub-management"
                           element={<SubscriptionManagement />}
+                        />
+                        <Route
+                          path="/test/:id"
+                          element={<Test />}
+                        />
+                        <Route
+                          path="/NfcCard"
+                          element={<NfcCardCustomizer />}
                         />
                         <Route path="*" element={<NotFound />} />
                       </Routes>

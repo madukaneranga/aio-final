@@ -1,61 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import ServiceCard from '../components/ServiceCard';
-import SearchFilters from '../components/SearchFilters';
-import LoadingSpinner from '../components/LoadingSpinner';
-import EmptyState from '../components/EmptyState';
-import { Calendar } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import ServiceCard from "../components/ServiceCard";
+import SearchFilters from "../components/SearchFilters";
+import LoadingSpinner from "../components/LoadingSpinner";
+import EmptyState from "../components/EmptyState";
+import { Calendar } from "lucide-react";
 
 const ServiceList = () => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const location = useLocation();
-
-  const categories = [
-    'Tutoring',
-    'Home Services',
-    'Beauty & Wellness',
-    'Consulting',
-    'Fitness',
-    'Technology',
-    'Creative Services',
-    'Professional Services'
-  ];
+  const [error, setError] = useState("");
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    fetchServices(searchParams.toString());
-  }, [location.search]);
+    fetchServices(); // No filters on initial load
+  }, []);
 
-  const fetchServices = async (queryString = '') => {
+  const fetchServices = async (filters = {}) => {
     try {
       setLoading(true);
-      setError('');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services?${queryString}`);
-      
+      setError("");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/services/listing`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(filters),
+        }
+      );
+
       if (response.ok) {
         const data = await response.json();
         setServices(data);
       } else {
-        setError('Failed to fetch services');
+        setError("Failed to fetch services");
       }
     } catch (error) {
-      console.error('Error fetching services:', error);
-      setError('Network error. Please try again.');
+      console.error("Error fetching services:", error);
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (filters) => {
-    const params = new URLSearchParams();
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
+  const loadCategories = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      const data = await res.json();
+      setCategories(data);
+    } catch (err) {
+      console.error("Error loading categories:", err);
+    }
+  };
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
-    fetchServices(params.toString());
+  const handleSearch = (filters) => {
+    fetchServices(filters);
   };
 
   if (loading) {
@@ -72,7 +77,7 @@ const ServiceList = () => {
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Services</h1>
-          
+
           <SearchFilters
             onSearch={handleSearch}
             categories={categories}
@@ -90,10 +95,10 @@ const ServiceList = () => {
 
         <div className="mb-6">
           <p className="text-gray-600">
-            {services.length} service{services.length !== 1 ? 's' : ''} found
+            {services.length} service{services.length !== 1 ? "s" : ""} found
           </p>
         </div>
-        
+
         {services.length === 0 ? (
           <EmptyState
             icon={Calendar}

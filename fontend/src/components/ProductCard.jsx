@@ -68,7 +68,7 @@ const ProductCard = ({ product }) => {
   return (
     <>
       <Link to={`/product/${product._id}`} className="block">
-        <div className="relative w-full">
+        <div className="relative w-full ">
           {/* Product Card */}
           <div className="group relative bg-white rounded-xl sm:rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full max-w-xs mx-auto">
             {/* Badges */}
@@ -158,13 +158,10 @@ const ProductCard = ({ product }) => {
 
               {/* Title */}
               <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-black transition-all duration-300 leading-tight text-sm sm:text-base">
-                {product.title}
+                {product.title.length > 35
+                  ? `${product.title.slice(0, 35)}...`
+                  : product.title}
               </h3>
-
-              {/* Description - Hidden on mobile */}
-              <p className="hidden sm:block text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
-                {product.description}
-              </p>
 
               {/* Price Section */}
               <div className="flex items-baseline gap-2 mb-2 sm:mb-3">

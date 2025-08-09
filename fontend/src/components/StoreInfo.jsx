@@ -27,9 +27,7 @@ import {
 
 const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
   const [hoveredContact, setHoveredContact] = useState(null);
-  const [isFavorited, setIsFavorited] = useState(
-    user.favoriteStores?.includes(store.id) || false
-  );
+  const [isFavorited, setIsFavorited] = useState(false);
 
   // Default store data with all features
   const defaultStore = {
