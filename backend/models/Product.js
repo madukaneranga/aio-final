@@ -1,36 +1,56 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
   },
   description: {
     type: String,
-    required: true
+    required: true,
   },
   price: {
     type: Number,
     required: true,
-    min: 0
+    min: 0,
   },
   oldPrice: {
     type: Number,
-    required: true,
-    min: 0
+    min: 0,
   },
-  images: [{
-    type: String,
-    required: true
-  }],
+  images: [
+    {
+      type: String,
+      required: true,
+    },
+  ],
+
+  // Updated category structure
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
+    required: true,
+  },
   category: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
   },
+  subcategory: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  childCategory: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
   stock: {
     type: Number,
-    min: 5
+    min: 5,
   },
   isPreorder: {
     type: Boolean,
@@ -39,8 +59,8 @@ const productSchema = new mongoose.Schema({
   },
   storeId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Store',
-    required: true
+    ref: "Store",
+    required: true,
   },
   rating: {
     type: Number,
@@ -50,32 +70,39 @@ const productSchema = new mongoose.Schema({
   },
   ownerId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: "User",
+    required: true,
   },
   isActive: {
     type: Boolean,
-    default: true
+    default: true,
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
 
   variants: {
     colors: [
       {
         name: { type: String, trim: true },
-        hex: { type: String }
-      }
+        hex: { type: String },
+      },
     ],
     sizes: [
       {
         name: { type: String, trim: true },
-        inStock: { type: Boolean }
-      }
-    ]
-  }
+        inStock: { type: Boolean },
+      },
+    ],
+  },
 });
 
-export default mongoose.model('Product', productSchema);
+productSchema.index({
+  categoryId: 1,
+  category: 1,
+  subcategory: 1,
+  childCategory: 1,
+});
+
+export default mongoose.model("Product", productSchema);

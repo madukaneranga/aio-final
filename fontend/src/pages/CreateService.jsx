@@ -99,6 +99,13 @@ const CreateService = () => {
       setLoading(false);
       return;
     }
+
+    const compressionOptions = {
+      maxSizeMB: 0.5, 
+      maxWidthOrHeight: 1000, 
+      useWebWorker: true,
+    };
+    
     try {
       // 🔄 Upload Product images
       const imageUrls = await Promise.all(

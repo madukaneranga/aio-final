@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { formatLKR } from "../utils/currency";
-import Pricing from "../components/Pricing";
 import {
   Plus,
   Package,
@@ -18,6 +17,7 @@ import {
   Star,
 } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
+import useUserPackage from "../hooks/useUserPackage";
 
 const StoreDashboard = () => {
   const { user } = useAuth();
@@ -29,6 +29,18 @@ const StoreDashboard = () => {
     totalBookings: 0,
     totalEarnings: 0,
   });
+  const {
+    usageInfo,
+    errorInfo,
+    loadUsage,
+    planInfo,
+    limitsInfo,
+    productsInfo,
+    servicesInfo,
+    headerImagesInfo,
+    variantsInfo,
+  } = useUserPackage();
+
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
   const [subscription, setSubscription] = useState(null);
@@ -38,11 +50,6 @@ const StoreDashboard = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(null);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [packages, setPackages] = useState([]);
-  const [subPackage, setSubPackage] = useState("");
-
-  const currentItems = products.length > 0 ? products : services;
 
   useEffect(() => {
     if (user?.role === "store_owner" && user?.storeId) {
@@ -50,87 +57,9 @@ const StoreDashboard = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (packages.length > 0 && !subPackage) {
-      setSubPackage(packages[0].name);
-    }
-  }, [packages]);
-
-  const loadPayHereSDK = () => {
-    return new Promise((resolve, reject) => {
-      if (window.payhere) return resolve();
-
-      const script = document.createElement("script");
-      script.src = "https://sandbox.payhere.lk/lib/payhere.js";
-      script.type = "text/javascript";
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("PayHere SDK failed to load"));
-      document.body.appendChild(script);
-    });
-  };
-
-  const handlePackageUpgrade = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/upgrade`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ packageName: subPackage }),
-        }
-      );
-
-      const result = await response.json();
-
-      // 🛑 Handle downgrade restriction (if backend returns 403)
-      if (response.status === 403 && result.nextAvailableDowngradeDate) {
-        const formattedDate = new Date(
-          result.nextAvailableDowngradeDate
-        ).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-        alert(`⛔ You can downgrade only after: ${formattedDate}`);
-        return;
-      }
-
-      // ❌ Other error
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to upgrade package");
-      }
-
-      // 💳 If PayHere payment is required
-      if (result.paymentRequired && result.paymentParams) {
-        try {
-          const orderId = await startPayHerePayment(result.paymentParams);
-          console.log("✅ PayHere Payment successful with Order ID:", orderId);
-        } catch (paymentError) {
-          console.error("❌ Payment failed:", paymentError);
-          alert("Payment was not successful. Upgrade was not completed.");
-          return;
-        }
-      }
-
-      // ✅ Update subscription
-      setSubscription(result.updatedSubscription || result);
-
-      // ✅ Close modal
-      setShowUpgradeModal(false);
-
-      alert(`✅ Successfully upgraded to: ${subPackage.toUpperCase()}`);
-    } catch (error) {
-      console.error("❌ Upgrade Error:", error);
-      alert(error.message || "Something went wrong during the upgrade.");
-    }
-  };
-
   const fetchDashboardData = async () => {
     setLoading(true);
-
+    loadUsage();
     const authHeader = {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     };
@@ -222,24 +151,11 @@ const StoreDashboard = () => {
         { headers: authHeader }
       );
       if (subscriptionResponse.ok) {
-        const subscriptionData = await subscriptionResponse.json();
-        setSubscription(subscriptionData);
-        setSubPackage(subscriptionData?.package || null);
+        const data = await subscriptionResponse.json();
+        setSubscription(data.subscription);
+
       } else {
         setSubscription(null);
-        setSubPackage(null);
-      }
-
-      // --- Packages ---
-      const packageResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/packages`,
-        { headers: authHeader }
-      );
-      if (packageResponse.ok) {
-        const packageData = await packageResponse.json();
-        setPackages(packageData);
-      } else {
-        setPackages([]);
       }
     } catch (error) {
       console.error("Unexpected error fetching dashboard data:", error);
@@ -247,112 +163,6 @@ const StoreDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const cancelSubscription = async () => {
-    console.log("cancelSubscription called");
-    try {
-      const response = await fetch("/api/subscriptions/cancel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ subscriptionId: subscription._id }),
-      });
-
-      if (response.ok) {
-        alert("Subscription cancelled successfully");
-        fetchDashboardData(); // ✅ Refresh UI immediately
-      } else {
-        const errorData = await response.json();
-        alert("Cancel failed: " + errorData?.error || "Unknown error");
-      }
-    } catch (error) {
-      console.error("Cancel error:", error);
-      alert("Error cancelling subscription");
-    }
-  };
-
-  const createSubscription = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const { paymentParams } = await response.json();
-
-        await loadPayHereSDK();
-
-        // 🔥 Start PayHere payment modal
-        await startPayHerePayment(paymentParams);
-
-        // ✅ Refresh subscription and dashboard data after successful payment
-        await fetchDashboardData();
-
-        // 💡 Wait for subscription to update
-        const refreshedSubscription = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
-
-        const subscriptionData = await refreshedSubscription.json();
-        setSubscription(subscriptionData);
-
-        alert(
-          `Your monthly subscription (LKR ${subscriptionData.amount}) is now active.`
-        );
-      } else {
-        const errorData = await response.json();
-        alert(
-          "Subscription setup failed. Please contact support: " +
-            (errorData?.error || "Unknown error")
-        );
-      }
-    } catch (error) {
-      console.error("Subscription error:", error);
-      alert("Error starting subscription. Please try again.");
-    }
-  };
-
-  const startPayHerePayment = (paymentParams) => {
-    return new Promise((resolve, reject) => {
-      if (!window.payhere) {
-        alert("Payment gateway not loaded. Please refresh and try again.");
-        return reject(new Error("PayHere SDK not loaded"));
-      }
-
-      window.payhere.onCompleted = function (orderId) {
-        console.log("✅ Payment completed. Order ID:", orderId);
-        resolve(orderId);
-      };
-
-      window.payhere.onDismissed = function () {
-        alert("Payment was cancelled.");
-        reject(new Error("Payment cancelled"));
-      };
-
-      window.payhere.onError = function (error) {
-        console.error("❌ PayHere error:", error);
-        alert("Payment failed. Please try again.");
-        reject(new Error("Payment error: " + error));
-      };
-
-      console.log("▶️ Starting PayHere payment with:", paymentParams);
-      window.payhere.startPayment(paymentParams);
-    });
   };
 
   const handleEdit = (editingItem) => {
@@ -556,7 +366,11 @@ const StoreDashboard = () => {
                 <Plus className="w-8 h-8 text-black" />
                 <div>
                   <p className="font-semibold text-gray-900">Add Product</p>
-                  <p className="text-sm text-gray-500">Create new product</p>
+                  {productsInfo.limitReached ? (
+                    <p className="text-sm text-red-500">Reched max products</p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Create new product</p>
+                  )}
                 </div>
               </Link>
               <Link
@@ -581,7 +395,11 @@ const StoreDashboard = () => {
                 <Calendar className="w-8 h-8 text-black" />
                 <div>
                   <p className="font-semibold text-gray-900">Add Service</p>
-                  <p className="text-sm text-gray-500">Create new service</p>
+                  {servicesInfo.limitReached ? (
+                    <p className="text-sm text-red-500">Reched max services</p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Create new service</p>
+                  )}
                 </div>
               </Link>
               <Link
@@ -605,6 +423,17 @@ const StoreDashboard = () => {
             <div>
               <p className="font-semibold text-gray-900">Store Settings</p>
               <p className="text-sm text-gray-500">Manage store</p>
+            </div>
+          </Link>
+
+          <Link
+            to={`/store/${store._id}`}
+            className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
+          >
+            <Store className="w-8 h-8 text-black" />
+            <div>
+              <p className="font-semibold text-gray-900">View My Store</p>
+              <p className="text-sm text-gray-500">{store.name}</p>
             </div>
           </Link>
         </div>
@@ -721,30 +550,34 @@ const StoreDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Orders</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {stats.totalOrders}
-                </p>
-              </div>
-              <Package className="w-8 h-8 text-blue-500" />
-            </div>
-          </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Bookings</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {stats.totalBookings}
-                </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {store?.type === "product" && (
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Total Orders</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {stats.totalOrders}
+                  </p>
+                </div>
+                <Package className="w-8 h-8 text-blue-500" />
               </div>
-              <Calendar className="w-8 h-8 text-green-500" />
             </div>
-          </div>
+          )}
+          {store?.type === "service" && (
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Total Bookings</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {stats.totalBookings}
+                  </p>
+                </div>
+                <Calendar className="w-8 h-8 text-green-500" />
+              </div>
+            </div>
+          )}
 
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
@@ -763,7 +596,7 @@ const StoreDashboard = () => {
               <div>
                 <p className="text-sm text-gray-500">Store Rating</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {store?.rating || 4.5}
+                  {store?.rating || 0}
                 </p>
               </div>
               <TrendingUp className="w-8 h-8 text-purple-500" />
@@ -1198,7 +1031,7 @@ const StoreDashboard = () => {
                       </select>
                     </div>
                   )}
-                  {store?.type === "product" && (
+                  {store?.type === "product" && limitsInfo.itemVariants && (
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Color Variants
@@ -1288,7 +1121,7 @@ const StoreDashboard = () => {
                       </button>
                     </div>
                   )}
-                  {store?.type === "product" && (
+                  {store?.type === "product" && limitsInfo.itemVariants && (
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Size Variants

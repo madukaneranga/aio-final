@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Star,
   Store,
@@ -20,7 +20,7 @@ const StoreCard = ({ store }) => {
   useEffect(() => {
     const fetchCount = async () => {
       try {
-        const response = await fetch(`/api/stores/${store_id}/product-count`);
+        const response = await fetch(`/api/stores/${store._id}/product-count`);
         const data = await response.json();
         setProductCount(data.count);
       } catch (err) {
@@ -145,13 +145,10 @@ const StoreCard = ({ store }) => {
             <div className="p-3 sm:p-4">
               {/* Store Name */}
               <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-black transition-all duration-300 leading-tight text-sm sm:text-base">
-                {store.name}
+                {store.name.length > 40
+                  ? `${store.name.slice(0, 40)}...`
+                  : store.name}
               </h3>
-
-              {/* Description - Hidden on mobile */}
-              <p className="hidden sm:block text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
-                {store.description}
-              </p>
 
               {/* Rating & Sales */}
               <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -199,13 +196,13 @@ const StoreCard = ({ store }) => {
               </div>
 
               {/* Quick View Button */}
-              {user?.role === "customer" && store.isActive && (
+              {user && store.isActive && (
                 <button
                   onClick={handleQuickView}
                   className="w-full bg-black text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold transition-all duration-300 hover:bg-gray-900 hover:shadow-2xl transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-300 tracking-wide text-xs sm:text-sm"
                 >
-                  <span className="hidden sm:inline">VISIT STORE</span>
-                  <span className="sm:hidden">VISIT</span>
+                  <span className="hidden sm:inline">QUICK VIEW</span>
+                  <span className="sm:hidden">VIEW</span>
                 </button>
               )}
             </div>

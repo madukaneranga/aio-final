@@ -42,7 +42,7 @@ const Header = () => {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/products?search=${searchQuery}`);
-      setSearchQuery("");
+      //setSearchQuery("");
     }
   };
 
@@ -166,7 +166,7 @@ const Header = () => {
 
             {/* Search Bar */}
             <form
-              onSubmit={handleSearch}
+              onChange={handleSearch}
               className="hidden lg:flex items-center space-x-2"
             >
               <div className="relative">

@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 
+
 // --- Express setup ---
 const app = express();
 
@@ -46,6 +47,9 @@ import packageRoutes from "./routes/packages.js";
 import sitemapRoutes from "./routes/sitemap.js";
 import walletRoutes from "./routes/wallet.js";
 import adminRoutes from "./routes/admin.js";
+import analyticsRoutes from "./routes/analytics.js";
+import emailSubscriptionRoutes from "./routes/emailSubscriptions.js";
+import categoriesRoutes from "./routes/categories.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 console.log("Registering API routes");
@@ -65,7 +69,11 @@ app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/sitemap.xml", sitemapRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/email-subscriptions", emailSubscriptionRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/categories", categoriesRoutes);
+
 
 // React frontend serving
 const distPath = path.resolve(__dirname, "../dist");

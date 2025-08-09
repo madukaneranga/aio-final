@@ -1,14 +1,39 @@
 import React, { useEffect, useState } from "react";
 import Pricing from "../components/Pricing";
+import { getUsageViolations } from "../utils/helpers";
+import ViolationSummary from "../components/ViolationSummary";
+import { set } from "mongoose";
 
 // Main Subscription Management Component
 const SubscriptionManagement = () => {
   const [subscription, setSubscription] = useState(null);
+  const [usageData, setUsageData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [subPackage, setSubPackage] = useState("");
+  const [selectedPackage, setSelectedPackage] = useState("");
   const [view, setView] = useState("overview"); // overview, packages, billing
-  const [billingHistory, setBillingHistory] = useState([]);
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  const [packages, setPackages] = useState(null);
+  const [currentPackage, setCurrentPackage] = useState(null);
+  const [violations, setViolations] = useState(null);
+
+  const checkViolations = (newPlan) => {
+    const newLimits = {
+      items: newPlan.items,
+      itemImages: newPlan.itemImages,
+      headerImages: newPlan.headerImages,
+      itemVariants: newPlan.itemVariants,
+    };
+
+    const usage = {
+      products: usageData.usageInfo.productsInfo,
+      services: usageData.usageInfo.servicesInfo,
+      headerImages: usageData.usageInfo.headerImagesInfo,
+      variants: usageData.usageInfo.variantsInfo,
+    };
+
+    return getUsageViolations(usage, newLimits);
+  };
 
   // Fetch current subscription
   const fetchSubscription = async () => {
@@ -21,11 +46,11 @@ const SubscriptionManagement = () => {
           },
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
-        setSubscription(data);
-        setSubPackage(data.package || "");
+        setSubscription(data.subscription);
+        setSelectedPackage(data.package.name || "");
       } else {
         setSubscription(null);
       }
@@ -33,7 +58,155 @@ const SubscriptionManagement = () => {
       console.error("Error fetching subscription:", error);
       setSubscription(null);
     } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchPackages = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/packages/`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch packages");
+      const data = await res.json();
+      setPackages(data);
+    } catch (err) {
+      console.error("Error:", err);
+    } finally {
+    }
+  };
+
+  const fetchCurrentPackage = async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/packages/user-package`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (!res.ok) throw new Error("Failed to fetch packages");
+      const data = await res.json();
+      setCurrentPackage(data);
+    } catch (err) {
+      console.error("Error:", err);
+    } finally {
+    }
+  };
+
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const [subscription, currentPackage, packages, usage] =
+          await Promise.all([
+            fetchSubscription(),
+            fetchCurrentPackage(),
+            fetchPackages(),
+            fetchUserUsage(),
+          ]);
+      } catch (e) {
+        console.error("Error loading subscription data:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAll();
+  }, []);
+
+  const handleSelectPlan = (selectedPackage) => {
+    if (!packages || !Array.isArray(packages)) {
+      console.warn("⚠️ Packages not yet loaded.");
+      return;
+    }
+
+    const selectedPkg = packages.find((pkg) => pkg.name === selectedPackage);
+
+    if (!selectedPkg) {
+      console.warn("⚠️ Selected package not found.");
+      return;
+    }
+
+    // 🟡 If there's no currentPackage, assume this is a new subscription
+    if (!currentPackage) {
+      setViolations(null);
+      setSelectedPackage(selectedPackage);
+      return;
+    }
+
+    const isDowngrade = selectedPkg.amount < currentPackage.amount;
+
+    if (isDowngrade) {
+      const result = checkViolations(selectedPkg);
+
+      if (Object.keys(result).length > 0) {
+        setViolations(result); // ❌ Block downgrade
+        return;
+      }
+
+      setViolations(null); // ✅ No violations
+    } else {
+      setViolations(null); // Upgrade
+    }
+
+    setSelectedPackage(selectedPackage);
+  };
+
+  useEffect(() => {
+    if (!packages || !Array.isArray(packages)) return;
+    if (!selectedPackage) return;
+    handleSelectPlan(selectedPackage);
+  }, [selectedPackage, packages]);
+
+  const handleCancelSubscription = () => {
+    const freeLimits = {
+      items: 0,
+      itemImages: 0,
+      headerImages: 0,
+      itemVariants: false,
+    };
+
+    const usage = {
+      products: usageData.usageInfo.productsInfo,
+      services: usageData.usageInfo.servicesInfo,
+      headerImages: usageData.usageInfo.headerImagesInfo,
+      variants: usageData.usageInfo.variantsInfo,
+    };
+
+    //console.log("usage", usage);
+
+    const result = getUsageViolations(usage, freeLimits);
+
+    if (Object.keys(result).length > 0) {
+      setViolations(result);
+      return; // ❌ Block cancel
+    }
+
+    setViolations(null);
+    // ✅ Proceed with cancel API call here
+  };
+
+  const fetchUserUsage = async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/usage-summary`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to fetch usage summary");
+
+      const data = await res.json();
+      //console.log("usage summary", data);
+      setUsageData(data);
+    } catch (error) {
+      console.error("Error loading usage data:", e);
+    } finally {
     }
   };
 
@@ -83,7 +256,7 @@ const SubscriptionManagement = () => {
 
   // Create new subscription
   const createSubscription = async () => {
-    if (!subPackage) {
+    if (!selectedPackage) {
       alert("Please select a package first.");
       return;
     }
@@ -97,7 +270,7 @@ const SubscriptionManagement = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: JSON.stringify({ packageName: subPackage }),
+          body: JSON.stringify({ packageName: selectedPackage }),
         }
       );
 
@@ -110,7 +283,9 @@ const SubscriptionManagement = () => {
         setView("overview");
       } else {
         const errorData = await response.json();
-        alert("Subscription setup failed: " + (errorData?.error || "Unknown error"));
+        alert(
+          "Subscription setup failed: " + (errorData?.error || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Subscription error:", error);
@@ -120,7 +295,7 @@ const SubscriptionManagement = () => {
 
   // Handle package upgrade/downgrade
   const handlePackageUpgrade = async () => {
-    if (!subPackage || subPackage === subscription?.package) {
+    if (!selectedPackage || selectedPackage === subscription?.package) {
       alert("Please select a different package.");
       return;
     }
@@ -134,14 +309,16 @@ const SubscriptionManagement = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: JSON.stringify({ packageName: subPackage }),
+          body: JSON.stringify({ packageName: selectedPackage }),
         }
       );
 
       const result = await response.json();
 
       if (response.status === 403 && result.nextAvailableDowngradeDate) {
-        const formattedDate = new Date(result.nextAvailableDowngradeDate).toLocaleDateString("en-US", {
+        const formattedDate = new Date(
+          result.nextAvailableDowngradeDate
+        ).toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
           day: "numeric",
@@ -166,7 +343,7 @@ const SubscriptionManagement = () => {
       }
 
       setSubscription(result.updatedSubscription || result);
-      alert(`✅ Successfully updated to: ${subPackage.toUpperCase()}`);
+      alert(`✅ Successfully updated to: ${selectedPackage.toUpperCase()}`);
       setView("overview");
     } catch (error) {
       console.error("❌ Upgrade Error:", error);
@@ -193,17 +370,16 @@ const SubscriptionManagement = () => {
         setShowCancelModal(false);
       } else {
         const errorData = await response.json();
-        alert("Failed to cancel subscription: " + (errorData?.error || "Unknown error"));
+        alert(
+          "Failed to cancel subscription: " +
+            (errorData?.error || "Unknown error")
+        );
       }
     } catch (error) {
       console.error("Cancel error:", error);
       alert("Error cancelling subscription. Please try again.");
     }
   };
-
-  useEffect(() => {
-    fetchSubscription();
-  }, []);
 
   if (loading) {
     return (
@@ -256,7 +432,9 @@ const SubscriptionManagement = () => {
               <>
                 {/* Current Subscription */}
                 <div className="bg-gray-50 rounded-2xl p-8">
-                  <h2 className="text-2xl font-light text-black mb-6">Current Subscription</h2>
+                  <h2 className="text-2xl font-light text-black mb-6">
+                    Current Subscription
+                  </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <h3 className="text-lg font-medium text-black mb-2">
@@ -266,9 +444,20 @@ const SubscriptionManagement = () => {
                         LKR {subscription.amount?.toLocaleString()}/month
                       </p>
                       <div className="space-y-2 text-sm text-gray-600">
-                        <p><span className="font-medium">Status:</span> {subscription.status}</p>
-                        <p><span className="font-medium">Started:</span> {new Date(subscription.startDate).toLocaleDateString()}</p>
-                        <p><span className="font-medium">Next Billing:</span> {new Date(subscription.endDate).toLocaleDateString()}</p>
+                        <p>
+                          <span className="font-medium">Status:</span>{" "}
+                          {subscription.status}
+                        </p>
+                        <p>
+                          <span className="font-medium">Started:</span>{" "}
+                          {new Date(
+                            subscription.startDate
+                          ).toLocaleDateString()}
+                        </p>
+                        <p>
+                          <span className="font-medium">Next Billing:</span>{" "}
+                          {new Date(subscription.endDate).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-col space-y-3">
@@ -279,7 +468,10 @@ const SubscriptionManagement = () => {
                         Upgrade / Change Plan
                       </button>
                       <button
-                        onClick={() => setShowCancelModal(true)}
+                        onClick={() => {
+                          setShowCancelModal(true);
+                          handleCancelSubscription();
+                        }}
                         className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
                       >
                         Cancel Subscription
@@ -291,7 +483,9 @@ const SubscriptionManagement = () => {
             ) : (
               /* No Subscription */
               <div className="text-center py-12">
-                <h2 className="text-3xl font-light text-black mb-4">No Active Subscription</h2>
+                <h2 className="text-3xl font-light text-black mb-4">
+                  No Active Subscription
+                </h2>
                 <p className="text-lg text-gray-600 mb-8">
                   Choose a plan to get started with your subscription
                 </p>
@@ -308,15 +502,17 @@ const SubscriptionManagement = () => {
 
         {view === "packages" && (
           <div>
-            <Pricing 
-              subPackage={subPackage} 
-              setSubPackage={setSubPackage} 
+            <Pricing
+              selectedPackage={selectedPackage}
+              setSelectedPackage={setSelectedPackage}
               isUpgrade={!!subscription}
             />
             <div className="text-center mt-8">
               <button
-                onClick={subscription ? handlePackageUpgrade : createSubscription}
-                disabled={!subPackage}
+                onClick={
+                  subscription ? handlePackageUpgrade : createSubscription
+                }
+                disabled={!selectedPackage}
                 className="bg-black text-white px-12 py-4 rounded-lg font-medium text-lg hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {subscription ? "Update Subscription" : "Start Subscription"}
@@ -333,10 +529,18 @@ const SubscriptionManagement = () => {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Method
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -349,14 +553,18 @@ const SubscriptionManagement = () => {
                           LKR {payment.amount?.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            payment.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              payment.status === "completed"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
                             {payment.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {payment.method || 'PayHere'}
+                          {payment.method || "PayHere"}
                         </td>
                       </tr>
                     ))}
@@ -376,19 +584,27 @@ const SubscriptionManagement = () => {
       {showCancelModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-            <h3 className="text-2xl font-light text-black mb-4">Cancel Subscription</h3>
+            <h3 className="text-2xl font-light text-black mb-4">
+              Cancel Subscription
+            </h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to cancel your subscription? This action cannot be undone.
+              Are you sure you want to cancel your subscription? This action
+              cannot be undone.
             </p>
             <div className="flex space-x-4">
               <button
-                onClick={cancelSubscription}
+                onClick={() => {
+                  cancelSubscription();
+                  handleCancelSubscription();
+                }}
                 className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors"
               >
                 Yes, Cancel
               </button>
               <button
-                onClick={() => setShowCancelModal(false)}
+                onClick={() => {
+                  setShowCancelModal(false);
+                }}
                 className="flex-1 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
               >
                 Keep Subscription
@@ -397,6 +613,20 @@ const SubscriptionManagement = () => {
           </div>
         </div>
       )}
+
+      {/* Cancel Confirmation Modal */}
+      {violations && (
+        
+        <div className="flex justify-center px-4">
+          <div className="w-full max-w-md">
+            <ViolationSummary violations={violations} />
+          </div>
+        </div>
+      )}
+
+
+
+      
     </div>
   );
 };

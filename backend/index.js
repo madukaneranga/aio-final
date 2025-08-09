@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+dotenv.config();
 import http from "http";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
@@ -6,7 +7,9 @@ import { Server } from "socket.io";
 import { setSocketInstance } from "./utils/socketUtils.js";
 import app from "./app.js";
 
-dotenv.config();
+
+
+console.log("Loaded RESEND_API_KEY:", process.env.RESEND_API_KEY);
 
 const SECRET = process.env.JWT_SECRET;
 

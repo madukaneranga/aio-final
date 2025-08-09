@@ -95,7 +95,7 @@ const storeSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: true,
+    default: false,
   },
   // NEW FIELDS ADDED FROM defaultStore
   isPremium: {

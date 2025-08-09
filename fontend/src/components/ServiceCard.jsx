@@ -134,13 +134,10 @@ const ServiceCard = ({ service }) => {
 
               {/* Title */}
               <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-black transition-all duration-300 leading-tight text-sm sm:text-base">
-                {service.title}
+                {service.title.length > 35
+                  ? `${service.title.slice(0, 35)}...`
+                  : service.title}
               </h3>
-
-              {/* Description - Hidden on mobile */}
-              <p className="hidden sm:block text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
-                {service.description}
-              </p>
 
               {/* Price Section */}
               <div className="flex items-baseline gap-2 mb-2 sm:mb-3">
