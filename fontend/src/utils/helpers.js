@@ -1,3 +1,22 @@
+
+import {
+  Instagram,
+  Twitter,
+  Facebook,
+  Youtube,
+  Linkedin,
+  MessageCircle, // WhatsApp
+  Send, // Telegram
+  Camera, // Snapchat
+  Music, // TikTok
+  Hash, // Pinterest (using Hash as placeholder)
+  Globe, // Website
+  Phone, // Viber
+  Zap, // Discord
+  Github,
+  Twitch,
+
+} from "lucide-react";
 // Format currency
 export const formatCurrency = (amount, currency = 'LKR') => {
   return new Intl.NumberFormat('en-US', {
@@ -133,6 +152,7 @@ export const defaultImages = {
   service: 'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop',
   store: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop',
   user: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop'
+
 };
 
 //violations  check
@@ -164,4 +184,61 @@ export const getUsageViolations = (usage, newLimits) => {
   }
 
   return violations;
+};
+
+
+export const extractSocialInfo = (url) => {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    const pathname = urlObj.pathname;
+
+    // Instagram
+    if (hostname.includes('instagram.com')) {
+      const username = pathname.split('/')[1];
+      return { platform: 'instagram', username };
+    }
+    
+    // Twitter/X
+    if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+      const username = pathname.split('/')[1];
+      return { platform: 'twitter', username };
+    }
+    
+    // Facebook
+    if (hostname.includes('facebook.com')) {
+      const username = pathname.split('/')[1];
+      return { platform: 'facebook', username };
+    }
+    
+    // YouTube
+    if (hostname.includes('youtube.com')) {
+      const username = pathname.replace('/@', '').replace('/', '');
+      return { platform: 'youtube', username };
+    }
+    
+    // TikTok
+    if (hostname.includes('tiktok.com')) {
+      const username = pathname.replace('/@', '').replace('/', '');
+      return { platform: 'tiktok', username };
+    }
+    
+    // WhatsApp
+    if (hostname.includes('wa.me')) {
+      const phone = pathname.replace('/', '');
+      return { platform: 'whatsapp', username: phone };
+    }
+    
+    // Snapchat
+    if (hostname.includes('snapchat.com')) {
+      const username = pathname.replace('/add/', '');
+      return { platform: 'snapchat', username };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error parsing URL:', url, error);
+    return null;
+  }
+
 };

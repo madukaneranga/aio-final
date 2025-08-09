@@ -23,6 +23,11 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
+  socialLinks: [
+    {
+      type: String,
+    },
+  ],
   idImages: [
     {
       type: String,
@@ -33,7 +38,6 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
-
   profileImage: {
     type: String,
     default: "",
@@ -74,8 +78,11 @@ const storeSchema = new mongoose.Schema({
       type: String,
       required: true,
     },
+    whatsapp: {
+      type: String,
+      required: false,
+    },
   },
-
   rating: {
     type: Number,
     default: 0,
@@ -90,6 +97,79 @@ const storeSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // NEW FIELDS ADDED FROM defaultStore
+  isPremium: {
+    type: Boolean,
+    default: false,
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  isFeatured: {
+    type: Boolean,
+    default: false,
+  },
+  storeLevel: {
+    type: String,
+    enum: ["Bronze", "Silver", "Gold", "Premium"],
+    default: "Bronze",
+  },
+  responseTime: {
+    type: String,
+    default: "24 hours",
+  },
+  completionRate: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100,
+  },
+  badges: [
+    {
+      type: String,
+    },
+  ],
+  operatingHours: {
+    weekdays: {
+      type: String,
+      default: "9:00 AM - 6:00 PM",
+    },
+    weekends: {
+      type: String,
+      default: "10:00 AM - 4:00 PM",
+    },
+  },
+  shippingInfo: {
+    freeShipping: {
+      type: Boolean,
+      default: false,
+    },
+    deliveryTime: {
+      type: String,
+      default: "3-5 business days",
+    },
+    areas: [
+      {
+        type: String,
+      },
+    ],
+  },
+  stats: {
+    totalOrders: {
+      type: Number,
+      default: 0,
+    },
+    repeatCustomers: {
+      type: Number,
+      default: 0,
+    },
+    avgOrderValue: {
+      type: Number,
+      default: 0,
+    },
+  },
+
   createdAt: {
     type: Date,
     default: Date.now,
