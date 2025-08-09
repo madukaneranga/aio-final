@@ -23,6 +23,11 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
+  socialLinks: [
+    {
+      type: String,
+    },
+  ],
   idImages: [
     {
       type: String,
@@ -33,7 +38,6 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
-
   profileImage: {
     type: String,
     default: "",
@@ -74,8 +78,11 @@ const storeSchema = new mongoose.Schema({
       type: String,
       required: true,
     },
+    whatsapp: {
+      type: String,
+      required: false,
+    },
   },
-
   rating: {
     type: Number,
     default: 0,
@@ -89,6 +96,19 @@ const storeSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true,
+  },
+  // NEW FIELDS ADDED FROM defaultStore
+  isPremium: {
+    type: Boolean,
+    default: false,
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  isFeatured: {
+    type: Boolean,
+    default: false,
   },
   createdAt: {
     type: Date,
