@@ -152,8 +152,7 @@ export const defaultImages = {
   service: 'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop',
   store: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop',
   user: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop'
-<<<<<<< Updated upstream
-=======
+
 };
 
 //violations  check
@@ -240,5 +239,5 @@ export const extractSocialInfo = (url) => {
     console.error('Error parsing URL:', url, error);
     return null;
   }
->>>>>>> Stashed changes
+
 };

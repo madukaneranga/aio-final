@@ -110,65 +110,6 @@ const storeSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  storeLevel: {
-    type: String,
-    enum: ["Bronze", "Silver", "Gold", "Premium"],
-    default: "Bronze",
-  },
-  responseTime: {
-    type: String,
-    default: "24 hours",
-  },
-  completionRate: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 100,
-  },
-  badges: [
-    {
-      type: String,
-    },
-  ],
-  operatingHours: {
-    weekdays: {
-      type: String,
-      default: "9:00 AM - 6:00 PM",
-    },
-    weekends: {
-      type: String,
-      default: "10:00 AM - 4:00 PM",
-    },
-  },
-  shippingInfo: {
-    freeShipping: {
-      type: Boolean,
-      default: false,
-    },
-    deliveryTime: {
-      type: String,
-      default: "3-5 business days",
-    },
-    areas: [
-      {
-        type: String,
-      },
-    ],
-  },
-  stats: {
-    totalOrders: {
-      type: Number,
-      default: 0,
-    },
-    repeatCustomers: {
-      type: Number,
-      default: 0,
-    },
-    avgOrderValue: {
-      type: Number,
-      default: 0,
-    },
-  },
   createdAt: {
     type: Date,
     default: Date.now,
