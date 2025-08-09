@@ -46,7 +46,7 @@ import Maintenance from "./pages/Maintenance";
 import "./App.css";
 
 // Toggle this to enable/disable maintenance
-const maintenanceMode = true;
+const maintenanceMode = false;
 
 function App() {
   return (
