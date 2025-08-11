@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X } from "lucide-react";
 import ProductListing from "../components/ProductListing";
 
 const Products = () => {
+  // URL parameter hooks
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
   // Product data state
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,14 +31,66 @@ const Products = () => {
     subcategories.find((sub) => sub.name === selectedSubcategory)
       ?.childCategories || [];
 
+  // Read URL parameters and trigger search
   useEffect(() => {
-    fetchProducts(); // No filters on initial load
-  }, []);
+    const searchFromUrl = searchParams.get('search');
+    const categoryFromUrl = searchParams.get('category');
+    const subcategoryFromUrl = searchParams.get('subcategory');
+    const childCategoryFromUrl = searchParams.get('childCategory');
+    const minPriceFromUrl = searchParams.get('minPrice');
+    const maxPriceFromUrl = searchParams.get('maxPrice');
+    
+    console.log("=== URL PARAMS DEBUG ===");
+    console.log("Current URL:", location.pathname + location.search);
+    console.log("Search from URL:", searchFromUrl);
+    console.log("All URL params:", Object.fromEntries(searchParams.entries()));
+    
+    // Set state from URL parameters
+    if (searchFromUrl) {
+      setSearchQuery(searchFromUrl);
+    }
+    if (categoryFromUrl) {
+      setSelectedCategory(categoryFromUrl);
+    }
+    if (subcategoryFromUrl) {
+      setSelectedSubcategory(subcategoryFromUrl);
+    }
+    if (childCategoryFromUrl) {
+      setSelectedChildCategory(childCategoryFromUrl);
+    }
+    if (minPriceFromUrl || maxPriceFromUrl) {
+      setPriceRange({ 
+        min: minPriceFromUrl || "", 
+        max: maxPriceFromUrl || "" 
+      });
+    }
+    
+    // Trigger search with URL parameters
+    if (searchFromUrl || categoryFromUrl || subcategoryFromUrl || childCategoryFromUrl || minPriceFromUrl || maxPriceFromUrl) {
+      const filters = {
+        search: searchFromUrl || "",
+        category: categoryFromUrl || "",
+        subcategory: subcategoryFromUrl || "",
+        childCategory: childCategoryFromUrl || "",
+        minPrice: minPriceFromUrl || "",
+        maxPrice: maxPriceFromUrl || "",
+      };
+      
+      console.log("Fetching products with URL filters:", filters);
+      fetchProducts(filters);
+    } else {
+      // No URL params, fetch all products
+      fetchProducts();
+    }
+  }, [searchParams, location]);
 
   const fetchProducts = async (filters = {}) => {
     try {
       setLoading(true);
       setError("");
+      
+      console.log("Fetching products with filters:", filters);
+      
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/products/listing`,
         {
@@ -47,9 +104,11 @@ const Products = () => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Products fetched:", data.length, "items");
         setProducts(data);
       } else {
         setError("Failed to fetch products");
+        console.error("API Error:", response.status, response.statusText);
       }
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -87,6 +146,7 @@ const Products = () => {
       maxPrice: priceRange.max,
     };
 
+    console.log("Manual search with filters:", filters);
     fetchProducts(filters);
   };
 
@@ -109,7 +169,13 @@ const Products = () => {
       priceRange.max
   );
 
-  // TODO: Replace this with your CategoryTreeMenu logic
+  // Temporary test function - remove this after testing
+  const testSearch = () => {
+    console.log("Testing manual search with query:", searchQuery);
+    fetchProducts({ search: searchQuery });
+  };
+
+  // Category tree menu logic
   const CategoryTreeMenuLogic = () => {
     return (
       <div>
@@ -179,6 +245,14 @@ const Products = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Products</h1>
 
+          {/* Temporary Test Button - Remove after testing 
+          <button 
+            onClick={testSearch} 
+            className="bg-red-500 text-white p-2 m-2 rounded"
+          >
+            Test Search: "{searchQuery}"
+          </button>
+
           {/* Search Filters */}
           <div className="space-y-4">
             {/* Breadcrumb */}
@@ -214,7 +288,7 @@ const Products = () => {
             )}
 
             {/* Search Bar */}
-            <div className="flex gap-2">
+            <form onSubmit={handleSearch} className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -222,6 +296,7 @@ const Products = () => {
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
+                    console.log("Search query changed to:", e.target.value);
                   }}
                   placeholder="Search products..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
@@ -229,8 +304,7 @@ const Products = () => {
               </div>
 
               <button
-                type="button"
-                onClick={handleSearch}
+                type="submit"
                 className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
               >
                 Search
@@ -262,7 +336,7 @@ const Products = () => {
                   </span>
                 )}
               </button>
-            </div>
+            </form>
 
             {/* Filters Panel */}
             {showFilters && (
@@ -334,6 +408,17 @@ const Products = () => {
         </div>
       </div>
 
+      {/* Debug Info - Remove after testing 
+      <div className="bg-yellow-100 p-4 m-4 rounded">
+        <h3 className="font-bold">Debug Info:</h3>
+        <p>Current URL: {location.pathname + location.search}</p>
+        <p>Search Query State: "{searchQuery}"</p>
+        <p>URL Search Param: "{searchParams.get('search')}"</p>
+        <p>Products Count: {products.length}</p>
+        <p>Loading: {loading.toString()}</p>
+        <p>Error: {error || "None"}</p>
+      </div>
+*/}
       {/* Products Content */}
       <ProductListing
         products={products}
