@@ -36,7 +36,24 @@ const upload = multer({
 // Get all services
 router.get("/", async (req, res) => {
   try {
-    const services = await Service.find({ isActive: true })
+    const { category, search, minPrice, maxPrice, storeId } = req.query;
+    let query = { isActive: true };
+
+    if (category) query.category = category;
+    if (storeId) query.storeId = storeId;
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+
+    const services = await Service.find(query)
       .populate("storeId", "name type")
       .sort({ createdAt: -1 });
 

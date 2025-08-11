@@ -34,10 +34,35 @@ const upload = multer({
   },
 });
 
-// Get all active products (no filters)
+// Get all active products 
 router.get("/", async (req, res) => {
   try {
-    const products = await Product.find({ isActive: true })
+    const { category, search, minPrice, maxPrice, storeId } = req.query;
+    let query = { isActive: true };
+
+    console.log("Received search request:", {
+      category,
+      search,
+      minPrice,
+      maxPrice,
+      storeId,
+    });
+
+    if (category) query.category = category;
+    if (storeId) query.storeId = storeId;
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+
+    const products = await Product.find(query)
       .populate("storeId", "name type")
       .sort({ createdAt: -1 });
 
@@ -61,17 +86,7 @@ router.post("/listing", async (req, res) => {
     } = req.body;
 
     const query = { isActive: true };
-
-    console.log("Received search request:", {
-      category,
-      categoryId,
-      subcategory,
-      childCategory,
-      search,
-      minPrice,
-      maxPrice,
-    });
-
+    
     if (category) query.category = category;
     if (categoryId) query.categoryId = categoryId;
     if (subcategory) query.subcategory = subcategory;

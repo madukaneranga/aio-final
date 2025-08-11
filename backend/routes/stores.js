@@ -38,15 +38,27 @@ const upload = multer({
 // Get all stores
 router.get("/", async (req, res) => {
   try {
-    const stores = await Product.find({ isActive: true })
-      .populate("ownerId", "name type")
-      .sort({ createdAt: -1 });
+    const { type, search, category } = req.query;
+    let query = { isActive: true };
+
+    if (type) query.type = type;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const stores = await Store.find(query)
+      .populate("ownerId", "name")
+      .sort({ rating: -1, totalSales: -1 });
 
     res.json(stores);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // Search/filter stores via POST
 router.post("/listing", async (req, res) => {

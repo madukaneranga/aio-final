@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Search, Filter, X } from "lucide-react";
-import ProductListing from "../components/ProductListing";
+import ServiceListing from "../components/ServiceListing";
 
-const Products = () => {
-  // Product data state
-  const [products, setProducts] = useState([]);
+const Services = () => {
+  // Service data state
+  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [categories, setCategories] = useState([]);
@@ -27,15 +27,15 @@ const Products = () => {
       ?.childCategories || [];
 
   useEffect(() => {
-    fetchProducts(); // No filters on initial load
+    fetchServices(); // No filters on initial load
   }, []);
 
-  const fetchProducts = async (filters = {}) => {
+  const fetchServices = async (filters = {}) => {
     try {
       setLoading(true);
       setError("");
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/listing`,
+        `${import.meta.env.VITE_API_URL}/api/services/listing`,
         {
           method: "POST",
           headers: {
@@ -47,12 +47,12 @@ const Products = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setProducts(data);
+        setServices(data);
       } else {
-        setError("Failed to fetch products");
+        setError("Failed to fetch services");
       }
     } catch (error) {
-      console.error("Error fetching products:", error);
+      console.error("Error fetching services:", error);
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -87,7 +87,7 @@ const Products = () => {
       maxPrice: priceRange.max,
     };
 
-    fetchProducts(filters);
+    fetchServices(filters);
   };
 
   const clearFilters = () => {
@@ -97,7 +97,7 @@ const Products = () => {
     setSelectedSubcategory("");
     setSelectedChildCategory("");
     setPriceRange({ min: "", max: "" });
-    fetchProducts({});
+    fetchServices({});
   };
 
   const hasActiveFilters = Boolean(
@@ -177,7 +177,7 @@ const Products = () => {
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Products</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Services</h1>
 
           {/* Search Filters */}
           <div className="space-y-4">
@@ -223,7 +223,7 @@ const Products = () => {
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                   }}
-                  placeholder="Search products..."
+                  placeholder="Search services..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                 />
               </div>
@@ -334,9 +334,9 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Products Content */}
-      <ProductListing
-        products={products}
+      {/* Services Content */}
+      <ServiceListing
+        services={services}
         loading={loading}
         error={error}
       />
@@ -344,4 +344,4 @@ const Products = () => {
   );
 };
 
-export default Products;
+export default Services;
