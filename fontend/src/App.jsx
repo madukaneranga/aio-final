@@ -7,9 +7,9 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
-import StoreList from "./pages/StoreList";
-import ProductList from "./pages/ProductList";
-import ServiceList from "./pages/ServiceList";
+import Stores from "./pages/Stores";
+import Products from "./pages/Products";
+import Services from "./pages/Services";
 import ProductDetail from "./pages/ProductDetail";
 import ServiceDetail from "./pages/ServiceDetail";
 import StoreDetail from "./pages/StoreDetail";
@@ -66,12 +66,11 @@ function App() {
                     <Header />
                     <main className="flex-1">
                       <ScrollToTop />
-                      <ScrollToTopButton />
                       <Routes>
                         <Route path="/" element={<Home />} />
-                        <Route path="/stores" element={<StoreList />} />
-                        <Route path="/products" element={<ProductList />} />
-                        <Route path="/services" element={<ServiceList />} />
+                        <Route path="/stores" element={<Stores />} />
+                        <Route path="/products" element={<Products />} />
+                        <Route path="/services" element={<Services />} />
                         <Route
                           path="/product/:id"
                           element={<ProductDetail />}
@@ -150,7 +149,7 @@ function App() {
                           element={<SubscriptionManagement />}
                         />
                         <Route
-                          path="/test/:id"
+                          path="/test"
                           element={<Test />}
                         />
                         <Route
@@ -160,7 +159,9 @@ function App() {
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </main>
+                   
                     <Footer />
+                     <ScrollToTopButton />
                   </>
                 )}
               </div>

@@ -86,7 +86,7 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
 
   const storeData = { ...defaultStore, ...store };
   const userData = { ...defaultUser, ...user };
-  const reviewsData = reviews.length > 0 ? reviews : Array(127).fill({});
+  const reviewsData = reviews.length > 0 ? reviews : Array(0).fill({});
 
   const isColorLight = (color) => {
     const getRGB = (color) => {

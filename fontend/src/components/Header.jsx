@@ -38,13 +38,29 @@ const Header = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // This should ONLY update state, not trigger search
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    console.log("User typed:", value);
+    // DON'T call handleSearch here!
+  };
+
+  // This should ONLY run on form submit
   const handleSearch = (e) => {
     e.preventDefault();
+    console.log("Form submitted - searching for:", searchQuery);
     if (searchQuery.trim()) {
-      navigate(`/products?search=${searchQuery}`);
-      //setSearchQuery("");
+      const searchUrl = `/products?search=${encodeURIComponent(searchQuery)}`;
+      console.log("Navigating to:", searchUrl);
+      navigate(searchUrl);
     }
   };
+
+  // Add this inside your component
+  useEffect(() => {
+    console.log("searchQuery state is now:", searchQuery);
+  }, [searchQuery]);
 
   const handleLogout = () => {
     logout();
@@ -91,7 +107,6 @@ const Header = () => {
         console.error(err.message);
       } finally {
         setIsSwitching(false);
-        
       }
     }, 4000); // wait 4s before switching
   };
@@ -122,12 +137,6 @@ const Header = () => {
             {/* Desktop Navigation */}
             <nav className="hidden md:flex space-x-8">
               <Link
-                to="/stores"
-                className="text-gray-700 hover:text-black transition-colors font-medium"
-              >
-                Stores
-              </Link>
-              <Link
                 to="/products"
                 className="text-gray-700 hover:text-black transition-colors font-medium"
               >
@@ -138,6 +147,12 @@ const Header = () => {
                 className="text-gray-700 hover:text-black transition-colors font-medium"
               >
                 Services
+              </Link>
+              <Link
+                to="/stores"
+                className="text-gray-700 hover:text-black transition-colors font-medium"
+              >
+                Stores
               </Link>
               {user?.role === "store_owner" && (
                 <Link
@@ -166,7 +181,7 @@ const Header = () => {
 
             {/* Search Bar */}
             <form
-              onChange={handleSearch}
+              onSubmit={handleSearch}
               className="hidden lg:flex items-center space-x-2"
             >
               <div className="relative">
@@ -174,7 +189,7 @@ const Header = () => {
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={handleInputChange}
                   placeholder="Search products & services..."
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent w-64"
                 />
