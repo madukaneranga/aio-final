@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X } from "lucide-react";
 import ProductListing from "../components/ProductListing";
-import FiltersSidebar from "../components/FilterSidebar";
+import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
 
 const Products = () => {
   // URL parameter hooks
@@ -17,7 +17,6 @@ const Products = () => {
 
   // Search filters state
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [selectedChildCategory, setSelectedChildCategory] = useState("");
@@ -25,7 +24,7 @@ const Products = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const selectedCategoryObj = categories.find(
-    (cat) => cat._id === selectedCategoryId
+    (cat) => cat.name === selectedCategory
   );
   const subcategories = selectedCategoryObj?.subcategories || [];
   const childCategories =
@@ -35,11 +34,6 @@ const Products = () => {
   // Read URL parameters and trigger search
   useEffect(() => {
     const searchFromUrl = searchParams.get("search");
-    const categoryFromUrl = searchParams.get("category");
-    const subcategoryFromUrl = searchParams.get("subcategory");
-    const childCategoryFromUrl = searchParams.get("childCategory");
-    const minPriceFromUrl = searchParams.get("minPrice");
-    const maxPriceFromUrl = searchParams.get("maxPrice");
 
     console.log("=== URL PARAMS DEBUG ===");
     console.log("Current URL:", location.pathname + location.search);
@@ -50,38 +44,10 @@ const Products = () => {
     if (searchFromUrl) {
       setSearchQuery(searchFromUrl);
     }
-    if (categoryFromUrl) {
-      setSelectedCategory(categoryFromUrl);
-    }
-    if (subcategoryFromUrl) {
-      setSelectedSubcategory(subcategoryFromUrl);
-    }
-    if (childCategoryFromUrl) {
-      setSelectedChildCategory(childCategoryFromUrl);
-    }
-    if (minPriceFromUrl || maxPriceFromUrl) {
-      setPriceRange({
-        min: minPriceFromUrl || "",
-        max: maxPriceFromUrl || "",
-      });
-    }
-
     // Trigger search with URL parameters
-    if (
-      searchFromUrl ||
-      categoryFromUrl ||
-      subcategoryFromUrl ||
-      childCategoryFromUrl ||
-      minPriceFromUrl ||
-      maxPriceFromUrl
-    ) {
+    if (searchFromUrl) {
       const filters = {
         search: searchFromUrl || "",
-        category: categoryFromUrl || "",
-        subcategory: subcategoryFromUrl || "",
-        childCategory: childCategoryFromUrl || "",
-        minPrice: minPriceFromUrl || "",
-        maxPrice: maxPriceFromUrl || "",
       };
 
       console.log("Fetching products with URL filters:", filters);
@@ -146,30 +112,22 @@ const Products = () => {
 
     const filters = {
       search: searchQuery,
-      categoryId: selectedCategoryId,
       category: selectedCategory,
       subcategory: selectedSubcategory,
       childCategory: selectedChildCategory,
       minPrice: priceRange.min,
       maxPrice: priceRange.max,
     };
-
-    console.log("Manual search with filters:", filters);
     fetchProducts(filters);
   };
 
-
-
   const hasActiveFilters = Boolean(
     searchQuery ||
-      selectedCategoryId ||
       selectedSubcategory ||
       selectedChildCategory ||
       priceRange.min ||
       priceRange.max
   );
-
-  
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -189,9 +147,7 @@ const Products = () => {
           {/* Search Filters */}
           <div className="space-y-4">
             {/* Breadcrumb */}
-            {(selectedCategoryId ||
-              selectedSubcategory ||
-              selectedChildCategory) && (
+            {(selectedSubcategory || selectedChildCategory) && (
               <nav
                 aria-label="breadcrumb"
                 className="text-sm text-gray-600 mt-2 select-none"
@@ -245,12 +201,10 @@ const Products = () => {
             </form>
 
             {/* Filters Side Drawer */}
-            <FiltersSidebar
+            <ProductsFiltersSidebar
               showFilters={showFilters}
               setShowFilters={setShowFilters}
-              categories={categories}
-              selectedCategoryId={selectedCategoryId}
-              setSelectedCategoryId={setSelectedCategoryId}
+              categorySet={categories}
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
               selectedSubcategory={selectedSubcategory}
@@ -308,7 +262,6 @@ const Products = () => {
               {
                 [
                   searchQuery,
-                  selectedCategoryId,
                   selectedSubcategory,
                   selectedChildCategory,
                   priceRange.min,

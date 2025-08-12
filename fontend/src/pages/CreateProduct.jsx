@@ -22,20 +22,25 @@ const CreateProduct = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [selectedChildCategory, setSelectedChildCategory] = useState("");
 
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const categories = [
-    "Electronics",
-    "Clothing",
-    "Home & Garden",
-    "Sports & Outdoors",
-    "Books",
-    "Beauty & Health",
-    "Toys & Games",
-    "Food & Beverages",
-  ];
+   const loadCategories = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      const data = await res.json();
+      setCategories(data);
+    } catch (err) {
+      console.error("Error loading categories:", err);
+    }
+  };
 
   // Variant handlers
   const addColor = () => {
@@ -110,8 +115,8 @@ const CreateProduct = () => {
     setError("");
 
     const compressionOptions = {
-      maxSizeMB: 0.5, 
-      maxWidthOrHeight: 1000, 
+      maxSizeMB: 0.5,
+      maxWidthOrHeight: 1000,
       useWebWorker: true,
     };
 

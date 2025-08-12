@@ -1,13 +1,11 @@
 // src/components/FiltersSidebar.jsx
 import React, { useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Star } from "lucide-react";
 
-const FiltersSidebar = ({
+const ProductsFiltersSidebar = ({
   showFilters,
   setShowFilters,
-  categories,
-  selectedCategoryId,
-  setSelectedCategoryId,
+  categorySet,
   selectedCategory,
   setSelectedCategory,
   selectedSubcategory,
@@ -17,9 +15,19 @@ const FiltersSidebar = ({
   priceRange,
   setPriceRange,
   handleSearch,
+  selectedStock,
+  setSelectedStock,
+  selectedRating,
+  setSelectedRating,
+  selectedShipping,
+  setSelectedShipping,
+  selectedCondition,
+  setSelectedCondition,
+  selectedWarrentyMonths,
+  setSelectedWarrentyMonths,
 }) => {
-  const selectedCategoryObj = categories.find(
-    (cat) => cat._id === selectedCategoryId
+  const selectedCategoryObj = categorySet.find(
+    (cat) => cat.name === selectedCategory
   );
   const subcategories = selectedCategoryObj?.subcategories || [];
 
@@ -27,13 +35,12 @@ const FiltersSidebar = ({
     (sub) => sub.name === selectedSubcategory
   );
 
-  const childCategories = (selectedSubcategoryObj?.childCategories || []).filter(
-    (child) => child && (child.name || typeof child === "string")
-  );
+  const childCategories = (
+    selectedSubcategoryObj?.childCategories || []
+  ).filter((child) => child && (child.name || typeof child === "string"));
 
   // Clear all filters
   const clearAllFilters = () => {
-    setSelectedCategoryId("");
     setSelectedCategory("");
     setSelectedSubcategory("");
     setSelectedChildCategory("");
@@ -85,37 +92,35 @@ const FiltersSidebar = ({
             </label>
 
             {/* Main Category */}
-            <select
-              value={selectedCategoryId}
-              onChange={(e) => {
-                const categoryId = e.target.value;
-                const category = categories.find((cat) => cat._id === categoryId);
 
-                setSelectedCategoryId(categoryId);
-                setSelectedCategory(category?.name || "");
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                const categoryValue = e.target.value;
+
+                setSelectedCategory(categoryValue || "");
                 setSelectedSubcategory(""); // Reset subcategory
                 setSelectedChildCategory(""); // Reset child category
 
                 handleSearch(); // Auto apply filter
               }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2"
             >
               <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat._id} value={cat._id}>
+              {categorySet.map((cat) => (
+                <option key={cat.name} value={cat.name}>
                   {cat.name}
                 </option>
               ))}
             </select>
-
             {/* Subcategory */}
-            {selectedCategoryId && subcategories.length > 0 && (
+            {selectedCategory && subcategories.length > 0 && (
               <select
                 value={selectedSubcategory}
                 onChange={(e) => {
                   const subcategoryValue = e.target.value;
 
-                  setSelectedSubcategory(subcategoryValue);
+                  setSelectedSubcategory(subcategoryValue || "");
                   setSelectedChildCategory(""); // Reset child category
 
                   handleSearch(); // Auto apply filter
@@ -125,7 +130,7 @@ const FiltersSidebar = ({
                 <option value="">All Subcategories</option>
                 {subcategories.map((sub, index) => (
                   <option
-                    key={`subcategory-${selectedCategoryId}-${index}`}
+                    key={`subcategory-${selectedCategory}-${index}`}
                     value={sub.name}
                   >
                     {sub.name}
@@ -140,7 +145,7 @@ const FiltersSidebar = ({
                 value={selectedChildCategory}
                 onChange={(e) => {
                   const childCategoryValue = e.target.value;
-                  setSelectedChildCategory(childCategoryValue);
+                  setSelectedChildCategory(childCategoryValue || "");
 
                   handleSearch(); // Auto apply filter
                 }}
@@ -148,7 +153,8 @@ const FiltersSidebar = ({
               >
                 <option value="">All Child Categories</option>
                 {childCategories.map((child, index) => {
-                  const childName = typeof child === "string" ? child : child.name;
+                  const childName =
+                    typeof child === "string" ? child : child.name;
                   const childValue =
                     typeof child === "string"
                       ? child
@@ -156,7 +162,7 @@ const FiltersSidebar = ({
 
                   return (
                     <option
-                      key={`childcategory-${selectedCategoryId}-${selectedSubcategory}-${index}`}
+                      key={`childcategory-${selectedCategory}-${selectedSubcategory}-${index}`}
                       value={childValue}
                     >
                       {childName}
@@ -181,7 +187,10 @@ const FiltersSidebar = ({
                 onChange={(e) =>
                   setPriceRange({
                     ...priceRange,
-                    min: e.target.value === "" ? "" : Math.max(0, Number(e.target.value)),
+                    min:
+                      e.target.value === ""
+                        ? ""
+                        : Math.max(0, Number(e.target.value)),
                   })
                 }
                 placeholder="Min"
@@ -195,13 +204,118 @@ const FiltersSidebar = ({
                 onChange={(e) =>
                   setPriceRange({
                     ...priceRange,
-                    max: e.target.value === "" ? "" : Math.max(0, Number(e.target.value)),
+                    max:
+                      e.target.value === ""
+                        ? ""
+                        : Math.max(0, Number(e.target.value)),
                   })
                 }
                 placeholder="Max"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               />
             </div>
+          </div>
+
+          {/* Stock Availability */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Stock Availability
+            </label>
+            <select
+              value={selectedStock}
+              onChange={(e) => {
+                setSelectedStock(e.target.value);
+                handleSearch();
+              }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            >
+              <option value="">All</option>
+              <option value="in-stock">In Stock</option>
+              <option value="out-of-stock">Out of Stock</option>
+            </select>
+          </div>
+
+          {/* Rating */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Minimum Rating
+            </label>
+            <div className="flex space-x-1 cursor-pointer">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  size={24}
+                  className={`transition-colors ${
+                    star <= selectedRating ? "text-yellow-400" : "text-gray-300"
+                  }`}
+                  onClick={() => {
+                    // toggle rating: if clicked star is already selected, clear it
+                    setSelectedRating(star === selectedRating ? "" : star);
+                    handleSearch();
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Shipping */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Shipping Options
+            </label>
+            <select
+              value={selectedShipping}
+              onChange={(e) => {
+                setSelectedShipping(e.target.value);
+                handleSearch();
+              }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            >
+              <option value="">All</option>
+              <option value="free">Free Shipping</option>
+              <option value="paid">Paid Shipping</option>
+            </select>
+          </div>
+
+          {/* Condition */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Condition
+            </label>
+            <select
+              value={selectedCondition}
+              onChange={(e) => {
+                setSelectedCondition(e.target.value);
+                handleSearch();
+              }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            >
+              <option value="">Any</option>
+              <option value="new">New</option>
+              <option value="used">Used</option>
+              <option value="refurbished">Refurbished</option>
+            </select>
+          </div>
+
+          {/* Warranty Months */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Warranty (Months)
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={selectedWarrentyMonths}
+              onChange={(e) => {
+                setSelectedWarrentyMonths(e.target.value);
+                handleSearch();
+              }}
+              placeholder="e.g., 12"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Enter warranty months (e.g., 6 means ≥ 6 months)
+            </p>
           </div>
         </div>
 
@@ -236,4 +350,4 @@ const FiltersSidebar = ({
   );
 };
 
-export default FiltersSidebar;
+export default ProductsFiltersSidebar;

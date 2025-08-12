@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Filter, X } from "lucide-react";
 import ServiceListing from "../components/ServiceListing";
-import FiltersSidebar from "../components/FilterSidebar";
+import ServicesFiltersSidebar from "../components/ServicesFiltersSidebar";
 
 const Services = () => {
   // Service data state
@@ -185,7 +185,7 @@ const Services = () => {
             </form>
 
             {/* Filters Side Drawer */}
-            <FiltersSidebar
+            <ServicesFiltersSidebar
               showFilters={showFilters}
               setShowFilters={setShowFilters}
               categories={categories}

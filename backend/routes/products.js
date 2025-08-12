@@ -34,7 +34,7 @@ const upload = multer({
   },
 });
 
-// Get all active products 
+// Get all active products
 router.get("/", async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, storeId } = req.query;
@@ -75,20 +75,21 @@ router.get("/", async (req, res) => {
 // Search/filter products via POST
 router.post("/listing", async (req, res) => {
   try {
-    const {
+    const { category, subcategory, childCategory, search, minPrice, maxPrice } =
+      req.body;
+
+    console.log("Received search request:", {
       category,
-      categoryId,
       subcategory,
       childCategory,
       search,
       minPrice,
       maxPrice,
-    } = req.body;
+    });
 
     const query = { isActive: true };
-    
+
     if (category) query.category = category;
-    if (categoryId) query.categoryId = categoryId;
     if (subcategory) query.subcategory = subcategory;
     if (childCategory) query.childCategory = childCategory;
 
@@ -141,10 +142,17 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       title,
       description,
       price,
+      oldPrice,
       category,
+      subcategory,
+      childCategory,
       stock,
       images,
-      variants, // <--- add this line
+      variants,
+      isPreorder = false,
+      shipping,
+      condition,
+      warrentyMonths = 0,
     } = req.body;
 
     // Verify store ownership
@@ -161,7 +169,7 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       });
     }
 
-    //Check Limits
+    // Check Limits
     const userId = req.user._id;
     const userPackage = await getUserPackage(userId);
 
@@ -176,23 +184,41 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       });
     }
 
-    if (variants && !userPackage.itemVariants) {
+    if (variants && variants.length > 0 && !userPackage.itemVariant) {
       return res
         .status(403)
         .json({ error: "Your current plan does not allow item variants" });
     }
 
-    //Create Product
+    // Calculate total stock
+    let totalStock = 0;
+    if (variants && variants.length > 0) {
+      totalStock = variants.reduce(
+        (acc, variant) => acc + (parseInt(variant.stock) || 0),
+        0
+      );
+    } else {
+      totalStock = parseInt(stock) || 0;
+    }
+
     const product = new Product({
       title,
       description,
       price: parseFloat(price),
+      oldPrice: oldPrice ? parseFloat(oldPrice) : undefined,
+      category: category || "",
+      subcategory: subcategory || "",
+      childCategory: childCategory || "",
+      stock: totalStock,
       images,
-      category,
-      stock: parseInt(stock),
+      isPreorder,
+      shipping: shipping || "",
+      condition: condition || "",
+      warrentyMonths: parseInt(warrentyMonths) || 0,
+      orderCount: 0,
       storeId: store._id,
       ownerId: req.user._id,
-      variants, // <--- add variants here
+      variants: variants && variants.length > 0 ? variants : [],
     });
 
     await product.save();

@@ -25,13 +25,6 @@ const productSchema = new mongoose.Schema({
       required: true,
     },
   ],
-
-  // Updated category structure
-  categoryId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Category",
-    required: true,
-  },
   category: {
     type: String,
     required: true,
@@ -68,6 +61,17 @@ const productSchema = new mongoose.Schema({
     min: 0,
     max: 5,
   },
+  shipping: {
+    type: String,
+  },
+  condition: {
+    type: String,
+  },
+  warrentyMonths: {
+    type: Number,
+    default: 0,
+  },
+
   ownerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -77,25 +81,35 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  orderCount: {
+    type: Number,
+    default: 0,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 
-  variants: {
-    colors: [
-      {
-        name: { type: String, trim: true },
-        hex: { type: String },
-      },
-    ],
-    sizes: [
-      {
-        name: { type: String, trim: true },
-        inStock: { type: Boolean },
-      },
-    ],
-  },
+  variants: [
+    {
+      name: { type: String }, // color name
+      hex: { type: String }, // color hex code
+      size: { type: String },
+      stock: { type: Number, min: 0 },
+    },
+  ],
+});
+
+productSchema.pre("save", function (next) {
+  if (this.variants && this.variants.length > 0) {
+    this.stock = this.variants.reduce(
+      (acc, variant) => acc + (variant.stock || 0),
+      0
+    );
+  }
+  // else do nothing - keep stock as set manually
+
+  next();
 });
 
 productSchema.index({

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Search, Filter, X } from "lucide-react";
 import StoreListing from "../components/StoreListing";
-import FiltersSidebar from "../components/FilterSidebar";
 
 const Stores = () => {
   // Store data state
