@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X } from "lucide-react";
 import ProductListing from "../components/ProductListing";
+import FiltersSidebar from "../components/FilterSidebar";
 
 const Products = () => {
   // URL parameter hooks
@@ -33,18 +34,18 @@ const Products = () => {
 
   // Read URL parameters and trigger search
   useEffect(() => {
-    const searchFromUrl = searchParams.get('search');
-    const categoryFromUrl = searchParams.get('category');
-    const subcategoryFromUrl = searchParams.get('subcategory');
-    const childCategoryFromUrl = searchParams.get('childCategory');
-    const minPriceFromUrl = searchParams.get('minPrice');
-    const maxPriceFromUrl = searchParams.get('maxPrice');
-    
+    const searchFromUrl = searchParams.get("search");
+    const categoryFromUrl = searchParams.get("category");
+    const subcategoryFromUrl = searchParams.get("subcategory");
+    const childCategoryFromUrl = searchParams.get("childCategory");
+    const minPriceFromUrl = searchParams.get("minPrice");
+    const maxPriceFromUrl = searchParams.get("maxPrice");
+
     console.log("=== URL PARAMS DEBUG ===");
     console.log("Current URL:", location.pathname + location.search);
     console.log("Search from URL:", searchFromUrl);
     console.log("All URL params:", Object.fromEntries(searchParams.entries()));
-    
+
     // Set state from URL parameters
     if (searchFromUrl) {
       setSearchQuery(searchFromUrl);
@@ -59,14 +60,21 @@ const Products = () => {
       setSelectedChildCategory(childCategoryFromUrl);
     }
     if (minPriceFromUrl || maxPriceFromUrl) {
-      setPriceRange({ 
-        min: minPriceFromUrl || "", 
-        max: maxPriceFromUrl || "" 
+      setPriceRange({
+        min: minPriceFromUrl || "",
+        max: maxPriceFromUrl || "",
       });
     }
-    
+
     // Trigger search with URL parameters
-    if (searchFromUrl || categoryFromUrl || subcategoryFromUrl || childCategoryFromUrl || minPriceFromUrl || maxPriceFromUrl) {
+    if (
+      searchFromUrl ||
+      categoryFromUrl ||
+      subcategoryFromUrl ||
+      childCategoryFromUrl ||
+      minPriceFromUrl ||
+      maxPriceFromUrl
+    ) {
       const filters = {
         search: searchFromUrl || "",
         category: categoryFromUrl || "",
@@ -75,7 +83,7 @@ const Products = () => {
         minPrice: minPriceFromUrl || "",
         maxPrice: maxPriceFromUrl || "",
       };
-      
+
       console.log("Fetching products with URL filters:", filters);
       fetchProducts(filters);
     } else {
@@ -88,9 +96,9 @@ const Products = () => {
     try {
       setLoading(true);
       setError("");
-      
+
       console.log("Fetching products with filters:", filters);
-      
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/products/listing`,
         {
@@ -150,15 +158,7 @@ const Products = () => {
     fetchProducts(filters);
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedCategoryId("");
-    setSelectedCategory("");
-    setSelectedSubcategory("");
-    setSelectedChildCategory("");
-    setPriceRange({ min: "", max: "" });
-    fetchProducts({});
-  };
+
 
   const hasActiveFilters = Boolean(
     searchQuery ||
@@ -169,74 +169,7 @@ const Products = () => {
       priceRange.max
   );
 
-  // Temporary test function - remove this after testing
-  const testSearch = () => {
-    console.log("Testing manual search with query:", searchQuery);
-    fetchProducts({ search: searchQuery });
-  };
-
-  // Category tree menu logic
-  const CategoryTreeMenuLogic = () => {
-    return (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Categories
-        </label>
-        <select
-          value={selectedCategoryId}
-          onChange={(e) => {
-            const categoryId = e.target.value;
-            const category = categories.find(cat => cat._id === categoryId);
-            setSelectedCategoryId(categoryId);
-            setSelectedCategory(category?.name || "");
-            setSelectedSubcategory("");
-            setSelectedChildCategory("");
-          }}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2"
-        >
-          <option value="">All Categories</option>
-          {categories.map((cat) => (
-            <option key={cat._id} value={cat._id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
-        
-        {subcategories.length > 0 && (
-          <select
-            value={selectedSubcategory}
-            onChange={(e) => {
-              setSelectedSubcategory(e.target.value);
-              setSelectedChildCategory("");
-            }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2"
-          >
-            <option value="">All Subcategories</option>
-            {subcategories.map((sub) => (
-              <option key={sub.name} value={sub.name}>
-                {sub.name}
-              </option>
-            ))}
-          </select>
-        )}
-        
-        {childCategories.length > 0 && (
-          <select
-            value={selectedChildCategory}
-            onChange={(e) => setSelectedChildCategory(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2"
-          >
-            <option value="">All Child Categories</option>
-            {childCategories.map((child) => (
-              <option key={child.name} value={child.name}>
-                {child.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-    );
-  };
+  
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -309,101 +242,25 @@ const Products = () => {
               >
                 Search
               </button>
-
-              <button
-                type="button"
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-                  hasActiveFilters
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                <span>{showFilters ? "Hide Filters" : "Show Filters"}</span>
-                {hasActiveFilters && (
-                  <span className="bg-white text-black text-xs px-1.5 py-0.5 rounded-full">
-                    {
-                      [
-                        searchQuery,
-                        selectedCategoryId,
-                        selectedSubcategory,
-                        selectedChildCategory,
-                        priceRange.min,
-                        priceRange.max,
-                      ].filter(Boolean).length
-                    }
-                  </span>
-                )}
-              </button>
             </form>
 
-            {/* Filters Panel */}
-            {showFilters && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold text-gray-900">Filters</h3>
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={clearFilters}
-                      className="text-sm text-gray-500 hover:text-gray-700 flex items-center space-x-1"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>Clear all</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <CategoryTreeMenuLogic />
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Price Range
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        value={priceRange.min}
-                        min="0"
-                        onBlur={() => {
-                          if (+priceRange.min < 0)
-                            setPriceRange((pr) => ({ ...pr, min: "0" }));
-                          if (+priceRange.max < 0)
-                            setPriceRange((pr) => ({ ...pr, max: "0" }));
-                          if (+priceRange.min > +priceRange.max) {
-                            // Maybe show warning or auto-correct
-                          }
-                        }}
-                        onChange={(e) =>
-                          setPriceRange({ ...priceRange, min: e.target.value })
-                        }
-                        placeholder="Min"
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                      <input
-                        type="number"
-                        value={priceRange.max}
-                        onChange={(e) =>
-                          setPriceRange({ ...priceRange, max: e.target.value })
-                        }
-                        placeholder="Max"
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSearch}
-                  className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  Apply Filters
-                </button>
-              </div>
-            )}
+            {/* Filters Side Drawer */}
+            <FiltersSidebar
+              showFilters={showFilters}
+              setShowFilters={setShowFilters}
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
+              setSelectedCategoryId={setSelectedCategoryId}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              selectedSubcategory={selectedSubcategory}
+              setSelectedSubcategory={setSelectedSubcategory}
+              selectedChildCategory={selectedChildCategory}
+              setSelectedChildCategory={setSelectedChildCategory}
+              priceRange={priceRange}
+              setPriceRange={setPriceRange}
+              handleSearch={handleSearch}
+            />
           </div>
         </div>
       </div>
@@ -419,12 +276,52 @@ const Products = () => {
         <p>Error: {error || "None"}</p>
       </div>
 */}
+      {/* Floating Filter Button (opens drawer) */}
+      {!showFilters && (
+        <button
+          onClick={() => setShowFilters(true)}
+          className="
+      fixed 
+      left-0 
+      top-24 
+      z-40 
+
+      bg-gradient-to-r from-black via-gray-800 to-white
+      text-white px-5 py-2 rounded-r-xl shadow-xl flex items-center space-x-3
+      hover:scale-105 hover:shadow-2xl transition-all duration-300 ease-out
+      border border-gray-700
+
+      md:top-24          /* On md+ screens, keep top:6rem */
+      md:left-0
+
+      /* On small screens, center vertically */
+      top-1/2 
+      -translate-y-1/2
+      left-0
+      "
+        >
+          <Filter className="w-5 h-5" />
+          <span className="font-medium">Filters</span>
+
+          {hasActiveFilters && (
+            <span className="ml-1 bg-white text-black text-xs font-semibold px-2 py-0.5 rounded-full shadow-md">
+              {
+                [
+                  searchQuery,
+                  selectedCategoryId,
+                  selectedSubcategory,
+                  selectedChildCategory,
+                  priceRange.min,
+                  priceRange.max,
+                ].filter(Boolean).length
+              }
+            </span>
+          )}
+        </button>
+      )}
+
       {/* Products Content */}
-      <ProductListing
-        products={products}
-        loading={loading}
-        error={error}
-      />
+      <ProductListing products={products} loading={loading} error={error} />
     </div>
   );
 };

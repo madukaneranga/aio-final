@@ -116,8 +116,8 @@ const storeSchema = new mongoose.Schema({
     default: "Bronze",
   },
   responseTime: {
-    type: String,
-    default: "24 hours",
+    type: Number,
+    default: 0,
   },
   completionRate: {
     type: Number,
