@@ -87,6 +87,8 @@ router.post("/listing", async (req, res) => {
       warrantyMonths,
       minPrice,
       maxPrice,
+      page = 1,
+      limit = 20,
     } = req.body;
 
     console.log("Received search request:", {
@@ -101,14 +103,19 @@ router.post("/listing", async (req, res) => {
       warrantyMonths,
       minPrice,
       maxPrice,
+      page,
+      limit,
     });
 
+    // Build the base query
     const query = { isActive: true };
 
+    // Category filters (hierarchical)
     if (childCategory) query.childCategory = childCategory;
     else if (subcategory) query.subcategory = subcategory;
     else if (category) query.category = category;
 
+    // Stock filter
     if (stock) {
       if (stock === "in") {
         query.stock = { $gt: 0 }; // In stock: greater than 0
@@ -118,11 +125,13 @@ router.post("/listing", async (req, res) => {
       }
     }
 
+    // Other filters
     if (rating) query.rating = { $gte: rating };
     if (shipping) query.shipping = shipping;
     if (condition) query.condition = condition;
     if (warrantyMonths) query.warrentyMonths = { $gte: warrantyMonths };
 
+    // Search filter (title and description)
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: "i" } },
@@ -130,22 +139,82 @@ router.post("/listing", async (req, res) => {
       ];
     }
 
+    // Price range filter
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = parseFloat(minPrice);
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
 
-    const products = await Product.find(query)
-      .populate("storeId", "name type")
-      .sort({ createdAt: -1 });
+    // Calculate pagination
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
 
-    res.json(products);
+    console.log("Executing query:", JSON.stringify(query, null, 2));
+    console.log("Pagination:", { page: pageNumber, limit: pageSize, skip });
+
+    // Execute queries in parallel for better performance
+    const [products, totalCount] = await Promise.all([
+      // Get paginated products
+      Product.find(query)
+        .populate("storeId", "name type")
+        .sort({ createdAt: -1 }) // Sort by newest first
+        .skip(skip)
+        .limit(pageSize)
+        .lean(), // Use lean() for better performance
+
+      // Get total count for pagination info
+      Product.countDocuments(query),
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const hasMore = pageNumber < totalPages;
+    const hasPrevious = pageNumber > 1;
+
+    // Enhanced response with pagination metadata
+    const response = {
+      products,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalProducts: totalCount,
+        productsPerPage: pageSize,
+        hasMore,
+        hasPrevious,
+        startIndex: skip + 1,
+        endIndex: Math.min(skip + pageSize, totalCount),
+      },
+      // Legacy support for frontend
+      total: totalCount,
+      hasMore,
+      // Performance metrics (optional - remove in production)
+      meta: {
+        query: query,
+        executionTime: new Date(),
+        resultsFound: products.length,
+      },
+    };
+
+    console.log("Returning results:", {
+      productsCount: products.length,
+      totalCount,
+      currentPage: pageNumber,
+      totalPages,
+      hasMore,
+    });
+
+    res.json(response);
   } catch (error) {
     console.error("Search error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      error: error.message,
+      details: "An error occurred while fetching products",
+    });
   }
 });
+
 
 // Get product by ID
 router.get("/:id", async (req, res) => {

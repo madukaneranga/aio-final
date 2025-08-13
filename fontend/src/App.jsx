@@ -1,3 +1,4 @@
+//නමෝ බුද්ධාය!
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";

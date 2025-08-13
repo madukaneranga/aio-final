@@ -1,56 +1,230 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import ImageUpload from "../components/ImageUpload";
-import LoadingSpinner from "../components/LoadingSpinner";
-import imageCompression from "browser-image-compression";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../utils/firebase";
-import ColorSelector from "../components/ColorSelect";
+// ============ PRODUCTS.JSX (WITH ELEGANT PAGINATION) ============
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
+import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
+import ProductListing from "../components/ProductListing";
+import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
 
-const CreateProduct = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+// Custom debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
 
-  // Categories and selections
-  const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedSubcategory, setSelectedSubcategory] = useState("");
-  const [selectedChildCategory, setSelectedChildCategory] = useState("");
-  const [totalVariantStock, setTotalVariantStock] = useState(0);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
 
-  // Images & loading
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(false);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+// Custom intersection observer hook for infinite scroll
+const useIntersectionObserver = (callback, options = {}) => {
+  const targetRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(callback, {
+      threshold: 0.1,
+      rootMargin: "100px",
+      ...options,
+    });
+
+    const currentTarget = targetRef.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [callback, options]);
+
+  return targetRef;
+};
+
+const Products = () => {
+  // URL parameter hooks
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Product data state
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [categories, setCategories] = useState([]);
 
-  // Form fields including extra fields
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    price: "",
-    oldPrice: "",
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const PRODUCTS_PER_PAGE = 20;
+
+  // Unified filters state
+  const [filters, setFilters] = useState({
+    search: "",
+    category: "",
+    subcategory: "",
+    childCategory: "",
+    priceRange: { min: "", max: "" },
     stock: "",
-    isPreorder: false,
+    rating: "",
     shipping: "",
     condition: "",
-    warrentyMonths: "",
-    variants: [], // Combined variants: { name, hex, size, stock }
+    warrantyMonths: "",
   });
 
-  // Load categories once on mount
-  useEffect(() => {
-    loadCategories();
-  }, []);
+  // UI state
+  const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    const total = formData.variants.reduce(
-      (sum, v) => sum + (Number(v.stock) || 0),
-      0
-    );
-    setTotalVariantStock(total);
-  }, [formData.variants]);
+  // Debounced filters for API calls
+  const debouncedFilters = useDebounce(filters, 300);
 
+  // Derived state for backwards compatibility
+  const selectedCategoryObj = categories.find(
+    (cat) => cat.name === filters.category
+  );
+  const subcategories = selectedCategoryObj?.subcategories || [];
+  const childCategories =
+    subcategories.find((sub) => sub.name === filters.subcategory)
+      ?.childCategories || [];
+
+  // Read URL parameters and set initial state
+  useEffect(() => {
+    const searchFromUrl = searchParams.get("search");
+
+    console.log("=== URL PARAMS DEBUG ===");
+    console.log("Current URL:", location.pathname + location.search);
+    console.log("Search from URL:", searchFromUrl);
+    console.log("All URL params:", Object.fromEntries(searchParams.entries()));
+
+    // Set state from URL parameters
+    if (searchFromUrl) {
+      setFilters((prev) => ({
+        ...prev,
+        search: searchFromUrl,
+      }));
+    }
+  }, [searchParams, location]);
+
+  // Fetch products function with pagination
+  const fetchProducts = async (
+    searchFilters = {},
+    page = 1,
+    append = false
+  ) => {
+    try {
+      if (!append) {
+        setLoading(true);
+        setProducts([]);
+      } else {
+        setLoadingMore(true);
+      }
+      setError("");
+
+      console.log(
+        "Fetching products with filters:",
+        searchFilters,
+        "Page:",
+        page
+      );
+
+      // Convert filters to API format
+      const apiFilters = {
+        search: searchFilters.search || "",
+        category: searchFilters.category || "",
+        subcategory: searchFilters.subcategory || "",
+        childCategory: searchFilters.childCategory || "",
+        minPrice: searchFilters.priceRange?.min || "",
+        maxPrice: searchFilters.priceRange?.max || "",
+        stock: searchFilters.stock || "",
+        rating: searchFilters.rating || "",
+        shipping: searchFilters.shipping || "",
+        condition: searchFilters.condition || "",
+        warrantyMonths: searchFilters.warrantyMonths || "",
+        page: page,
+        limit: PRODUCTS_PER_PAGE,
+      };
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/products/listing`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(apiFilters),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(
+          "Products fetched:",
+          data.products.length,
+          "items",
+          "Total:",
+          data.total
+        );
+
+        if (append) {
+          setProducts((prev) => [...prev, ...data.products]);
+        } else {
+          setProducts(data.products);
+        }
+
+        setTotalProducts(data.total);
+        setHasMoreProducts(
+          data.products.length === PRODUCTS_PER_PAGE && data.hasMore
+        );
+        setCurrentPage(page);
+      } else {
+        setError("Failed to fetch products");
+        console.error("API Error:", response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Load more products
+  const loadMoreProducts = useCallback(() => {
+    if (!loadingMore && hasMoreProducts && !loading) {
+      const nextPage = currentPage + 1;
+      fetchProducts(debouncedFilters, nextPage, true);
+    }
+  }, [loadingMore, hasMoreProducts, loading, currentPage, debouncedFilters]);
+
+  // Intersection observer for infinite scroll
+  const loadMoreRef = useIntersectionObserver(
+    useCallback(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          loadMoreProducts();
+        }
+      },
+      [loadMoreProducts]
+    )
+  );
+
+  // Auto-fetch products when debounced filters change (reset to page 1)
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchProducts(debouncedFilters, 1, false);
+  }, [debouncedFilters]);
+
+  // Load categories
   const loadCategories = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
@@ -62,525 +236,327 @@ const CreateProduct = () => {
     }
   };
 
-  // Handle cascading selects for categories
-  const onCategoryChange = (e) => {
-    setSelectedCategory(e.target.value);
-    setSelectedSubcategory("");
-    setSelectedChildCategory("");
-  };
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
-  const onSubcategoryChange = (e) => {
-    setSelectedSubcategory(e.target.value);
-    setSelectedChildCategory("");
-  };
+  // Filter update functions
+  const updateFilter = useCallback((key, value) => {
+    setFilters((prev) => {
+      const newFilters = { ...prev, [key]: value };
 
-  const onChildCategoryChange = (e) => {
-    setSelectedChildCategory(e.target.value);
-  };
-
-  // Handle normal inputs
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  // Variants: Add a new variant row
-  const addVariant = () => {
-    setFormData((prev) => ({
-      ...prev,
-      variants: [
-        ...prev.variants,
-        { name: "", hex: "#000000", size: "", stock: "" },
-      ],
-    }));
-  };
-
-  // Update variant fields
-  const updateVariant = (index, field, value) => {
-    const newVariants = [...formData.variants];
-    newVariants[index][field] = value;
-    setFormData((prev) => ({
-      ...prev,
-      variants: newVariants,
-    }));
-  };
-
-  // Remove variant row
-  const removeVariant = (index) => {
-    const newVariants = formData.variants.filter((_, i) => i !== index);
-    setFormData((prev) => ({
-      ...prev,
-      variants: newVariants,
-    }));
-  };
-
-  // Upload images, compress and get URLs
-  const uploadImages = async () => {
-    const compressionOptions = {
-      maxSizeMB: 0.5,
-      maxWidthOrHeight: 1000,
-      useWebWorker: true,
-    };
-    return Promise.all(
-      images.map(async (file) => {
-        const compressedFile = await imageCompression(file, compressionOptions);
-        const imageRef = ref(storage, `products/id_${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, compressedFile);
-        return getDownloadURL(imageRef);
-      })
-    );
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      // Upload images
-      const imageUrls = await uploadImages();
-
-      // Validate required selects
-      if (!selectedCategory || !selectedSubcategory || !selectedChildCategory) {
-        setError("Please select category, subcategory, and child category.");
-        setLoading(false);
-        return;
+      // Auto-clear dependent filters
+      if (key === "category") {
+        newFilters.subcategory = "";
+        newFilters.childCategory = "";
+      } else if (key === "subcategory") {
+        newFilters.childCategory = "";
       }
 
-      // Prepare payload, transform variants: convert stock to number
-      const variantsPayload =
-        formData.variants.length > 0
-          ? formData.variants.map(({ name, hex, size, stock }) => ({
-              name,
-              hex,
-              size,
-              stock: Number(stock) || 0,
-            }))
-          : [];
+      return newFilters;
+    });
+  }, []);
 
-      // Calculate total stock if variants exist
-      const totalStock =
-        variantsPayload.length > 0
-          ? variantsPayload.reduce((acc, v) => acc + v.stock, 0)
-          : Number(formData.stock) || 0;
+  const updateFilters = useCallback((updates) => {
+    setFilters((prev) => ({ ...prev, ...updates }));
+  }, []);
 
-      const payload = {
-        title: formData.title,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        oldPrice: formData.oldPrice ? parseFloat(formData.oldPrice) : undefined,
-        category: selectedCategory,
-        subcategory: selectedSubcategory,
-        childCategory: selectedChildCategory,
-        stock: totalStock,
-        images: imageUrls,
-        isPreorder: formData.isPreorder,
-        shipping: formData.shipping,
-        condition: formData.condition,
-        warrentyMonths: Number(formData.warrentyMonths) || 0,
-        variants: variantsPayload.length > 0 ? variantsPayload : undefined,
-      };
+  const clearAllFilters = useCallback(() => {
+    setFilters({
+      search: "",
+      category: "",
+      subcategory: "",
+      childCategory: "",
+      priceRange: { min: "", max: "" },
+      stock: "",
+      rating: "",
+      shipping: "",
+      condition: "",
+      warrantyMonths: "",
+    });
+  }, []);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+  // Manual search handler (for search form)
+  const handleSearch = (e) => {
+    e?.preventDefault?.();
 
-      if (response.ok) {
-        navigate("/dashboard");
-      } else {
-        const data = await response.json();
-        setError(data.error || "Failed to create product");
-      }
-    } catch (error) {
-      console.error(error);
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    // Force immediate search without debounce
+    fetchProducts(filters, 1, false);
   };
 
-  if (!user || user.role !== "store_owner") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Access Denied
-          </h2>
-          <p className="text-gray-600">
-            You need to be a store owner to create products
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Check for active filters
+  const hasActiveFilters = Boolean(
+    filters.search ||
+      filters.category ||
+      filters.subcategory ||
+      filters.childCategory ||
+      filters.priceRange.min ||
+      filters.priceRange.max ||
+      filters.stock ||
+      filters.rating ||
+      filters.shipping ||
+      filters.condition ||
+      filters.warrantyMonths
+  );
+
+  const activeFiltersCount = [
+    filters.search,
+    filters.category,
+    filters.subcategory,
+    filters.childCategory,
+    filters.priceRange.min,
+    filters.priceRange.max,
+    filters.stock,
+    filters.rating,
+    filters.shipping,
+    filters.condition,
+    filters.warrantyMonths,
+  ].filter(Boolean).length;
+
+  // Calculate display range for results counter
+  const startResult = products.length > 0 ? 1 : 0;
+  const endResult = products.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">
-            Create New Product
-          </h1>
+      {/* Header */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Products</h1>
 
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-              {error}
-            </div>
-          )}
+          {/* Search Filters */}
+          <div className="space-y-4">
+            {/* Breadcrumb */}
+            {(filters.subcategory || filters.childCategory) && (
+              <nav
+                aria-label="breadcrumb"
+                className="text-sm text-gray-600 mt-2 select-none"
+              >
+                <ol className="list-reset flex space-x-2">
+                  {filters.category && (
+                    <li>
+                      {categories.find(
+                        (c) => c.name.toString() === filters.category
+                      )?.name || "Category"}
+                    </li>
+                  )}
+                  {filters.subcategory && (
+                    <>
+                      <li>→</li>
+                      <li>{filters.subcategory}</li>
+                    </>
+                  )}
+                  {filters.childCategory && (
+                    <>
+                      <li>→</li>
+                      <li>{filters.childCategory}</li>
+                    </>
+                  )}
+                </ol>
+              </nav>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Title and Description */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Product Title
-                </label>
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  required
-                  placeholder="Sample Product Name"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  value={filters.search}
+                  onChange={(e) => {
+                    updateFilter("search", e.target.value);
+                    console.log("Search query changed to:", e.target.value);
+                  }}
+                  placeholder="Search products..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  required
-                  rows={4}
-                  placeholder="A detailed description of the product..."
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Price, Old Price, Stock, Is Preorder */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Price (LKR)
-                </label>
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  required
-                  min="0"
-                  step="0.01"
-                  placeholder="2999.99"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Old Price (optional)
-                </label>
-                <input
-                  type="number"
-                  name="oldPrice"
-                  value={formData.oldPrice}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Stock Quantity
-                </label>
-                <input
-                  type="number"
-                  name="stock"
-                  value={
-                    formData.variants.length > 0
-                      ? totalVariantStock
-                      : formData.stock
-                  }
-                  onChange={handleChange}
-                  min="0"
-                  className={`w-full border rounded-lg px-4 py-2 ${
-                    formData.variants.length > 0
-                      ? "bg-gray-100 cursor-not-allowed"
-                      : "border-gray-300"
-                  }`}
-                  placeholder="0"
-                  disabled={formData.variants.length > 0}
-                  required={formData.variants.length === 0}
-                />
-                {formData.variants.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Stock is managed via variants and cannot be set here.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2 mt-6 md:mt-0">
-                <input
-                  type="checkbox"
-                  name="isPreorder"
-                  checked={formData.isPreorder}
-                  onChange={handleChange}
-                  id="isPreorder"
-                  className="h-5 w-5"
-                />
-                <label htmlFor="isPreorder" className="text-sm font-medium">
-                  Is Preorder
-                </label>
-              </div>
-            </div>
-
-            {/* Category, Subcategory, Child Category */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Category
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={onCategoryChange}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  <option value="">Select a category</option>
-                  {categories.map((cat) => (
-                    <option key={cat._id} value={cat.name}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Subcategory
-                </label>
-                <select
-                  value={selectedSubcategory}
-                  onChange={onSubcategoryChange}
-                  required
-                  disabled={!selectedCategory}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  <option value="">Select a subcategory</option>
-                  {categories
-                    .find((cat) => cat.name === selectedCategory)
-                    ?.subcategories.map((subcat) => (
-                      <option key={subcat.name} value={subcat.name}>
-                        {subcat.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Child Category
-                </label>
-                <select
-                  value={selectedChildCategory}
-                  onChange={onChildCategoryChange}
-                  required
-                  disabled={!selectedSubcategory}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  <option value="">Select a child category</option>
-                  {categories
-                    .find((cat) => cat.name === selectedCategory)
-                    ?.subcategories.find(
-                      (sub) => sub.name === selectedSubcategory
-                    )
-                    ?.childCategories.map((childCat) => (
-                      <option key={childCat} value={childCat}>
-                        {childCat}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Shipping, Condition, Warranty */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Shipping Info
-                </label>
-                <select
-                  name="shipping"
-                  value={formData.shipping}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  <option value="">Select shipping</option>
-                  <option value="free-shipping">Free Shipping</option>
-                  <option value="paid-shipping">Paid Shipping</option>
-                  <option value="local-pickup">Local Pickup</option>
-                </select>
-                <p className="text-xs text-gray-500 mb-2">
-                  You can only charge for the <b>Paid Shipping</b> fees through
-                  the user.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Condition
-                </label>
-                <select
-                  name="condition"
-                  value={formData.condition}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  <option value="">Select condition</option>
-                  <option value="new">New</option>
-                  <option value="used">Used</option>
-                  <option value="refurbished">Refurbished</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Warranty Months
-                </label>
-                <input
-                  type="number"
-                  name="warrentyMonths"
-                  value={formData.warrentyMonths}
-                  onChange={handleChange}
-                  min="0"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            {/* Variants */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Variants</label>
-              <p className="text-xs text-gray-500 mb-2">
-                Add color, size, and stock for each variant combination.
-              </p>
-
-              {formData.variants.map((variant, idx) => (
-                <div key={idx} className="flex items-center space-x-4 mb-3">
-                  <ColorSelector
-                    selectedColor={variant.name}
-                    onColorSelect={(index, colorName) => {
-                      updateVariant(index, "name", colorName);
-                    }}
-                    variantIndex={idx}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Size (e.g. M, L, 42)"
-                    value={variant.size}
-                    onChange={(e) => updateVariant(idx, "size", e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 w-32 h-10"
-
-                  />
-                  <input
-                    type="number"
-                    placeholder="Stock"
-                    value={variant.stock}
-                    onChange={(e) =>
-                      updateVariant(idx, "stock", e.target.value)
-                    }
-                    min="0"
-                    className="border border-gray-300 rounded-lg px-3 py-2 w-20 h-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeVariant(idx)}
-                    className="text-red-500 hover:text-red-700 px-2 py-2 h-10 flex items-center"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={addVariant}
-                className="text-blue-500 hover:text-blue-700 font-medium"
-              >
-                + Add Variant
-              </button>
-
-              {formData.variants.length > 0 && (
-                <p className="text-sm font-medium mt-2">
-                  Total Stock (from variants):{" "}
-                  <span className="text-green-600 font-semibold">
-                    {totalVariantStock}
-                  </span>
-                </p>
-              )}
-            </div>
-
-            {/* Product Images */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Product Images (up to 10)
-              </label>
-              <ImageUpload
-                images={images}
-                onImagesChange={setImages}
-                maxImages={10}
-                multiple
-              />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex justify-end space-x-4 mt-8">
-              <button
-                type="button"
-                onClick={() => navigate("/dashboard")}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                {loading ? (
-                  <div className="flex items-center space-x-2">
-                    <LoadingSpinner size="sm" />
-                    <span>Creating...</span>
-                  </div>
-                ) : (
-                  "Create Product"
-                )}
+                Search
               </button>
-            </div>
-          </form>
+            </form>
+
+            {/* Elegant Results Counter */}
+            {!loading && (
+              <div className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 text-gray-700">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm font-medium">
+                      Showing {startResult.toLocaleString()}-
+                      {endResult.toLocaleString()} of{" "}
+                      {totalProducts.toLocaleString()} results
+                    </span>
+                  </div>
+                  {hasActiveFilters && (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                      <span className="text-xs text-gray-500 font-medium">
+                        {activeFiltersCount} filter
+                        {activeFiltersCount !== 1 ? "s" : ""} applied
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {hasMoreProducts && (
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    <div className="animate-pulse w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>More available</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Filters Side Drawer */}
+            <ProductsFiltersSidebar
+              showFilters={showFilters}
+              setShowFilters={setShowFilters}
+              categorySet={categories}
+              filters={filters}
+              updateFilter={updateFilter}
+              updateFilters={updateFilters}
+              clearAllFilters={clearAllFilters}
+            />
+          </div>
         </div>
       </div>
+
+      {/* Floating Filter Button */}
+      {!showFilters && (
+        <button
+          onClick={() => setShowFilters(true)}
+          className="
+            fixed 
+            left-0 
+            top-1/2 
+            -translate-y-1/2
+            z-40 
+            bg-gradient-to-b from-black via-gray-800 to-white
+            text-white px-3 py-6 rounded-r-xl shadow-xl 
+            flex flex-col items-center justify-center space-y-2
+            hover:scale-105 hover:shadow-2xl transition-all duration-300 ease-out
+            border border-gray-700
+            writing-mode-vertical
+            min-h-[120px]
+          "
+        >
+          <Filter className="w-5 h-5" />
+
+          <span
+            className="font-medium text-sm transform -rotate-90 whitespace-nowrap"
+            style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+          >
+            Filters
+          </span>
+
+          {hasActiveFilters && (
+            <span className="bg-white text-black text-xs font-semibold px-2 py-1 rounded-full shadow-md min-w-[24px] text-center">
+              {activeFiltersCount}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* Products Content */}
+      <ProductListing products={products} loading={loading} error={error} />
+
+      {/* Elegant Load More Section */}
+      {!loading && products.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {hasMoreProducts ? (
+            <div
+              ref={loadMoreRef}
+              className="flex flex-col items-center justify-center py-12 space-y-6"
+            >
+              {loadingMore ? (
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="relative">
+                    <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
+                    <div
+                      className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-gray-400 rounded-full animate-spin"
+                      style={{
+                        animationDirection: "reverse",
+                        animationDuration: "1.5s",
+                      }}
+                    ></div>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-gray-600 font-medium">
+                      Loading more products...
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Finding the perfect items for you
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={loadMoreProducts}
+                  className="group relative overflow-hidden bg-gradient-to-r from-gray-900 to-black text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 ease-out"
+                >
+                  <span className="relative z-10 flex items-center space-x-2">
+                    <span>Load More Products</span>
+                    <ChevronDown className="w-5 h-5 group-hover:animate-bounce" />
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-black to-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center shadow-lg">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  You've seen it all! ✨
+                </h3>
+                <p className="text-gray-600 max-w-md">
+                  That's every product we have matching your criteria. Try
+                  adjusting your filters to discover more amazing items.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && products.length === 0 && !error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center space-y-6">
+            <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto shadow-lg">
+              <Search className="w-12 h-12 text-gray-500" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                No products found
+              </h3>
+              <p className="text-gray-600 max-w-md mx-auto mb-6">
+                We couldn't find any products matching your search criteria. Try
+                adjusting your filters or search terms.
+              </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center space-x-2 bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Clear All Filters</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default CreateProduct;
+export default Products;

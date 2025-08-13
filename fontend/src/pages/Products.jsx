@@ -1,7 +1,7 @@
-// ============ PRODUCTS.JSX (MAIN COMPONENT) ============
-import React, { useState, useEffect, useCallback } from "react";
+// ============ PRODUCTS.JSX (WITH ELEGANT PAGINATION) ============
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
 import ProductListing from "../components/ProductListing";
 import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
 
@@ -22,6 +22,32 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
+// Custom intersection observer hook for infinite scroll
+const useIntersectionObserver = (callback, options = {}) => {
+  const targetRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(callback, {
+      threshold: 0.1,
+      rootMargin: "100px",
+      ...options,
+    });
+
+    const currentTarget = targetRef.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [callback, options]);
+
+  return targetRef;
+};
+
 const Products = () => {
   // URL parameter hooks
   const [searchParams] = useSearchParams();
@@ -30,10 +56,17 @@ const Products = () => {
   // Product data state
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [categories, setCategories] = useState([]);
 
-  // Unified filters state - THIS IS THE KEY CHANGE
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const PRODUCTS_PER_PAGE = 20;
+
+  // Unified filters state
   const [filters, setFilters] = useState({
     search: "",
     category: "",
@@ -44,7 +77,7 @@ const Products = () => {
     rating: "",
     shipping: "",
     condition: "",
-    warrantyMonths: ""
+    warrantyMonths: "",
   });
 
   // UI state
@@ -73,20 +106,34 @@ const Products = () => {
 
     // Set state from URL parameters
     if (searchFromUrl) {
-      setFilters(prev => ({
+      setFilters((prev) => ({
         ...prev,
-        search: searchFromUrl
+        search: searchFromUrl,
       }));
     }
   }, [searchParams, location]);
 
-  // Fetch products function
-  const fetchProducts = async (searchFilters = {}) => {
+  // Fetch products function with pagination
+  const fetchProducts = async (
+    searchFilters = {},
+    page = 1,
+    append = false
+  ) => {
     try {
-      setLoading(true);
+      if (!append) {
+        setLoading(true);
+        setProducts([]);
+      } else {
+        setLoadingMore(true);
+      }
       setError("");
 
-      console.log("Fetching products with filters:", searchFilters);
+      console.log(
+        "Fetching products with filters:",
+        searchFilters,
+        "Page:",
+        page
+      );
 
       // Convert filters to API format
       const apiFilters = {
@@ -100,7 +147,9 @@ const Products = () => {
         rating: searchFilters.rating || "",
         shipping: searchFilters.shipping || "",
         condition: searchFilters.condition || "",
-        warrantyMonths: searchFilters.warrantyMonths || ""
+        warrantyMonths: searchFilters.warrantyMonths || "",
+        page: page,
+        limit: PRODUCTS_PER_PAGE,
       };
 
       const response = await fetch(
@@ -116,8 +165,25 @@ const Products = () => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Products fetched:", data.length, "items");
-        setProducts(data);
+        console.log(
+          "Products fetched:",
+          data.products.length,
+          "items",
+          "Total:",
+          data.total
+        );
+
+        if (append) {
+          setProducts((prev) => [...prev, ...data.products]);
+        } else {
+          setProducts(data.products);
+        }
+
+        setTotalProducts(data.total);
+        setHasMoreProducts(
+          data.products.length === PRODUCTS_PER_PAGE && data.hasMore
+        );
+        setCurrentPage(page);
       } else {
         setError("Failed to fetch products");
         console.error("API Error:", response.status, response.statusText);
@@ -127,12 +193,35 @@ const Products = () => {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  // Auto-fetch products when debounced filters change
+  // Load more products
+  const loadMoreProducts = useCallback(() => {
+    if (!loadingMore && hasMoreProducts && !loading) {
+      const nextPage = currentPage + 1;
+      fetchProducts(debouncedFilters, nextPage, true);
+    }
+  }, [loadingMore, hasMoreProducts, loading, currentPage, debouncedFilters]);
+
+  // Intersection observer for infinite scroll
+  const loadMoreRef = useIntersectionObserver(
+    useCallback(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          loadMoreProducts();
+        }
+      },
+      [loadMoreProducts]
+    )
+  );
+
+  // Auto-fetch products when debounced filters change (reset to page 1)
   useEffect(() => {
-    fetchProducts(debouncedFilters);
+    setCurrentPage(1);
+    fetchProducts(debouncedFilters, 1, false);
   }, [debouncedFilters]);
 
   // Load categories
@@ -153,23 +242,23 @@ const Products = () => {
 
   // Filter update functions
   const updateFilter = useCallback((key, value) => {
-    setFilters(prev => {
+    setFilters((prev) => {
       const newFilters = { ...prev, [key]: value };
-      
+
       // Auto-clear dependent filters
-      if (key === 'category') {
+      if (key === "category") {
         newFilters.subcategory = "";
         newFilters.childCategory = "";
-      } else if (key === 'subcategory') {
+      } else if (key === "subcategory") {
         newFilters.childCategory = "";
       }
-      
+
       return newFilters;
     });
   }, []);
 
   const updateFilters = useCallback((updates) => {
-    setFilters(prev => ({ ...prev, ...updates }));
+    setFilters((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const clearAllFilters = useCallback(() => {
@@ -183,31 +272,31 @@ const Products = () => {
       rating: "",
       shipping: "",
       condition: "",
-      warrantyMonths: ""
+      warrantyMonths: "",
     });
   }, []);
 
   // Manual search handler (for search form)
   const handleSearch = (e) => {
     e?.preventDefault?.();
-    
+
     // Force immediate search without debounce
-    fetchProducts(filters);
+    fetchProducts(filters, 1, false);
   };
 
   // Check for active filters
   const hasActiveFilters = Boolean(
     filters.search ||
-    filters.category ||
-    filters.subcategory ||
-    filters.childCategory ||
-    filters.priceRange.min ||
-    filters.priceRange.max ||
-    filters.stock ||
-    filters.rating ||
-    filters.shipping ||
-    filters.condition ||
-    filters.warrantyMonths
+      filters.category ||
+      filters.subcategory ||
+      filters.childCategory ||
+      filters.priceRange.min ||
+      filters.priceRange.max ||
+      filters.stock ||
+      filters.rating ||
+      filters.shipping ||
+      filters.condition ||
+      filters.warrantyMonths
   );
 
   const activeFiltersCount = [
@@ -223,6 +312,10 @@ const Products = () => {
     filters.condition,
     filters.warrantyMonths,
   ].filter(Boolean).length;
+
+  // Calculate display range for results counter
+  const startResult = products.length > 0 ? 1 : 0;
+  const endResult = products.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -271,7 +364,7 @@ const Products = () => {
                   type="text"
                   value={filters.search}
                   onChange={(e) => {
-                    updateFilter('search', e.target.value);
+                    updateFilter("search", e.target.value);
                     console.log("Search query changed to:", e.target.value);
                   }}
                   placeholder="Search products..."
@@ -286,6 +379,38 @@ const Products = () => {
                 Search
               </button>
             </form>
+
+            {/* Elegant Results Counter */}
+            {!loading && (
+              <div className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 text-gray-700">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm font-medium">
+                      Showing {startResult.toLocaleString()}-
+                      {endResult.toLocaleString()} of{" "}
+                      {totalProducts.toLocaleString()} results
+                    </span>
+                  </div>
+                  {hasActiveFilters && (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                      <span className="text-xs text-gray-500 font-medium">
+                        {activeFiltersCount} filter
+                        {activeFiltersCount !== 1 ? "s" : ""} applied
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {hasMoreProducts && (
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    <div className="animate-pulse w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>More available</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Filters Side Drawer */}
             <ProductsFiltersSidebar
@@ -304,41 +429,132 @@ const Products = () => {
       {/* Floating Filter Button */}
       {!showFilters && (
         <button
-  onClick={() => setShowFilters(true)}
-  className="
-    fixed 
-    left-0 
-    top-1/2 
-    -translate-y-1/2
-    z-40 
-    bg-gradient-to-b from-black via-gray-800 to-white
-    text-white px-3 py-6 rounded-r-xl shadow-xl 
-    flex flex-col items-center justify-center space-y-2
-    hover:scale-105 hover:shadow-2xl transition-all duration-300 ease-out
-    border border-gray-700
-    writing-mode-vertical
-    min-h-[120px]
-  "
->
-  <Filter className="w-5 h-5" />
-  
-  <span 
-    className="font-medium text-sm transform -rotate-90 whitespace-nowrap"
-    style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
-  >
-    Filters
-  </span>
+          onClick={() => setShowFilters(true)}
+          className="
+            fixed 
+            left-0 
+            top-1/2 
+            -translate-y-1/2
+            z-40 
+            bg-gradient-to-b from-black via-gray-800 to-white
+            text-white px-3 py-6 rounded-r-xl shadow-xl 
+            flex flex-col items-center justify-center space-y-2
+            hover:scale-105 hover:shadow-2xl transition-all duration-300 ease-out
+            border border-gray-700
+            writing-mode-vertical
+            min-h-[120px]
+          "
+        >
+          <Filter className="w-5 h-5" />
 
-  {hasActiveFilters && (
-    <span className="bg-white text-black text-xs font-semibold px-2 py-1 rounded-full shadow-md min-w-[24px] text-center">
-      {activeFiltersCount}
-    </span>
-  )}
-</button>
+          <span
+            className="font-medium text-sm transform -rotate-90 whitespace-nowrap"
+            style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+          >
+            Filters
+          </span>
+
+          {hasActiveFilters && (
+            <span className="bg-white text-black text-xs font-semibold px-2 py-1 rounded-full shadow-md min-w-[24px] text-center">
+              {activeFiltersCount}
+            </span>
+          )}
+        </button>
       )}
 
       {/* Products Content */}
       <ProductListing products={products} loading={loading} error={error} />
+
+      {/* Elegant Load More Section */}
+      {!loading && products.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {hasMoreProducts ? (
+            <div
+              ref={loadMoreRef}
+              className="flex flex-col items-center justify-center py-12 space-y-6"
+            >
+              {loadingMore ? (
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="relative">
+                    <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
+                    <div
+                      className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-gray-400 rounded-full animate-spin"
+                      style={{
+                        animationDirection: "reverse",
+                        animationDuration: "1.5s",
+                      }}
+                    ></div>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-gray-600 font-medium">
+                      Loading more products...
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Finding the perfect items for you
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={loadMoreProducts}
+                  className="group relative overflow-hidden bg-gradient-to-r from-gray-900 to-black text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 ease-out"
+                >
+                  <span className="relative z-10 flex items-center space-x-2">
+                    <span>Load More Products</span>
+                    <ChevronDown className="w-5 h-5 group-hover:animate-bounce" />
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-black to-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center shadow-lg">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  You've seen it all! ✨
+                </h3>
+                <p className="text-gray-600 max-w-md">
+                  That's every product we have matching your criteria. Try
+                  adjusting your filters to discover more amazing items.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && products.length === 0 && !error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center space-y-6">
+            <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto shadow-lg">
+              <Search className="w-12 h-12 text-gray-500" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                No products found
+              </h3>
+              <p className="text-gray-600 max-w-md mx-auto mb-6">
+                We couldn't find any products matching your search criteria. Try
+                adjusting your filters or search terms.
+              </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center space-x-2 bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Clear All Filters</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ImageUpload from "../components/ImageUpload";
@@ -6,32 +6,52 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import imageCompression from "browser-image-compression";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase";
+import ColorSelector from "../components/ColorSelect";
 
 const CreateProduct = () => {
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    price: "",
-    category: "",
-    stock: "",
-    variants: {
-      colors: [],
-      sizes: [],
-    },
-  });
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Categories and selections
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [selectedChildCategory, setSelectedChildCategory] = useState("");
+  const [totalVariantStock, setTotalVariantStock] = useState(0);
 
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  // Images & loading
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-   const loadCategories = async () => {
+  // Form fields including extra fields
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    price: "",
+    oldPrice: "",
+    stock: "",
+    isPreorder: false,
+    shipping: "",
+    condition: "",
+    warrentyMonths: "",
+    variants: [], // Combined variants: { name, hex, size, stock }
+  });
+
+  // Load categories once on mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    const total = formData.variants.reduce(
+      (sum, v) => sum + (Number(v.stock) || 0),
+      0
+    );
+    setTotalVariantStock(total);
+  }, [formData.variants]);
+
+  const loadCategories = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
       if (!res.ok) throw new Error("Failed to fetch categories");
@@ -42,71 +62,76 @@ const CreateProduct = () => {
     }
   };
 
-  // Variant handlers
-  const addColor = () => {
+  // Handle cascading selects for categories
+  const onCategoryChange = (e) => {
+    setSelectedCategory(e.target.value);
+    setSelectedSubcategory("");
+    setSelectedChildCategory("");
+  };
+
+  const onSubcategoryChange = (e) => {
+    setSelectedSubcategory(e.target.value);
+    setSelectedChildCategory("");
+  };
+
+  const onChildCategoryChange = (e) => {
+    setSelectedChildCategory(e.target.value);
+  };
+
+  // Handle normal inputs
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      variants: {
-        ...prev.variants,
-        colors: [...prev.variants.colors, { name: "", hex: "#000000" }],
-      },
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
-  const updateColor = (index, field, value) => {
-    const newColors = [...formData.variants.colors];
-    newColors[index][field] = value;
+  // Variants: Add a new variant row
+  const addVariant = () => {
     setFormData((prev) => ({
       ...prev,
-      variants: {
+      variants: [
         ...prev.variants,
-        colors: newColors,
-      },
+        { name: "", hex: "#000000", size: "", stock: "" },
+      ],
     }));
   };
 
-  const removeColor = (index) => {
-    const newColors = formData.variants.colors.filter((_, i) => i !== index);
+  // Update variant fields
+  const updateVariant = (index, field, value) => {
+    const newVariants = [...formData.variants];
+    newVariants[index][field] = value;
     setFormData((prev) => ({
       ...prev,
-      variants: {
-        ...prev.variants,
-        colors: newColors,
-      },
+      variants: newVariants,
     }));
   };
 
-  const addSize = () => {
+  // Remove variant row
+  const removeVariant = (index) => {
+    const newVariants = formData.variants.filter((_, i) => i !== index);
     setFormData((prev) => ({
       ...prev,
-      variants: {
-        ...prev.variants,
-        sizes: [...prev.variants.sizes, { name: "", inStock: true }],
-      },
+      variants: newVariants,
     }));
   };
 
-  const updateSize = (index, field, value) => {
-    const newSizes = [...formData.variants.sizes];
-    newSizes[index][field] = field === "inStock" ? value === "true" : value;
-    setFormData((prev) => ({
-      ...prev,
-      variants: {
-        ...prev.variants,
-        sizes: newSizes,
-      },
-    }));
-  };
-
-  const removeSize = (index) => {
-    const newSizes = formData.variants.sizes.filter((_, i) => i !== index);
-    setFormData((prev) => ({
-      ...prev,
-      variants: {
-        ...prev.variants,
-        sizes: newSizes,
-      },
-    }));
+  // Upload images, compress and get URLs
+  const uploadImages = async () => {
+    const compressionOptions = {
+      maxSizeMB: 0.5,
+      maxWidthOrHeight: 1000,
+      useWebWorker: true,
+    };
+    return Promise.all(
+      images.map(async (file) => {
+        const compressedFile = await imageCompression(file, compressionOptions);
+        const imageRef = ref(storage, `products/id_${Date.now()}_${file.name}`);
+        await uploadBytes(imageRef, compressedFile);
+        return getDownloadURL(imageRef);
+      })
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -114,41 +139,49 @@ const CreateProduct = () => {
     setLoading(true);
     setError("");
 
-    const compressionOptions = {
-      maxSizeMB: 0.5,
-      maxWidthOrHeight: 1000,
-      useWebWorker: true,
-    };
-
     try {
-      // 🔄 Upload Product images
-      const imageUrls = await Promise.all(
-        images.map(async (file) => {
-          const compressedFile = await imageCompression(
-            file,
-            compressionOptions
-          );
-          const imageRef = ref(
-            storage,
-            `products/id_${Date.now()}_${file.name}`
-          );
-          await uploadBytes(imageRef, compressedFile);
-          return getDownloadURL(imageRef);
-        })
-      );
+      // Upload images
+      const imageUrls = await uploadImages();
+
+      // Validate required selects
+      if (!selectedCategory || !selectedSubcategory || !selectedChildCategory) {
+        setError("Please select category, subcategory, and child category.");
+        setLoading(false);
+        return;
+      }
+
+      // Prepare payload, transform variants: convert stock to number
+      const variantsPayload =
+        formData.variants.length > 0
+          ? formData.variants.map(({ name, hex, size, stock }) => ({
+              name,
+              hex,
+              size,
+              stock: Number(stock) || 0,
+            }))
+          : [];
+
+      // Calculate total stock if variants exist
+      const totalStock =
+        variantsPayload.length > 0
+          ? variantsPayload.reduce((acc, v) => acc + v.stock, 0)
+          : Number(formData.stock) || 0;
 
       const payload = {
         title: formData.title,
         description: formData.description,
-        price: formData.price,
-        category: formData.category,
-        stock: formData.stock,
+        price: parseFloat(formData.price),
+        oldPrice: formData.oldPrice ? parseFloat(formData.oldPrice) : undefined,
+        category: selectedCategory,
+        subcategory: selectedSubcategory,
+        childCategory: selectedChildCategory,
+        stock: totalStock,
         images: imageUrls,
-        // Only send variants if any colors or sizes exist
-        ...(formData.variants.colors.length > 0 ||
-        formData.variants.sizes.length > 0
-          ? { variants: formData.variants }
-          : {}),
+        isPreorder: formData.isPreorder,
+        shipping: formData.shipping,
+        condition: formData.condition,
+        warrentyMonths: Number(formData.warrentyMonths) || 0,
+        variants: variantsPayload.length > 0 ? variantsPayload : undefined,
       };
 
       const response = await fetch(
@@ -177,13 +210,6 @@ const CreateProduct = () => {
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
   if (!user || user.role !== "store_owner") {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -200,61 +226,57 @@ const CreateProduct = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">
-              Create New Product
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Add a new product to your store
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">
+            Create New Product
+          </h1>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                {error}
-              </div>
-            )}
-
-            {/* Product Title */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Product Title
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                placeholder="Enter product title"
-              />
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+              {error}
             </div>
+          )}
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                required
-                rows={4}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                placeholder="Describe your product"
-              />
-            </div>
-
-            {/* Price and Stock */}
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Title and Description */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium mb-2">
+                  Product Title
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  required
+                  placeholder="Sample Product Name"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  required
+                  rows={4}
+                  placeholder="A detailed description of the product..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Price, Old Price, Stock, Is Preorder */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
                   Price (LKR)
                 </label>
                 <input
@@ -265,158 +287,293 @@ const CreateProduct = () => {
                   required
                   min="0"
                   step="0.01"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  placeholder="2999.99"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Old Price (optional)
+                </label>
+                <input
+                  type="number"
+                  name="oldPrice"
+                  value={formData.oldPrice}
+                  onChange={handleChange}
+                  min="0"
+                  step="0.01"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
                   placeholder="0.00"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium mb-2">
                   Stock Quantity
                 </label>
                 <input
                   type="number"
                   name="stock"
-                  value={formData.stock}
+                  value={
+                    formData.variants.length > 0
+                      ? totalVariantStock
+                      : formData.stock
+                  }
                   onChange={handleChange}
-                  required
                   min="0"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  className={`w-full border rounded-lg px-4 py-2 ${
+                    formData.variants.length > 0
+                      ? "bg-gray-100 cursor-not-allowed"
+                      : "border-gray-300"
+                  }`}
+                  placeholder="0"
+                  disabled={formData.variants.length > 0}
+                  required={formData.variants.length === 0}
+                />
+                {formData.variants.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Stock is managed via variants and cannot be set here.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2 mt-6 md:mt-0">
+                <input
+                  type="checkbox"
+                  name="isPreorder"
+                  checked={formData.isPreorder}
+                  onChange={handleChange}
+                  id="isPreorder"
+                  className="h-5 w-5"
+                />
+                <label htmlFor="isPreorder" className="text-sm font-medium">
+                  Is Preorder
+                </label>
+              </div>
+            </div>
+
+            {/* Category, Subcategory, Child Category */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Category
+                </label>
+                <select
+                  value={selectedCategory}
+                  onChange={onCategoryChange}
+                  required
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((cat) => (
+                    <option key={cat._id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Subcategory
+                </label>
+                <select
+                  value={selectedSubcategory}
+                  onChange={onSubcategoryChange}
+                  required
+                  disabled={!selectedCategory}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  <option value="">Select a subcategory</option>
+                  {categories
+                    .find((cat) => cat.name === selectedCategory)
+                    ?.subcategories.map((subcat) => (
+                      <option key={subcat.name} value={subcat.name}>
+                        {subcat.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Child Category
+                </label>
+                <select
+                  value={selectedChildCategory}
+                  onChange={onChildCategoryChange}
+                  required
+                  disabled={!selectedSubcategory}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  <option value="">Select a child category</option>
+                  {categories
+                    .find((cat) => cat.name === selectedCategory)
+                    ?.subcategories.find(
+                      (sub) => sub.name === selectedSubcategory
+                    )
+                    ?.childCategories.map((childCat) => (
+                      <option key={childCat} value={childCat}>
+                        {childCat}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Shipping, Condition, Warranty */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Shipping Info
+                </label>
+                <select
+                  name="shipping"
+                  value={formData.shipping}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  <option value="">Select shipping</option>
+                  <option value="free-shipping">Free Shipping</option>
+                  <option value="paid-shipping">Paid Shipping</option>
+                  <option value="local-pickup">Local Pickup</option>
+                </select>
+                <p className="text-xs text-gray-500 mb-2">
+                  You can only charge for the <b>Paid Shipping</b> fees through
+                  the user.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Condition
+                </label>
+                <select
+                  name="condition"
+                  value={formData.condition}
+                  onChange={handleChange}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  <option value="">Select condition</option>
+                  <option value="new">New</option>
+                  <option value="used">Used</option>
+                  <option value="refurbished">Refurbished</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Warranty Months
+                </label>
+                <input
+                  type="number"
+                  name="warrentyMonths"
+                  value={formData.warrentyMonths}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
                   placeholder="0"
                 />
               </div>
             </div>
 
-            {/* Category */}
+            {/* Variants */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+              <label className="block text-sm font-medium mb-2">Variants</label>
+              <p className="text-xs text-gray-500 mb-2">
+                Add color, size, and stock for each variant combination.
+              </p>
+
+              {formData.variants.map((variant, idx) => (
+                <div key={idx} className="flex items-center space-x-4 mb-3">
+                  <ColorSelector
+                    selectedColor={variant.name}
+                    onColorSelect={(index, colorName) => {
+                      updateVariant(index, "name", colorName);
+                    }}
+                    variantIndex={idx}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Size (e.g. M, L, 42)"
+                    value={variant.size}
+                    onChange={(e) => updateVariant(idx, "size", e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-2 w-32 h-10"
+
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stock"
+                    value={variant.stock}
+                    onChange={(e) =>
+                      updateVariant(idx, "stock", e.target.value)
+                    }
+                    min="0"
+                    className="border border-gray-300 rounded-lg px-3 py-2 w-20 h-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeVariant(idx)}
+                    className="text-red-500 hover:text-red-700 px-2 py-2 h-10 flex items-center"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addVariant}
+                className="text-blue-500 hover:text-blue-700 font-medium"
               >
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+                + Add Variant
+              </button>
+
+              {formData.variants.length > 0 && (
+                <p className="text-sm font-medium mt-2">
+                  Total Stock (from variants):{" "}
+                  <span className="text-green-600 font-semibold">
+                    {totalVariantStock}
+                  </span>
+                </p>
+              )}
             </div>
 
             {/* Product Images */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 Product Images (up to 10)
               </label>
               <ImageUpload
                 images={images}
                 onImagesChange={setImages}
                 maxImages={10}
-                multiple={true}
+                multiple
               />
             </div>
 
-            {/* Variants Section */}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Color Variants
-              </label>
-              {formData.variants.colors.map((color, index) => (
-                <div key={index} className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="text"
-                    placeholder="Color Name"
-                    value={color.name}
-                    onChange={(e) => updateColor(index, "name", e.target.value)}
-                    className="border border-gray-300 rounded px-2 py-1"
-                  />
-                  <input
-                    type="color"
-                    value={color.hex}
-                    onChange={(e) => updateColor(index, "hex", e.target.value)}
-                    className="w-10 h-10 border"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeColor(index)}
-                    className="text-red-500 hover:underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addColor}
-                className="text-blue-500 hover:underline mt-2"
-              >
-                + Add Color
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Size Variants
-              </label>
-              {formData.variants.sizes.map((size, index) => (
-                <div key={index} className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="text"
-                    placeholder="Size Name"
-                    value={size.name}
-                    onChange={(e) => updateSize(index, "name", e.target.value)}
-                    className="border border-gray-300 rounded px-2 py-1"
-                  />
-                  <select
-                    value={size.inStock ? "true" : "false"}
-                    onChange={(e) =>
-                      updateSize(index, "inStock", e.target.value)
-                    }
-                    className="border border-gray-300 rounded px-2 py-1"
-                  >
-                    <option value="true">In Stock</option>
-                    <option value="false">Out of Stock</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeSize(index)}
-                    className="text-red-500 hover:underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addSize}
-                className="text-blue-500 hover:underline mt-2"
-              >
-                + Add Size
-              </button>
-            </div>
-
-            <div className="flex justify-end space-x-4">
+            {/* Buttons */}
+            <div className="flex justify-end space-x-4 mt-8">
               <button
                 type="button"
                 onClick={() => navigate("/dashboard")}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
               >
-                <div className="flex items-center space-x-2">
-                  {loading && <LoadingSpinner size="sm" />}
-                  <span>{loading ? "Creating..." : "Create Product"}</span>
-                </div>
+                {loading ? (
+                  <div className="flex items-center space-x-2">
+                    <LoadingSpinner size="sm" />
+                    <span>Creating...</span>
+                  </div>
+                ) : (
+                  "Create Product"
+                )}
               </button>
             </div>
           </form>
