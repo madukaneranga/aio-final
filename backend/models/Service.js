@@ -15,6 +15,10 @@ const serviceSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
+  oldPrice: {
+    type: Number,
+    min: 0,
+  },
   priceType: {
     type: String,
     enum: ["fixed", "hourly"],
@@ -25,12 +29,6 @@ const serviceSchema = new mongoose.Schema({
       type: String,
     },
   ],
-  // Updated category structure
-  categoryId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Category",
-    required: true,
-  },
   category: {
     type: String,
     required: true,
@@ -46,15 +44,21 @@ const serviceSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-
+  rating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5,
+  },
   duration: {
     type: Number, // in minutes
-    required: true,
   },
   timeSlots: [
     {
+      day: Date,
       startTime: String,
       endTime: String,
+      taken: { type: Boolean, default: false },
     },
   ],
   storeId: {
