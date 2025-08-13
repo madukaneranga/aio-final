@@ -54,7 +54,8 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
     },
     shippingInfo: {
       freeShipping: true,
-      deliveryTime: "1-3 business days",
+      deliveryDaysMin: 3,
+      deliveryDaysMax: 5,
       areas: ["default1", "defaultr2", "default3"],
     },
     ownerId: {
@@ -757,7 +758,8 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Avg. delivery:</span>
                       <span className="font-medium text-green-600">
-                        {storeData.shippingInfo.deliveryTime}
+                        {storeData.shippingInfo.deleveryDaysMin} -{" "}
+                        {storeData.shippingInfo.deleveryDaysMax}
                       </span>
                     </div>
                   </div>

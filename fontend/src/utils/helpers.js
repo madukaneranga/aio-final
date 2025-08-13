@@ -17,6 +17,7 @@ import {
   Twitch,
 
 } from "lucide-react";
+
 // Format currency
 export const formatCurrency = (amount, currency = 'LKR') => {
   return new Intl.NumberFormat('en-US', {

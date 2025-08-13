@@ -34,7 +34,7 @@ const upload = multer({
   },
 });
 
-// Get all active products 
+// Get all active products
 router.get("/", async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, storeId } = req.query;
@@ -76,22 +76,62 @@ router.get("/", async (req, res) => {
 router.post("/listing", async (req, res) => {
   try {
     const {
+      search,
       category,
-      categoryId,
       subcategory,
       childCategory,
-      search,
+      stock,
+      rating,
+      shipping,
+      condition,
+      warrantyMonths,
       minPrice,
       maxPrice,
+      page = 1,
+      limit = 20,
     } = req.body;
 
-    const query = { isActive: true };
-    
-    if (category) query.category = category;
-    if (categoryId) query.categoryId = categoryId;
-    if (subcategory) query.subcategory = subcategory;
-    if (childCategory) query.childCategory = childCategory;
+    console.log("Received search request:", {
+      search,
+      category,
+      subcategory,
+      childCategory,
+      stock,
+      rating,
+      shipping,
+      condition,
+      warrantyMonths,
+      minPrice,
+      maxPrice,
+      page,
+      limit,
+    });
 
+    // Build the base query
+    const query = { isActive: true };
+
+    // Category filters (hierarchical)
+    if (childCategory) query.childCategory = childCategory;
+    else if (subcategory) query.subcategory = subcategory;
+    else if (category) query.category = category;
+
+    // Stock filter
+    if (stock) {
+      if (stock === "in") {
+        query.stock = { $gt: 0 }; // In stock: greater than 0
+      }
+      if (stock === "out") {
+        query.stock = { $eq: 0 }; // Out of stock: exactly 0
+      }
+    }
+
+    // Other filters
+    if (rating) query.rating = { $gte: rating };
+    if (shipping) query.shipping = shipping;
+    if (condition) query.condition = condition;
+    if (warrantyMonths) query.warrentyMonths = { $gte: warrantyMonths };
+
+    // Search filter (title and description)
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: "i" } },
@@ -99,22 +139,82 @@ router.post("/listing", async (req, res) => {
       ];
     }
 
+    // Price range filter
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = parseFloat(minPrice);
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
 
-    const products = await Product.find(query)
-      .populate("storeId", "name type")
-      .sort({ createdAt: -1 });
+    // Calculate pagination
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
 
-    res.json(products);
+    console.log("Executing query:", JSON.stringify(query, null, 2));
+    console.log("Pagination:", { page: pageNumber, limit: pageSize, skip });
+
+    // Execute queries in parallel for better performance
+    const [products, totalCount] = await Promise.all([
+      // Get paginated products
+      Product.find(query)
+        .populate("storeId", "name type")
+        .sort({ createdAt: -1 }) // Sort by newest first
+        .skip(skip)
+        .limit(pageSize)
+        .lean(), // Use lean() for better performance
+
+      // Get total count for pagination info
+      Product.countDocuments(query),
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const hasMore = pageNumber < totalPages;
+    const hasPrevious = pageNumber > 1;
+
+    // Enhanced response with pagination metadata
+    const response = {
+      products,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalProducts: totalCount,
+        productsPerPage: pageSize,
+        hasMore,
+        hasPrevious,
+        startIndex: skip + 1,
+        endIndex: Math.min(skip + pageSize, totalCount),
+      },
+      // Legacy support for frontend
+      total: totalCount,
+      hasMore,
+      // Performance metrics (optional - remove in production)
+      meta: {
+        query: query,
+        executionTime: new Date(),
+        resultsFound: products.length,
+      },
+    };
+
+    console.log("Returning results:", {
+      productsCount: products.length,
+      totalCount,
+      currentPage: pageNumber,
+      totalPages,
+      hasMore,
+    });
+
+    res.json(response);
   } catch (error) {
     console.error("Search error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      error: error.message,
+      details: "An error occurred while fetching products",
+    });
   }
 });
+
 
 // Get product by ID
 router.get("/:id", async (req, res) => {
@@ -141,10 +241,17 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       title,
       description,
       price,
+      oldPrice,
       category,
+      subcategory,
+      childCategory,
       stock,
       images,
-      variants, // <--- add this line
+      variants,
+      isPreorder = false,
+      shipping,
+      condition,
+      warrentyMonths = 0,
     } = req.body;
 
     // Verify store ownership
@@ -161,7 +268,7 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       });
     }
 
-    //Check Limits
+    // Check Limits
     const userId = req.user._id;
     const userPackage = await getUserPackage(userId);
 
@@ -176,23 +283,41 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       });
     }
 
-    if (variants && !userPackage.itemVariants) {
+    if (variants && variants.length > 0 && !userPackage.itemVariant) {
       return res
         .status(403)
         .json({ error: "Your current plan does not allow item variants" });
     }
 
-    //Create Product
+    // Calculate total stock
+    let totalStock = 0;
+    if (variants && variants.length > 0) {
+      totalStock = variants.reduce(
+        (acc, variant) => acc + (parseInt(variant.stock) || 0),
+        0
+      );
+    } else {
+      totalStock = parseInt(stock) || 0;
+    }
+
     const product = new Product({
       title,
       description,
       price: parseFloat(price),
+      oldPrice: oldPrice ? parseFloat(oldPrice) : undefined,
+      category: category || "",
+      subcategory: subcategory || "",
+      childCategory: childCategory || "",
+      stock: totalStock,
       images,
-      category,
-      stock: parseInt(stock),
+      isPreorder,
+      shipping: shipping || "",
+      condition: condition || "",
+      warrentyMonths: parseInt(warrentyMonths) || 0,
+      orderCount: 0,
       storeId: store._id,
       ownerId: req.user._id,
-      variants, // <--- add variants here
+      variants: variants && variants.length > 0 ? variants : [],
     });
 
     await product.save();

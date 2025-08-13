@@ -116,8 +116,8 @@ const storeSchema = new mongoose.Schema({
     default: "Bronze",
   },
   responseTime: {
-    type: String,
-    default: "24 hours",
+    type: Number,
+    default: 0,
   },
   completionRate: {
     type: Number,
@@ -145,9 +145,13 @@ const storeSchema = new mongoose.Schema({
       type: Boolean,
       default: false,
     },
-    deliveryTime: {
-      type: String,
-      default: "3-5 business days",
+    deliveryDaysMin: {
+      type: Number,
+      default: 3,
+    },
+    deliveryDaysMax: {
+      type: Number,
+      default: 3,
     },
     areas: [
       {
