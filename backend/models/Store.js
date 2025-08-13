@@ -145,9 +145,13 @@ const storeSchema = new mongoose.Schema({
       type: Boolean,
       default: false,
     },
-    deliveryTime: {
-      type: String,
-      default: "3-5 business days",
+    deliveryDaysMin: {
+      type: Number,
+      default: 3,
+    },
+    deliveryDaysMax: {
+      type: Number,
+      default: 3,
     },
     areas: [
       {

@@ -433,9 +433,9 @@ const CreateProduct = () => {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"
                 >
                   <option value="">Select shipping</option>
-                  <option value="Free Shipping">Free Shipping</option>
-                  <option value="Paid Shipping">Paid Shipping</option>
-                  <option value="Local Pickup">Local Pickup</option>
+                  <option value="free-shipping">Free Shipping</option>
+                  <option value="paid-shipping">Paid Shipping</option>
+                  <option value="local-pickup">Local Pickup</option>
                 </select>
                 <p className="text-xs text-gray-500 mb-2">
                   You can only charge for the <b>Paid Shipping</b> fees through
@@ -454,9 +454,9 @@ const CreateProduct = () => {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"
                 >
                   <option value="">Select condition</option>
-                  <option value="New">New</option>
-                  <option value="Used">Used</option>
-                  <option value="Refurbished">Refurbished</option>
+                  <option value="new">New</option>
+                  <option value="used">Used</option>
+                  <option value="refurbished">Refurbished</option>
                 </select>
               </div>
 

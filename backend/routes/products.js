@@ -75,23 +75,53 @@ router.get("/", async (req, res) => {
 // Search/filter products via POST
 router.post("/listing", async (req, res) => {
   try {
-    const { category, subcategory, childCategory, search, minPrice, maxPrice } =
-      req.body;
-
-    console.log("Received search request:", {
+    const {
+      search,
       category,
       subcategory,
       childCategory,
+      stock,
+      rating,
+      shipping,
+      condition,
+      warrantyMonths,
+      minPrice,
+      maxPrice,
+    } = req.body;
+
+    console.log("Received search request:", {
       search,
+      category,
+      subcategory,
+      childCategory,
+      stock,
+      rating,
+      shipping,
+      condition,
+      warrantyMonths,
       minPrice,
       maxPrice,
     });
 
     const query = { isActive: true };
 
-    if (category) query.category = category;
-    if (subcategory) query.subcategory = subcategory;
     if (childCategory) query.childCategory = childCategory;
+    else if (subcategory) query.subcategory = subcategory;
+    else if (category) query.category = category;
+
+    if (stock) {
+      if (stock === "in") {
+        query.stock = { $gt: 0 }; // In stock: greater than 0
+      }
+      if (stock === "out") {
+        query.stock = { $eq: 0 }; // Out of stock: exactly 0
+      }
+    }
+
+    if (rating) query.rating = { $gte: rating };
+    if (shipping) query.shipping = shipping;
+    if (condition) query.condition = condition;
+    if (warrantyMonths) query.warrentyMonths = { $gte: warrantyMonths };
 
     if (search) {
       query.$or = [
