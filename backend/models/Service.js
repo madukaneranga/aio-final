@@ -19,10 +19,10 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     min: 0,
   },
-  priceType: {
-    type: String,
-    enum: ["fixed", "hourly"],
-    default: "fixed",
+  duration: {
+    type: Number,
+    required: true,
+    min: 30,
   },
   images: [
     {
@@ -50,17 +50,21 @@ const serviceSchema = new mongoose.Schema({
     min: 0,
     max: 5,
   },
+  bookingSettings: {
+    maxAdvanceBookingDays: Number, // Override store setting if needed
+    minAdvanceBookingHours: {
+      type: Number,
+      default: 1,
+    },
+    maxBookingsPerDay: Number,
+    maxBookingsPerSlot: {
+      type: Number,
+      default: 1,
+    },
+  },
   duration: {
     type: Number, // in minutes
   },
-  timeSlots: [
-    {
-      day: Date,
-      startTime: String,
-      endTime: String,
-      taken: { type: Boolean, default: false },
-    },
-  ],
   storeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Store",

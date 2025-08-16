@@ -1,59 +1,27 @@
-// src/components/FiltersSidebar.jsx
-import React, { useEffect } from "react";
+import React from "react";
 import { X, Star } from "lucide-react";
 
-const ProductsFiltersSidebar = ({
+const ServicesFiltersSidebar = ({
   showFilters,
   setShowFilters,
-  categories,
-  selectedCategoryId,
-  setSelectedCategoryId,
-  selectedCategory,
-  setSelectedCategory,
-  selectedSubcategory,
-  setSelectedSubcategory,
-  selectedChildCategory,
-  setSelectedChildCategory,
-  priceRange,
-  setPriceRange,
-  handleSearch,
-  selectedStock,
-  setSelectedStock,
-  selectedRating,
-  setSelectedRating,
-  selectedShipping,
-  setSelectedShipping,
-  selectedCondition,
-  setSelectedCondition,
-  selectedWarrentyMonths,
-  setSelectedWarrentyMonths,
+  categorySet,
+  filters,
+  updateFilter,
+  updateFilters,
+  clearAllFilters,
 }) => {
-  const selectedCategoryObj = categories.find(
-    (cat) => cat._id === selectedCategoryId
+  const selectedCategoryObj = categorySet.find(
+    (cat) => cat.name === filters.category
   );
   const subcategories = selectedCategoryObj?.subcategories || [];
 
   const selectedSubcategoryObj = subcategories.find(
-    (sub) => sub.name === selectedSubcategory
+    (sub) => sub.name === filters.subcategory
   );
 
   const childCategories = (
     selectedSubcategoryObj?.childCategories || []
   ).filter((child) => child && (child.name || typeof child === "string"));
-
-  // Clear all filters
-  const clearAllFilters = () => {
-    setSelectedCategoryId("");
-    setSelectedCategory("");
-    setSelectedSubcategory("");
-    setSelectedChildCategory("");
-    setPriceRange({ min: "", max: "" });
-  };
-
-  // Auto-trigger search on price range changes (because setPriceRange is async)
-  useEffect(() => {
-    handleSearch();
-  }, [priceRange]);
 
   return (
     <>
@@ -96,48 +64,29 @@ const ProductsFiltersSidebar = ({
 
             {/* Main Category */}
             <select
-              value={selectedCategoryId}
-              onChange={(e) => {
-                const categoryId = e.target.value;
-                const category = categories.find(
-                  (cat) => cat._id === categoryId
-                );
-
-                setSelectedCategoryId(categoryId);
-                setSelectedCategory(category?.name || "");
-                setSelectedSubcategory(""); // Reset subcategory
-                setSelectedChildCategory(""); // Reset child category
-
-                handleSearch(); // Auto apply filter
-              }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              value={filters.category}
+              onChange={(e) => updateFilter('category', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2"
             >
               <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat._id} value={cat._id}>
+              {categorySet.map((cat) => (
+                <option key={cat.name} value={cat.name}>
                   {cat.name}
                 </option>
               ))}
             </select>
 
             {/* Subcategory */}
-            {selectedCategoryId && subcategories.length > 0 && (
+            {filters.category && subcategories.length > 0 && (
               <select
-                value={selectedSubcategory}
-                onChange={(e) => {
-                  const subcategoryValue = e.target.value;
-
-                  setSelectedSubcategory(subcategoryValue);
-                  setSelectedChildCategory(""); // Reset child category
-
-                  handleSearch(); // Auto apply filter
-                }}
+                value={filters.subcategory}
+                onChange={(e) => updateFilter('subcategory', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2"
               >
                 <option value="">All Subcategories</option>
                 {subcategories.map((sub, index) => (
                   <option
-                    key={`subcategory-${selectedCategoryId}-${index}`}
+                    key={`subcategory-${filters.category}-${index}`}
                     value={sub.name}
                   >
                     {sub.name}
@@ -147,29 +96,22 @@ const ProductsFiltersSidebar = ({
             )}
 
             {/* Child Category */}
-            {selectedSubcategory && childCategories.length > 0 && (
+            {filters.subcategory && childCategories.length > 0 && (
               <select
-                value={selectedChildCategory}
-                onChange={(e) => {
-                  const childCategoryValue = e.target.value;
-                  setSelectedChildCategory(childCategoryValue);
-
-                  handleSearch(); // Auto apply filter
-                }}
+                value={filters.childCategory}
+                onChange={(e) => updateFilter('childCategory', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2"
               >
                 <option value="">All Child Categories</option>
                 {childCategories.map((child, index) => {
-                  const childName =
-                    typeof child === "string" ? child : child.name;
-                  const childValue =
-                    typeof child === "string"
-                      ? child
-                      : child.name || child._id || child;
+                  const childName = typeof child === "string" ? child : child.name;
+                  const childValue = typeof child === "string" 
+                    ? child 
+                    : child.name || child._id || child;
 
                   return (
                     <option
-                      key={`childcategory-${selectedCategoryId}-${selectedSubcategory}-${index}`}
+                      key={`childcategory-${filters.category}-${filters.subcategory}-${index}`}
                       value={childValue}
                     >
                       {childName}
@@ -188,57 +130,46 @@ const ProductsFiltersSidebar = ({
             <div className="flex gap-2">
               <input
                 type="number"
-                name="min"
-                value={priceRange.min}
+                value={filters.priceRange.min}
                 min="0"
-                onChange={(e) =>
-                  setPriceRange({
-                    ...priceRange,
-                    min:
-                      e.target.value === ""
-                        ? ""
-                        : Math.max(0, Number(e.target.value)),
-                  })
-                }
+                onChange={(e) => {
+                  const value = e.target.value === "" ? "" : Math.max(0, Number(e.target.value));
+                  updateFilter('priceRange', { ...filters.priceRange, min: value });
+                }}
                 placeholder="Min"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               />
               <input
                 type="number"
-                name="max"
-                value={priceRange.max}
+                value={filters.priceRange.max}
                 min="0"
-                onChange={(e) =>
-                  setPriceRange({
-                    ...priceRange,
-                    max:
-                      e.target.value === ""
-                        ? ""
-                        : Math.max(0, Number(e.target.value)),
-                  })
-                }
+                onChange={(e) => {
+                  const value = e.target.value === "" ? "" : Math.max(0, Number(e.target.value));
+                  updateFilter('priceRange', { ...filters.priceRange, max: value });
+                }}
                 placeholder="Max"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
               />
             </div>
           </div>
 
-          {/* Stock Availability */}
+          {/* Duration */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Stock Availability
+              Max Duration
             </label>
             <select
-              value={selectedStock}
-              onChange={(e) => {
-                setSelectedStock(e.target.value);
-                handleSearch();
-              }}
+              value={filters.duration}
+              onChange={(e) => updateFilter('duration', e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2"
             >
               <option value="">All</option>
-              <option value="in-stock">In Stock</option>
-              <option value="out-of-stock">Out of Stock</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hr</option>
+              <option value="180">3 hrs</option>
+              <option value="360">6 hrs</option>
+              <option value="720">12 hrs</option>
+              <option value="1440">24 hrs</option>
             </select>
           </div>
 
@@ -253,108 +184,33 @@ const ProductsFiltersSidebar = ({
                   key={star}
                   size={24}
                   className={`transition-colors ${
-                    star <= selectedRating ? "text-yellow-400" : "text-gray-300"
+                    star <= filters.rating ? "text-yellow-400" : "text-gray-300"
                   }`}
                   onClick={() => {
-                    // toggle rating: if clicked star is already selected, clear it
-                    setSelectedRating(star === selectedRating ? "" : star);
-                    handleSearch();
+                    const newRating = star === filters.rating ? "" : star;
+                    updateFilter('rating', newRating);
                   }}
                 />
               ))}
             </div>
           </div>
 
-          {/* Shipping */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Shipping Options
-            </label>
-            <select
-              value={selectedShipping}
-              onChange={(e) => {
-                setSelectedShipping(e.target.value);
-                handleSearch();
-              }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="">All</option>
-              <option value="free">Free Shipping</option>
-              <option value="paid">Paid Shipping</option>
-            </select>
-          </div>
-
-          {/* Condition */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Condition
-            </label>
-            <select
-              value={selectedCondition}
-              onChange={(e) => {
-                setSelectedCondition(e.target.value);
-                handleSearch();
-              }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="">Any</option>
-              <option value="new">New</option>
-              <option value="used">Used</option>
-              <option value="refurbished">Refurbished</option>
-            </select>
-          </div>
-
-          {/* Warranty Months */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Warranty (Months)
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={selectedWarrentyMonths}
-              onChange={(e) => {
-                setSelectedWarrentyMonths(e.target.value);
-                handleSearch();
-              }}
-              placeholder="e.g., 12"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Enter warranty months (e.g., 6 means ≥ 6 months)
-            </p>
-          </div>
+         
         </div>
 
         {/* Footer Buttons */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white space-y-2">
           <button
             type="button"
-            onClick={() => {
-              clearAllFilters();
-              handleSearch();
-            }}
+            onClick={clearAllFilters}
             className="w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
           >
             Clear All Filters
           </button>
-          {/* Optional: keep this if you want manual Apply Filters button */}
-          {/* 
-          <button
-            type="button"
-            onClick={() => {
-              handleSearch();
-              setShowFilters(false);
-            }}
-            className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            Apply Filters
-          </button> 
-          */}
         </div>
       </div>
     </>
   );
 };
 
-export default ProductsFiltersSidebar;
+export default ServicesFiltersSidebar;

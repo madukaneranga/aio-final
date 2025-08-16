@@ -3,14 +3,26 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ImageUpload from "../components/ImageUpload";
 import ColorThemeSelector from "../components/ColorThemeSelector";
-import TimeSlotManager from "../components/TimeSlotManager";
 import LoadingSpinner from "../components/LoadingSpinner";
 import imageCompression from "browser-image-compression";
-import { Store, Camera, Eye, EyeOff, MessageSquare, Star } from "lucide-react";
+import {
+  Store,
+  Camera,
+  Eye,
+  EyeOff,
+  MessageSquare,
+  Star,
+  Clock,
+  Calendar,
+  Plus,
+  Trash2,
+  Settings,
+  X,
+} from "lucide-react";
 
-//  ADDED: Firebase storage imports
+// Firebase storage imports
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+import { storage } from "../utils/firebase";
 
 const StoreManagement = () => {
   const { user } = useAuth();
@@ -25,20 +37,43 @@ const StoreManagement = () => {
   const [success, setSuccess] = useState("");
   const [reviewFilter, setReviewFilter] = useState("all");
   const [subscription, setSubscription] = useState(null);
-  const [timeSlots, setTimeSlots] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     themeColor: "#000000",
+    storeType: "product",
     contactInfo: {
       email: "",
       phone: "",
       address: "",
     },
+    serviceSettings: {
+      workingHours: {
+        start: "09:00",
+        end: "17:00",
+      },
+      workingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      excludedDates: [],
+      timeZone: "Asia/Colombo",
+      bookingBuffer: 0,
+      advanceBookingDays: 30,
+    },
   });
+
   const [heroImages, setHeroImages] = useState([]);
   const [profileImage, setProfileImage] = useState(null);
+  const [newExcludedDate, setNewExcludedDate] = useState("");
+
+  const weekDays = [
+    { value: "monday", label: "Monday" },
+    { value: "tuesday", label: "Tuesday" },
+    { value: "wednesday", label: "Wednesday" },
+    { value: "thursday", label: "Thursday" },
+    { value: "friday", label: "Friday" },
+    { value: "saturday", label: "Saturday" },
+    { value: "sunday", label: "Sunday" },
+  ];
 
   useEffect(() => {
     if (user?.role === "store_owner" && user?.storeId) {
@@ -57,15 +92,29 @@ const StoreManagement = () => {
       if (response.ok) {
         const data = await response.json();
         setStore(data.store);
-        setTimeSlots(data.timeSlots);
         setFormData({
           name: data.store.name || "",
           description: data.store.description || "",
           themeColor: data.store.themeColor || "#000000",
+          storeType: data.store.storeType || "product",
           contactInfo: data.store.contactInfo || {
             email: "",
             phone: "",
             address: "",
+          },
+          serviceSettings: data.store.serviceSettings || {
+            workingHours: { start: "09:00", end: "17:00" },
+            workingDays: [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+            ],
+            excludedDates: [],
+            timeZone: "Asia/Colombo",
+            bookingBuffer: 0,
+            advanceBookingDays: 30,
           },
         });
       }
@@ -124,7 +173,7 @@ const StoreManagement = () => {
     };
 
     try {
-      // 🔄 Upload Hero images
+      // Upload Hero images
       let imageUrls = await Promise.all(
         heroImages.map(async (file) => {
           const compressedFile = await imageCompression(
@@ -136,15 +185,17 @@ const StoreManagement = () => {
           return getDownloadURL(imageRef);
         })
       );
-      // Use existing images if no new ones are uploaded
+
       const finalImages = imageUrls.length > 0 ? imageUrls : store.heroImages;
 
       const payload = {
         name: formData.name,
         description: formData.description,
         themeColor: formData.themeColor,
+        storeType: formData.storeType,
         contactInfo: formData.contactInfo,
         heroImages: finalImages,
+        serviceSettings: formData.serviceSettings,
       };
 
       const response = await fetch(
@@ -158,7 +209,6 @@ const StoreManagement = () => {
           body: JSON.stringify(payload),
         }
       );
-
 
       if (response.ok) {
         const updatedStore = await response.json();
@@ -189,13 +239,12 @@ const StoreManagement = () => {
         profileImage,
         compressionOptionsProfile
       );
-      // Upload a single image to Firebase
       const imageRef = ref(storage, `users/${Date.now()}_${profileImage.name}`);
       await uploadBytes(imageRef, compressedFile);
       const imageUrl = await getDownloadURL(imageRef);
 
       const payload = {
-        profileImage: imageUrl, // use imageUrl directly, not array
+        profileImage: imageUrl,
       };
 
       const response = await fetch(
@@ -235,12 +284,81 @@ const StoreManagement = () => {
           [field]: value,
         },
       }));
+    } else if (name.startsWith("serviceSettings.")) {
+      const parts = name.split(".");
+      if (parts.length === 3) {
+        // Handle nested objects like workingHours.start
+        const [, section, field] = parts;
+        setFormData((prev) => ({
+          ...prev,
+          serviceSettings: {
+            ...prev.serviceSettings,
+            [section]: {
+              ...prev.serviceSettings[section],
+              [field]: value,
+            },
+          },
+        }));
+      } else {
+        // Handle direct fields like timeZone
+        const field = parts[1];
+        setFormData((prev) => ({
+          ...prev,
+          serviceSettings: {
+            ...prev.serviceSettings,
+            [field]: value,
+          },
+        }));
+      }
     } else {
       setFormData((prev) => ({
         ...prev,
         [name]: value,
       }));
     }
+  };
+
+  const handleWorkingDaysChange = (day) => {
+    setFormData((prev) => ({
+      ...prev,
+      serviceSettings: {
+        ...prev.serviceSettings,
+        workingDays: prev.serviceSettings.workingDays.includes(day)
+          ? prev.serviceSettings.workingDays.filter((d) => d !== day)
+          : [...prev.serviceSettings.workingDays, day],
+      },
+    }));
+  };
+
+  const addExcludedDate = () => {
+    if (
+      newExcludedDate &&
+      !formData.serviceSettings.excludedDates.includes(newExcludedDate)
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        serviceSettings: {
+          ...prev.serviceSettings,
+          excludedDates: [
+            ...prev.serviceSettings.excludedDates,
+            newExcludedDate,
+          ],
+        },
+      }));
+      setNewExcludedDate("");
+    }
+  };
+
+  const removeExcludedDate = (dateToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      serviceSettings: {
+        ...prev.serviceSettings,
+        excludedDates: prev.serviceSettings.excludedDates.filter(
+          (date) => date !== dateToRemove
+        ),
+      },
+    }));
   };
 
   const toggleReviewVisibility = async (reviewId, isVisible) => {
@@ -264,7 +382,7 @@ const StoreManagement = () => {
         }
       } else {
         setInvitation(
-          "To manage reviews and enhance your brand credibility, simply upgrade your package. It’s quick, easy, and unlocks powerful features to grow your business."
+          "To manage reviews and enhance your brand credibility, simply upgrade your package. It's quick, easy, and unlocks powerful features to grow your business."
         );
       }
     } catch (error) {
@@ -522,6 +640,196 @@ const StoreManagement = () => {
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                 />
               </div>
+
+              {/* Service Settings - Only show for service stores */}
+              {store.type === "service" && (
+                <div className="border-t pt-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                    <Clock className="w-5 h-5 mr-2" />
+                    Service & Booking Settings
+                  </h3>
+
+                  <div className="space-y-6">
+                    {/* Working Hours */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Working Hours
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            name="serviceSettings.workingHours.start"
+                            value={formData.serviceSettings.workingHours.start}
+                            onChange={handleChange}
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">
+                            End Time
+                          </label>
+                          <input
+                            type="time"
+                            name="serviceSettings.workingHours.end"
+                            value={formData.serviceSettings.workingHours.end}
+                            onChange={handleChange}
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Working Days */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Working Days
+                      </label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {weekDays.map((day) => (
+                          <label
+                            key={day.value}
+                            className="flex items-center space-x-2 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.serviceSettings.workingDays.includes(
+                                day.value
+                              )}
+                              onChange={() =>
+                                handleWorkingDaysChange(day.value)
+                              }
+                              className="w-4 h-4 text-black focus:ring-black border-gray-300 rounded"
+                            />
+                            <span className="text-sm text-gray-700">
+                              {day.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Excluded Dates */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Excluded Dates (Holidays/Closures)
+                      </label>
+                      <div className="space-y-3">
+                        <div className="flex space-x-2">
+                          <input
+                            type="date"
+                            value={newExcludedDate}
+                            onChange={(e) => setNewExcludedDate(e.target.value)}
+                            min={new Date().toISOString().split("T")[0]}
+                            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                          />
+                          <button
+                            type="button"
+                            onClick={addExcludedDate}
+                            className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {formData.serviceSettings.excludedDates.length > 0 && (
+                          <div className="space-y-2">
+                            {formData.serviceSettings.excludedDates.map(
+                              (date, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
+                                >
+                                  <span className="text-sm text-gray-700">
+                                    {new Date(date).toLocaleDateString()}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeExcludedDate(date)}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Additional Settings */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Booking Buffer (minutes)
+                        </label>
+                        <input
+                          type="number"
+                          name="serviceSettings.bookingBuffer"
+                          value={formData.serviceSettings.bookingBuffer}
+                          onChange={handleChange}
+                          min="0"
+                          max="60"
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                          placeholder="0"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Buffer time between bookings
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Advance Booking Days
+                        </label>
+                        <input
+                          type="number"
+                          name="serviceSettings.advanceBookingDays"
+                          value={formData.serviceSettings.advanceBookingDays}
+                          onChange={handleChange}
+                          min="1"
+                          max="365"
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                          placeholder="30"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          How far in advance customers can book
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Time Zone
+                        </label>
+                        <select
+                          name="serviceSettings.timeZone"
+                          value={formData.serviceSettings.timeZone}
+                          onChange={handleChange}
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                        >
+                          <option value="Asia/Colombo">
+                            Asia/Colombo (Sri Lanka)
+                          </option>
+                          <option value="Asia/Kolkata">
+                            Asia/Kolkata (India)
+                          </option>
+                          <option value="UTC">UTC</option>
+                          <option value="America/New_York">
+                            America/New_York (EST)
+                          </option>
+                          <option value="Europe/London">
+                            Europe/London (GMT)
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Color Theme Selector */}
               <ColorThemeSelector
                 selectedColor={formData.themeColor}
@@ -530,13 +838,6 @@ const StoreManagement = () => {
                 }
               />
 
-              {/* Time Slots for Service Stores */}
-              {formData.type === "service" && (
-                <TimeSlotManager
-                  timeSlots={timeSlots}
-                  onTimeSlotsChange={setTimeSlots}
-                />
-              )}
               {/* Hero Images */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

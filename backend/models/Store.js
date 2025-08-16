@@ -44,20 +44,12 @@ const storeSchema = new mongoose.Schema({
   },
   timeSlots: [
     {
-      day: {
-        type: String,
-        enum: [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday",
-        ],
-      },
+      startDate: Date,
+      endDate: Date,
       startTime: String,
       endTime: String,
+      taken: { type: Boolean, default: false },
+      exluded: { type: Boolean, default: false },
     },
   ],
   ownerId: {
@@ -95,7 +87,7 @@ const storeSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: false,
+    default: true,
   },
   // NEW FIELDS ADDED FROM defaultStore
   isPremium: {
@@ -130,15 +122,19 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
-  operatingHours: {
-    weekdays: {
-      type: String,
-      default: "9:00 AM - 6:00 PM",
+  serviceSettings: {
+    workingHours: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
     },
-    weekends: {
-      type: String,
-      default: "10:00 AM - 4:00 PM",
+    workingDays: {
+      type: [String],
+      default: ["monday", "tuesday", "wednesday", "thursday", "friday"],
     },
+    excludedDates: { type: [Date], default: [] },
+    timeZone: { type: String, default: "Asia/Colombo" },
+    bookingBuffer: { type: Number, default: 0 },
+    advanceBookingDays: { type: Number, default: 30 },
   },
   shippingInfo: {
     freeShipping: {
@@ -161,6 +157,10 @@ const storeSchema = new mongoose.Schema({
   },
   stats: {
     totalOrders: {
+      type: Number,
+      default: 0,
+    },
+    totalBookings: {
       type: Number,
       default: 0,
     },
