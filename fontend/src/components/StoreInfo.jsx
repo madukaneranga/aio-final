@@ -23,11 +23,26 @@ import {
   Youtube,
   Camera,
   Music,
+  UserPlus,
+  UserCheck,
 } from "lucide-react";
 
-const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
+const StoreInfo = ({
+  store = {},
+  user = {},
+  reviews = [],
+  onFollowChange,
+  followData,
+  setFollowData,
+}) => {
   const [hoveredContact, setHoveredContact] = useState(null);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [followersCount, setFollowersCount] = useState(
+    store.stats?.followersCount || 0
+  );
+
+  const [followLoading, setFollowLoading] = useState(false);
+  const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
 
   // Default store data with all features
   const defaultStore = {
@@ -83,6 +98,86 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
     id: "user_456",
     subscriptionLevel: "Premium",
     favoriteStores: ["store_123"],
+  };
+
+  const handleFollow = async () => {
+    if (followData.isFollowing) {
+      setShowUnfollowConfirm(true);
+      return;
+    }
+
+    try {
+      setFollowLoading(true);
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`/api/stores/${storeData._id}/follow`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setFollowData((prev) => ({
+          ...prev,
+          isFollowing: data.isFollowing,
+        }));
+        setFollowersCount(data.followersCount);
+
+        // Notify parent component
+        if (onFollowChange) {
+          onFollowChange(data.isFollowing, data.followersCount);
+        }
+      } else {
+        alert(data.error || "Something went wrong");
+      }
+    } catch (error) {
+      console.error("Follow error:", error);
+      alert("Something went wrong");
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const confirmUnfollow = async () => {
+    try {
+      setFollowLoading(true);
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`/api/stores/${storeData._id}/follow`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setFollowData((prev) => ({
+          ...prev,
+          isFollowing: data.isFollowing,
+        }));
+        setFollowersCount(data.followersCount);
+
+        // Notify parent component
+        if (onFollowChange) {
+          onFollowChange(data.isFollowing, data.followersCount);
+        }
+      } else {
+        alert(data.error || "Something went wrong");
+      }
+    } catch (error) {
+      console.error("Unfollow error:", error);
+      alert("Something went wrong");
+    } finally {
+      setFollowLoading(false);
+      setShowUnfollowConfirm(false);
+    }
   };
 
   const storeData = { ...defaultStore, ...store };
@@ -393,20 +488,63 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
 
                     {/* Action buttons */}
                     <div className="flex items-center space-x-2 ml-auto">
-                      <button
-                        onClick={toggleFavorite}
-                        className={`p-2 rounded-full transition-all duration-300 ${
-                          isFavorited
-                            ? "text-red-500 bg-red-50"
-                            : "text-gray-400 hover:text-red-500 hover:bg-red-50"
-                        }`}
-                      >
-                        <Heart
-                          className={`w-4 h-4 ${
-                            isFavorited ? "fill-current" : ""
-                          }`}
-                        />
-                      </button>
+                      {/* Follow Button */}
+                      {!store.isOwnStore && (
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={handleFollow}
+                            disabled={followLoading}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${
+                              followData.isFollowing
+                                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                : "text-white hover:scale-105 shadow-md"
+                            }`}
+                            style={
+                              !followData.isFollowing
+                                ? {
+                                    backgroundColor: colors.primary,
+                                    boxShadow: `0 4px 12px ${colors.primary}30`,
+                                  }
+                                : {}
+                            }
+                          >
+                            {followLoading ? (
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                            ) : followData.isFollowing ? (
+                              <UserCheck className="w-4 h-4" />
+                            ) : (
+                              <UserPlus className="w-4 h-4" />
+                            )}
+                            <span>
+                              {followLoading
+                                ? "Loading..."
+                                : followData.isFollowing
+                                ? "Following"
+                                : "Follow"}
+                            </span>
+                            {/* Follow count badge */}
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full font-medium ${
+                                followData.isFollowing
+                                  ? "bg-green-200 text-green-800"
+                                  : "bg-white/20 text-white"
+                              }`}
+                            >
+                              {followersCount}
+                            </span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Show followers count for store owner */}
+                      {store.isOwnStore && (
+                        <div className="flex items-center space-x-2">
+                          <span className="flex items-center space-x-1 px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-700">
+                            <Users className="w-4 h-4" />
+                            <span>{followersCount} followers</span>
+                          </span>
+                        </div>
+                      )}
                       <button
                         onClick={handleShare}
                         className="p-2 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all duration-300"
@@ -548,9 +686,9 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
                   <div className="text-center">
                     <p
                       className="text-lg font-semibold"
-                      style={{ color: themeStyles.color }}
+                      style={{ color: colors.primary }}
                     >
-                      {storeData.stats.totalOrders.toLocaleString()}
+                      {storeData.stats.totalOrdersOrBookings.toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500">
                       {storeData.type === "product" ? "Orders" : "Bookings"}
@@ -561,16 +699,16 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
                       className="text-lg font-semibold"
                       style={{ color: colors.primary }}
                     >
-                      {storeData.stats.repeatCustomers}%
+                      {storeData.stats.views || 0}
                     </p>
-                    <p className="text-xs text-gray-500">Retention Rate</p>
+                    <p className="text-xs text-gray-500">Views</p>
                   </div>
                   <div className="text-center">
                     <p
                       className="text-lg font-semibold"
                       style={{ color: themeStyles.color }}
                     >
-                      {formatLKR(storeData.stats.avgOrderValue)}
+                      {formatLKR(storeData.stats.avgPurchaseAmount || 0)}
                     </p>
                     <p className="text-xs text-gray-500">Avg Order</p>
                   </div>
@@ -767,6 +905,34 @@ const StoreInfo = ({ store = {}, user = {}, reviews = [] }) => {
               </div>
             </div>
           </div>
+          {/* Unfollow Confirmation Modal */}
+          {showUnfollowConfirm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
+                <h3 className="text-lg font-medium mb-2">
+                  Unfollow {storeData.name}?
+                </h3>
+                <p className="text-gray-600 text-sm mb-4">
+                  You'll stop receiving updates about this store.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={confirmUnfollow}
+                    disabled={followLoading}
+                    className="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors"
+                  >
+                    {followLoading ? "Unfollowing..." : "Unfollow"}
+                  </button>
+                  <button
+                    onClick={() => setShowUnfollowConfirm(false)}
+                    className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

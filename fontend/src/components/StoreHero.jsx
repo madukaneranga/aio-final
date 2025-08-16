@@ -259,48 +259,6 @@ const PremiumHeroSection = ({
                       {storeData.name}
                     </span>
                   </h1>
-
-                  <p
-                    className="text-lg md:text-xl leading-relaxed opacity-90 max-w-lg opacity-0 fade-in-up-2"
-                    style={{ textShadow: theme.textShadow }}
-                  >
-                    {storeData.description}
-                  </p>
-                </div>
-
-
-                {/* Stats */}
-                <div className="hidden md:flex space-x-8 opacity-0 fade-in-up-3">
-                  {Object.entries(storeData.stats).map(
-                    ([key, value], index) => {
-                      const getLabel = (key) => {
-                        switch (key) {
-                          case "totalOrders":
-                            return "Total Orders";
-                          case "repeatCustomers":
-                            return "Repeat Customers";
-                          case "avgOrderValue":
-                            return "Avg Order Value";
-                          default:
-                            return key;
-                        }
-                      };
-
-                      return (
-                        <div key={index} className="text-center">
-                          <div
-                            className="text-2xl font-bold mb-1"
-                            style={{ color: theme.primary }}
-                          >
-                            {value}
-                          </div>
-                          <div className="text-sm opacity-75 uppercase tracking-wide">
-                            {getLabel(key)}
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
                 </div>
 
                 {/* CTA Buttons */}
@@ -354,39 +312,6 @@ const PremiumHeroSection = ({
                     <span>Fast Shipping</span>
                   </div>
                 </div>
-              </div>
-
-
-              {/* Right Content - Mobile Stats */}
-              <div className="md:hidden flex justify-center space-x-6 text-white opacity-0 fade-in-up-3">
-                {Object.entries(storeData.stats).map(([key, value], index) => {
-                  const getLabel = (key) => {
-                    switch (key) {
-                      case "totalOrders":
-                        return "Total Orders";
-                      case "repeatCustomers":
-                        return "Repeat Customers";
-                      case "avgOrderValue":
-                        return "Avg Order Value";
-                      default:
-                        return key;
-                    }
-                  };
-
-                  return (
-                    <div key={index} className="text-center">
-                      <div
-                        className="text-xl font-bold mb-1"
-                        style={{ color: theme.primary }}
-                      >
-                        {value}
-                      </div>
-                      <div className="text-xs opacity-75 uppercase tracking-wide">
-                        {getLabel(key)}
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
             </div>
           </div>

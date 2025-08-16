@@ -75,9 +75,20 @@ const serviceSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  bookingCount: {
-    type: Number,
-    default: 0,
+
+  stats: {
+    totalBookings: {
+      type: Number,
+      default: 0,
+    },
+    views: {
+      type: Number,
+      default: 98,
+    },
+    impressions: {
+      type: Number,
+      default: 0,
+    },
   },
   isActive: {
     type: Boolean,

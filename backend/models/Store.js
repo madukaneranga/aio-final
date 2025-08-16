@@ -42,16 +42,6 @@ const storeSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
-  timeSlots: [
-    {
-      startDate: Date,
-      endDate: Date,
-      startTime: String,
-      endTime: String,
-      taken: { type: Boolean, default: false },
-      exluded: { type: Boolean, default: false },
-    },
-  ],
   ownerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -155,29 +145,55 @@ const storeSchema = new mongoose.Schema({
       },
     ],
   },
+  followers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
   stats: {
-    totalOrders: {
+    totalOrdersOrBookings: {
       type: Number,
       default: 0,
     },
-    totalBookings: {
+    followersCount: {
       type: Number,
       default: 0,
     },
-    repeatCustomers: {
+    completionRate: {
       type: Number,
       default: 0,
     },
-    avgOrderValue: {
+    views: {
+      type: Number,
+      default: 98,
+    },
+    impressions: {
       type: Number,
       default: 0,
     },
   },
-
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+// Virtual field for avgPurchaseAmount - automatically calculated
+storeSchema.virtual("stats.avgPurchaseAmount").get(function () {
+  if (
+    !this.stats.totalOrdersOrBookings ||
+    this.stats.totalOrdersOrBookings === 0
+  ) {
+    return 0;
+  }
+  return (
+    Math.round((this.totalSales / this.stats.totalOrdersOrBookings) * 100) / 100
+  );
+});
+
+// Ensure virtuals are included when converting to JSON/Object
+storeSchema.set("toJSON", { virtuals: true });
+storeSchema.set("toObject", { virtuals: true });
 
 export default mongoose.model("Store", storeSchema);

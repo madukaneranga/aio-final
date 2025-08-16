@@ -169,7 +169,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
           customerId: req.user._id,
           storeId: service.storeId,
           serviceId: service._id,
-          bookingDetails:item.bookingDetails,
+          bookingDetails: item.bookingDetails,
           totalAmount: serviceAmount.toFixed(2),
           platformFee: commissionAmount.toFixed(2),
           storeAmount,
@@ -413,7 +413,10 @@ router.post(
 
             // Update store total sales
             await Store.findByIdAndUpdate(order.storeId, {
-              $inc: { totalSales: order.storeAmount },
+              $inc: {
+                totalSales: order.storeAmount,
+                "stats.totalOrdersOrBookings": 1,
+              },
             });
 
             // Save commission record
@@ -445,7 +448,10 @@ router.post(
           for (const booking of bookings) {
             // Update store total sales
             await Store.findByIdAndUpdate(booking.storeId, {
-              $inc: { totalSales: booking.storeAmount },
+              $inc: {
+                totalSales: booking.storeAmount,
+                "stats.totalOrdersOrBookings": 1,
+              },
             });
 
             // Save commission record
