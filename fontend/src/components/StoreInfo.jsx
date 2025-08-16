@@ -25,6 +25,7 @@ import {
   Music,
   UserPlus,
   UserCheck,
+  Users,
 } from "lucide-react";
 
 const StoreInfo = ({
@@ -98,6 +99,16 @@ const StoreInfo = ({
     id: "user_456",
     subscriptionLevel: "Premium",
     favoriteStores: ["store_123"],
+  };
+
+  const formatFollowersCount = (count) => {
+    if (count >= 1000000) {
+      return `${(count / 1000000).toFixed(count % 1000000 === 0 ? 0 : 1)}M`;
+    }
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(count % 1000 === 0 ? 0 : 1)}K`;
+    }
+    return count.toString();
   };
 
   const handleFollow = async () => {
@@ -489,23 +500,29 @@ const StoreInfo = ({
                     {/* Action buttons */}
                     <div className="flex items-center space-x-2 ml-auto">
                       {/* Follow Button */}
-                      {!store.isOwnStore && (
+                      {/* Follow Button - Updated without outside colors */}
+                      {/* Follow Button - Using theme colors with black/white text */}
+                      {!followData.isOwnStore && (
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={handleFollow}
                             disabled={followLoading}
                             className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${
                               followData.isFollowing
-                                ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                : "text-white hover:scale-105 shadow-md"
+                                ? "hover:opacity-80"
+                                : "hover:opacity-90 shadow-md"
                             }`}
                             style={
-                              !followData.isFollowing
+                              followData.isFollowing
                                 ? {
-                                    backgroundColor: colors.primary,
-                                    boxShadow: `0 4px 12px ${colors.primary}30`,
+                                    backgroundColor: colors.light,
+                                    color: "#000000",
+                                    border: `1px solid ${colors.primary}`,
                                   }
-                                : {}
+                                : {
+                                    backgroundColor: colors.primary,
+                                    color: "#ffffff",
+                                  }
                             }
                           >
                             {followLoading ? (
@@ -524,32 +541,48 @@ const StoreInfo = ({
                             </span>
                             {/* Follow count badge */}
                             <span
-                              className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              className="px-2 py-1 text-xs rounded-full font-medium"
+                              style={
                                 followData.isFollowing
-                                  ? "bg-green-200 text-green-800"
-                                  : "bg-white/20 text-white"
-                              }`}
+                                  ? {
+                                      backgroundColor: colors.primary,
+                                      color: "#ffffff",
+                                    }
+                                  : {
+                                      backgroundColor:
+                                        "rgba(255, 255, 255, 0.2)",
+                                      color: "#ffffff",
+                                    }
+                              }
                             >
-                              {followersCount}
+                              {formatFollowersCount(followersCount)}
                             </span>
                           </button>
                         </div>
                       )}
 
                       {/* Show followers count for store owner */}
-                      {store.isOwnStore && (
+                      {followData.isOwnStore && (
                         <div className="flex items-center space-x-2">
-                          <span className="flex items-center space-x-1 px-3 py-2 bg-gray-100 rounded-full text-sm text-gray-700">
+                          <span
+                            className="flex items-center space-x-1 px-3 py-2 rounded-full text-sm font-medium"
+                            style={{
+                              backgroundColor: colors.light,
+                              color: "#000000",
+                              border: `1px solid ${colors.primary}`,
+                            }}
+                          >
                             <Users className="w-4 h-4" />
-                            <span>{followersCount} followers</span>
+                            <span>{formatFollowersCount(followersCount)} followers</span>
                           </span>
                         </div>
                       )}
                       <button
                         onClick={handleShare}
-                        className="p-2 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all duration-300"
+                        className="flex items-center space-x-1 px-3 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-all duration-300 text-sm"
                       >
                         <Share2 className="w-4 h-4" />
+                        <span>Share</span>
                       </button>
                     </div>
                   </div>

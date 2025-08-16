@@ -9,6 +9,7 @@ import {
   Shield,
   Truck,
 } from "lucide-react";
+import { use } from "react";
 
 // ✅ FIXED: Properly destructure props
 const PremiumHeroSection = ({
@@ -26,6 +27,38 @@ const PremiumHeroSection = ({
     themeColor: "#000000ff", // Gold
     stats: [{ label: "Sales", value: "1000+" }],
   };
+  const heroMediaMock = [
+    {
+      type: "video",
+      src: "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
+      poster:
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80",
+      title: "Luxury Redefined",
+    },
+    {
+      type: "image",
+      src: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80",
+      title: "Crafted Perfection",
+    },
+    {
+      type: "image",
+      src: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80",
+      title: "Timeless Elegance",
+    },
+  ];
+  const [heroMedia, setHeroMedia] = useState(heroMediaMock);
+
+  useEffect(() => {
+    console.log("Store Hero Images:", store?.heroImages);
+    if (store?.heroImages.length > 0) {
+      const newHeroMedia = store.heroImages.map((imageSrc) => ({
+        type: "image",
+        src: imageSrc,
+        title: "",
+      }));
+      setHeroMedia(newHeroMedia);
+    }
+  }, [store?.heroImages]); // Add dependency
 
   // Default user data
   const defaultUser = {
@@ -93,26 +126,6 @@ const PremiumHeroSection = ({
   };
 
   const theme = getThemeStyles();
-
-  const heroMedia = [
-    {
-      type: "video",
-      src: "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
-      poster:
-        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80",
-      title: "Luxury Redefined",
-    },
-    {
-      type: "image",
-      src: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80",
-      title: "Crafted Perfection",
-    },
-    {
-      type: "image",
-      src: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80",
-      title: "Timeless Elegance",
-    },
-  ];
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
