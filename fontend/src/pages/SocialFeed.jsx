@@ -8,115 +8,76 @@ import {
   User,
   ShoppingBag,
   Plus,
-  ChevronUp,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  RotateCcw,
-  Eye,
   Play,
   Pause,
+  X,
+  Send,
+  MoreHorizontal,
+  Eye,
+  Bookmark,
+  UserPlus,
+  RotateCcw,
 } from "lucide-react";
 
-import CommentSidebar from "../components/CommentSidebar";
-
-const SocialFeed = () => {
-  const [posts, setPosts] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+// CommentSidebar Component
+const CommentSidebar = ({
+  isOpen,
+  onClose,
+  postId,
+  commentCount,
+  onCommentAdded,
+}) => {
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [showComments, setShowComments] = useState(false);
-  const [mediaLoadingStates, setMediaLoadingStates] = useState({});
-  const [mediaErrors, setMediaErrors] = useState({});
-  const [preloadedPosts, setPreloadedPosts] = useState(new Set());
-  const [showProducts, setShowProducts] = useState({});
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [currentImageIndex, setCurrentImageIndex] = useState({}); // Track current image for each post
+  const [newComment, setNewComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [showReplies, setShowReplies] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [currentPostId, setCurrentPostId] = useState(null);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const textareaRef = useRef(null);
+  const bottomRef = useRef(null);
 
-  const videoRefs = useRef({});
-  const containerRef = useRef({});
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-  // Cache management
-  const MAX_CACHED_VIDEOS = 5;
-  const PRELOAD_RANGE = 2;
-
+  // Reset state when postId changes
   useEffect(() => {
-    loadPosts();
-  }, []);
+    if (postId !== currentPostId && postId) {
+      console.log("Post changed from", currentPostId, "to", postId);
+      setComments([]);
+      setPage(1);
+      setHasMore(true);
+      setError(null);
+      setNewComment("");
+      setReplyingTo(null);
+      setShowReplies({});
+      setCommentsLoaded(false);
+      setCurrentPostId(postId);
 
-  useEffect(() => {
-    // Auto-play current video and pause others
-    Object.keys(videoRefs.current).forEach((postId, index) => {
-      const video = videoRefs.current[postId];
-      if (video) {
-        if (index === currentIndex && isPlaying) {
-          video.currentTime = 0;
-          video.play().catch(console.error);
-          trackView(postId);
-        } else {
-          video.pause();
-        }
-      }
-    });
-
-    // Preload nearby posts
-    preloadNearbyPosts();
-
-    // Clean up old cached videos
-    cleanupOldVideos();
-  }, [currentIndex, posts, isPlaying]);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        handleScroll("up");
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        handleScroll("down");
-      } else if (e.key === " ") {
-        e.preventDefault();
-        togglePlayPause();
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        handleImageSwipe("prev");
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        handleImageSwipe("next");
-      }
-    };
-
-    const handleWheel = (e) => {
-      e.preventDefault();
-      if (Math.abs(e.deltaY) > 50) {
-        if (e.deltaY > 0) {
-          handleScroll("down");
-        } else {
-          handleScroll("up");
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("wheel", handleWheel, { passive: false });
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("wheel", handleWheel);
-    };
-  }, [currentIndex, posts.length, hasMore, isPlaying]);
-
-  // Reset image index when post changes
-  useEffect(() => {
-    if (posts[currentIndex]) {
-      const postId = posts[currentIndex]._id;
-      if (!(postId in currentImageIndex)) {
-        setCurrentImageIndex(prev => ({ ...prev, [postId]: 0 }));
+      // Load comments immediately if sidebar is open
+      if (isOpen) {
+        loadComments(1, postId);
       }
     }
-  }, [currentIndex, posts]);
+  }, [postId, currentPostId, isOpen]);
+
+  // Load comments when sidebar opens for the first time with this post
+  useEffect(() => {
+    if (
+      isOpen &&
+      postId &&
+      postId === currentPostId &&
+      !commentsLoaded &&
+      !loading
+    ) {
+      loadComments(1, postId);
+    }
+  }, [isOpen, postId, currentPostId, commentsLoaded, loading]);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("token");
@@ -126,71 +87,583 @@ const SocialFeed = () => {
     };
   };
 
-  const preloadNearbyPosts = () => {
-    const startIndex = Math.max(0, currentIndex - 1);
-    const endIndex = Math.min(posts.length - 1, currentIndex + PRELOAD_RANGE);
+  const loadComments = async (pageNum = 1, targetPostId = postId) => {
+    if (!targetPostId) return;
 
-    for (let i = startIndex; i <= endIndex; i++) {
-      const post = posts[i];
-      if (post && !preloadedPosts.has(post._id)) {
-        preloadMedia(post);
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log("Loading comments for post:", targetPostId, "page:", pageNum);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/posts/${targetPostId}/comments?page=${pageNum}&limit=20`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+
+      console.log("Comments response status:", response.status);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Comments API error:", response.status, errorData);
+        throw new Error(`Failed to load comments (${response.status})`);
       }
-    }
-  };
 
-  const preloadMedia = (post) => {
-    if (post.mediaType === "video") {
-      const video = document.createElement("video");
-      video.src = post.mediaUrls[0];
-      video.preload = "metadata";
-      video.muted = true;
+      const data = await response.json();
+      console.log("Comments data:", data);
 
-      video.addEventListener("loadedmetadata", () => {
-        setPreloadedPosts((prev) => new Set([...prev, post._id]));
-      });
-
-      video.addEventListener("error", () => {
-        console.error("Failed to preload video:", post._id);
-      });
-    } else {
-      // Preload all images for image posts
-      post.mediaUrls.forEach((url) => {
-        const img = new Image();
-        img.src = url;
-        img.onload = () => {
-          setPreloadedPosts((prev) => new Set([...prev, post._id]));
+      // Process comments
+      const processedComments = (data.comments || []).map(comment => {
+        return {
+          ...comment,
+          replyCount: comment.replyCount || 0,
+          replies: [], // Start with empty replies array
+          repliesLoaded: false // Mark as not loaded initially
         };
       });
+
+      // Only update state if this is still the current post
+      if (targetPostId === currentPostId || targetPostId === postId) {
+        if (pageNum === 1) {
+          setComments(processedComments);
+          setCommentsLoaded(true);
+        } else {
+          setComments((prev) => [...prev, ...processedComments]);
+        }
+
+        setHasMore(data.pagination?.hasMore || false);
+        setPage(pageNum);
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Failed to load comments:", error);
+      if (targetPostId === currentPostId || targetPostId === postId) {
+        setError(error.message);
+      }
+      setLoading(false);
     }
   };
 
-  const cleanupOldVideos = () => {
-    const keysToKeep = posts
-      .slice(
-        Math.max(0, currentIndex - 2),
-        Math.min(posts.length, currentIndex + 3)
-      )
-      .map((post) => post._id);
+  const loadReplies = async (commentId) => {
+    try {
+      console.log("=== LOADING REPLIES DEBUG ===");
+      console.log("Comment ID:", commentId);
+      console.log("Current Post ID:", currentPostId);
 
-    Object.keys(videoRefs.current).forEach((postId) => {
-      if (!keysToKeep.includes(postId)) {
-        const video = videoRefs.current[postId];
-        if (video) {
-          video.pause();
-          video.src = "";
-          delete videoRefs.current[postId];
+      // Set loading state for this specific comment
+      setComments((prev) =>
+        prev.map((comment) =>
+          comment._id === commentId
+            ? { ...comment, repliesLoading: true, repliesError: false }
+            : comment
+        )
+      );
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/posts/comments/${commentId}/replies?page=1&limit=10`,
+        {
+          headers: getAuthHeaders(),
         }
+      );
+      
+      console.log(`Response status: ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`❌ Failed to load replies. Status: ${response.status}, Error: ${errorText}`);
+        throw new Error(`Failed to load replies (${response.status}): ${errorText}`);
       }
-    });
 
-    // Clean up preloaded posts cache
-    setPreloadedPosts((prev) => {
-      const newSet = new Set();
-      keysToKeep.forEach((id) => {
-        if (prev.has(id)) newSet.add(id);
+      const data = await response.json();
+      console.log("Raw API Response:", data);
+
+      const replies = data.replies || [];
+      console.log("Processed replies:", replies);
+      console.log("Number of replies found:", replies.length);
+
+      // Update the comment with replies
+      setComments((prev) =>
+        prev.map((comment) =>
+          comment._id === commentId
+            ? { 
+                ...comment, 
+                replies: replies, 
+                repliesLoaded: true,
+                repliesLoading: false,
+                repliesError: false,
+                replyCount: replies.length > 0 ? replies.length : comment.replyCount,
+              }
+            : comment
+        )
+      );
+
+      setShowReplies((prev) => ({ ...prev, [commentId]: true }));
+      
+      console.log("=== REPLIES LOADED SUCCESSFULLY ===");
+      
+    } catch (error) {
+      console.error("=== FAILED TO LOAD REPLIES ===");
+      console.error("Error details:", error);
+      
+      // Show error state in UI
+      setComments((prev) =>
+        prev.map((comment) =>
+          comment._id === commentId
+            ? { 
+                ...comment, 
+                repliesError: true,
+                repliesLoaded: true,
+                repliesLoading: false,
+                errorMessage: error.message
+              }
+            : comment
+        )
+      );
+      setShowReplies((prev) => ({ ...prev, [commentId]: true }));
+    }
+  };
+
+  const submitComment = async () => {
+    if (!newComment.trim() || submitting || !currentPostId) return;
+
+    try {
+      setSubmitting(true);
+
+      console.log("Submitting comment:", {
+        postId: currentPostId,
+        text: newComment,
+        parentComment: replyingTo,
       });
-      return newSet;
-    });
+
+      const response = await fetch(`${API_BASE_URL}/api/posts/${currentPostId}/comment`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          text: newComment.trim(),
+          parentComment: replyingTo,
+        }),
+      });
+
+      console.log("Comment submit response status:", response.status);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Comment submit error:", response.status, errorData);
+        throw new Error("Failed to add comment");
+      }
+
+      const data = await response.json();
+      console.log("Comment submit success:", data);
+
+      if (replyingTo) {
+        // Add reply to existing comment
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment._id === replyingTo
+              ? {
+                  ...comment,
+                  replyCount: (comment.replyCount || 0) + 1,
+                  replies: comment.repliesLoaded 
+                    ? [data.comment, ...(comment.replies || [])]
+                    : [], // Only add to local state if replies are already loaded
+                  repliesLoaded: comment.repliesLoaded || false,
+                }
+              : comment
+          )
+        );
+        
+        // Show replies if they were already loaded
+        const parentComment = comments.find(c => c._id === replyingTo);
+        if (parentComment && parentComment.repliesLoaded) {
+          setShowReplies((prev) => ({ ...prev, [replyingTo]: true }));
+        }
+      } else {
+        // Add new top-level comment
+        setComments((prev) => [data.comment, ...prev]);
+      }
+
+      setNewComment("");
+      setReplyingTo(null);
+      setSubmitting(false);
+
+      // Callback to update comment count in parent
+      if (onCommentAdded) {
+        onCommentAdded();
+      }
+
+      // Scroll to bottom if new comment
+      if (!replyingTo && bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    } catch (error) {
+      console.error("Failed to submit comment:", error);
+      setSubmitting(false);
+    }
+  };
+
+  const likeComment = async (commentId, isReply = false, parentId = null) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/posts/comments/${commentId}/like`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to like comment");
+      }
+
+      const data = await response.json();
+
+      if (isReply && parentId) {
+        // Update reply like status
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment._id === parentId
+              ? {
+                  ...comment,
+                  replies: comment.replies?.map((reply) =>
+                    reply._id === commentId
+                      ? {
+                          ...reply,
+                          isLiked: data.liked,
+                          likes: data.liked
+                            ? (reply.likes || 0) + 1
+                            : Math.max(0, (reply.likes || 0) - 1),
+                        }
+                      : reply
+                  ),
+                }
+              : comment
+          )
+        );
+      } else {
+        // Update comment like status
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment._id === commentId
+              ? {
+                  ...comment,
+                  isLiked: data.liked,
+                  likes: data.liked
+                    ? (comment.likes || 0) + 1
+                    : Math.max(0, (comment.likes || 0) - 1),
+                }
+              : comment
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to like comment:", error);
+    }
+  };
+
+  const formatTimeAgo = (date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
+
+    if (diffInSeconds < 60) return `${diffInSeconds}s`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d`;
+    return `${Math.floor(diffInSeconds / 604800)}w`;
+  };
+
+  const CommentItem = ({ comment, isReply = false, parentId = null }) => (
+    <div className={`flex gap-3 ${isReply ? "ml-8 mt-3" : "mb-4"}`}>
+      <img
+        src={comment.userId?.profilePicture || ""}
+        alt={comment.userId?.username}
+        className="w-8 h-8 rounded-full object-cover"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl px-4 py-3 border border-gray-800/50">
+          <div className="font-semibold text-sm text-white">
+            {comment.userId?.username}
+          </div>
+          <div className="text-sm text-gray-200 mt-1 break-words">
+            {comment.text}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 mt-2 px-2">
+          <span className="text-xs text-gray-400">{formatTimeAgo(comment.createdAt)}</span>
+          
+          <button
+            onClick={() => likeComment(comment._id, isReply, parentId)}
+            className={`flex items-center gap-1 text-xs font-medium transition-colors ${
+              comment.isLiked ? "text-red-400" : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <Heart className={`w-3 h-3 ${comment.isLiked ? "fill-current" : ""}`} />
+            {(comment.likes || 0) > 0 && comment.likes}
+          </button>
+
+          {!isReply && (
+            <button
+              onClick={() => {
+                setReplyingTo(comment._id);
+                textareaRef.current?.focus();
+              }}
+              className="text-xs font-medium text-gray-400 hover:text-white transition-colors"
+            >
+              Reply
+            </button>
+          )}
+        </div>
+
+        {/* Replies */}
+        {!isReply && (comment.replyCount || 0) > 0 && (
+          <div className="mt-3 pl-2">
+            {!showReplies[comment._id] ? (
+              <button
+                onClick={() => loadReplies(comment._id)}
+                disabled={comment.repliesLoading}
+                className="text-xs font-medium text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {comment.repliesLoading 
+                  ? "Loading..." 
+                  : `View ${comment.replyCount} ${comment.replyCount === 1 ? "reply" : "replies"}`
+                }
+              </button>
+            ) : (
+              <div>
+                {comment.repliesError ? (
+                  <div className="text-center py-2">
+                    <p className="text-red-400 text-xs mb-2">
+                      Failed to load replies
+                      {comment.errorMessage && (
+                        <span className="block text-gray-500">({comment.errorMessage})</span>
+                      )}
+                    </p>
+                    <button
+                      onClick={() => {
+                        // Reset error state and retry
+                        setComments((prev) =>
+                          prev.map((c) =>
+                            c._id === comment._id
+                              ? { 
+                                  ...c, 
+                                  repliesError: false, 
+                                  repliesLoaded: false,
+                                  repliesLoading: false,
+                                  errorMessage: null 
+                                }
+                              : c
+                          )
+                        );
+                        setShowReplies((prev) => ({ ...prev, [comment._id]: false }));
+                        loadReplies(comment._id);
+                      }}
+                      className="text-gray-300 hover:text-gray-100 text-xs font-semibold"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : comment.replies && comment.replies.length > 0 ? (
+                  <div>
+                    {comment.replies.map((reply) => (
+                      <CommentItem
+                        key={reply._id}
+                        comment={reply}
+                        isReply={true}
+                        parentId={comment._id}
+                      />
+                    ))}
+                    <button
+                      onClick={() => setShowReplies((prev) => ({ ...prev, [comment._id]: false }))}
+                      className="text-xs font-medium text-gray-400 hover:text-white transition-colors mt-2"
+                    >
+                      Hide replies
+                    </button>
+                  </div>
+                ) : comment.repliesLoaded ? (
+                  <div className="text-gray-500 text-xs py-2">
+                    No replies found
+                  </div>
+                ) : (
+                  <div className="flex justify-center py-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-black bg-opacity-70 z-40"
+        onClick={onClose}
+      />
+
+      {/* Sidebar */}
+      <div className="fixed top-0 right-0 h-full w-[30%] min-w-[400px] bg-black/95 backdrop-blur-xl border-l border-gray-800/50 z-50 flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-800/50">
+          <h3 className="text-lg font-semibold text-white">
+            Comments ({commentCount})
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-300" />
+          </button>
+        </div>
+
+        {/* Comments List */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading && comments.length === 0 ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-red-400 mb-4">
+                Failed to load comments: {error}
+              </p>
+              <button
+                onClick={() => loadComments(1)}
+                className="text-gray-300 hover:text-gray-100 font-semibold"
+              >
+                Retry
+              </button>
+            </div>
+          ) : comments.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-4xl mb-4">💬</div>
+              <h4 className="text-lg font-semibold text-white mb-2">
+                No comments yet
+              </h4>
+              <p className="text-gray-400">Be the first to comment!</p>
+            </div>
+          ) : (
+            <>
+              {comments.map((comment) => (
+                <CommentItem key={comment._id} comment={comment} />
+              ))}
+
+              {/* Load More */}
+              {hasMore && (
+                <div className="text-center py-4">
+                  <button
+                    onClick={() => loadComments(page + 1)}
+                    disabled={loading}
+                    className="text-gray-300 hover:text-gray-100 font-semibold disabled:opacity-50"
+                  >
+                    {loading ? "Loading..." : "Load more comments"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Comment Input */}
+        <div className="border-t border-gray-800/50 p-4">
+          {replyingTo && (
+            <div className="mb-3 p-3 bg-gray-900/50 rounded-xl flex items-center justify-between">
+              <span className="text-sm text-gray-300">
+                Replying to{" "}
+                {comments.find((c) => c._id === replyingTo)?.userId?.username}
+              </span>
+              <button
+                onClick={() => setReplyingTo(null)}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex gap-3 items-end">
+            <img
+              src=""
+              alt="Your profile"
+              className="w-8 h-8 rounded-full object-cover"
+            />
+            <div className="flex-1">
+              <textarea
+                ref={textareaRef}
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder={
+                  replyingTo ? "Write a reply..." : "Add a comment..."
+                }
+                className="w-full px-4 py-3 bg-gray-900/50 backdrop-blur-xl border border-gray-700 rounded-2xl resize-none focus:ring-2 focus:ring-white/20 focus:border-transparent text-sm text-white placeholder-gray-400"
+                rows={2}
+                maxLength={2200}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitComment();
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between mt-2 px-1">
+                <span className="text-xs text-gray-500">
+                  {newComment.length}/2200
+                </span>
+                <button
+                  onClick={submitComment}
+                  disabled={!newComment.trim() || submitting}
+                  className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200 transition-colors disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  {submitting ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {replyingTo ? "Reply" : "Post"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// Main SocialFeed Component
+const SocialFeed = () => {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [showComments, setShowComments] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+  const [mediaLoadingStates, setMediaLoadingStates] = useState({});
+  const [mediaErrors, setMediaErrors] = useState({});
+  const [showProducts, setShowProducts] = useState({});
+  const [isPlaying, setIsPlaying] = useState({});
+  const [currentImageIndex, setCurrentImageIndex] = useState({});
+
+  const videoRefs = useRef({});
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
   };
 
   const loadPosts = async () => {
@@ -198,7 +671,7 @@ const SocialFeed = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/posts/feed?page=${page}&limit=10`, {
+      const response = await fetch(`${API_BASE_URL}/api/posts/feed?page=${page}&limit=10`, {
         headers: getAuthHeaders(),
       });
 
@@ -225,7 +698,7 @@ const SocialFeed = () => {
 
   const trackView = async (postId) => {
     try {
-      await fetch(`/api/posts/${postId}/view`, {
+      await fetch(`${API_BASE_URL}/api/posts/${postId}/view`, {
         method: "POST",
         headers: getAuthHeaders(),
       });
@@ -248,7 +721,7 @@ const SocialFeed = () => {
         )
       );
 
-      const response = await fetch(`/api/posts/${postId}/like`, {
+      const response = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
         method: "POST",
         headers: getAuthHeaders(),
       });
@@ -313,90 +786,65 @@ const SocialFeed = () => {
     const video = videoRefs.current[postId];
     if (video) {
       video.muted = !video.muted;
-      setPosts((prevPosts) =>
-        prevPosts.map((post) =>
-          post._id === postId ? { ...post, isMuted: video.muted } : post
-        )
-      );
     }
   };
 
-  const togglePlayPause = () => {
-    setIsPlaying(!isPlaying);
+  const togglePlayPause = (postId) => {
+    const video = videoRefs.current[postId];
+    if (video) {
+      if (video.paused) {
+        video.play();
+        setIsPlaying(prev => ({ ...prev, [postId]: true }));
+      } else {
+        video.pause();
+        setIsPlaying(prev => ({ ...prev, [postId]: false }));
+      }
+    }
   };
 
-  const handleCommentClick = () => {
+  const handleCommentClick = (postId) => {
+    setSelectedPostId(postId);
     setShowComments(true);
   };
 
   const handleCommentAdded = () => {
     setPosts((prevPosts) =>
-      prevPosts.map((post, index) =>
-        index === currentIndex ? { ...post, comments: post.comments + 1 } : post
+      prevPosts.map((post) =>
+        post._id === selectedPostId ? { ...post, comments: post.comments + 1 } : post
       )
     );
   };
 
-  const handleImageSwipe = (direction) => {
-    const currentPost = posts[currentIndex];
-    if (!currentPost || currentPost.mediaType === "video" || currentPost.mediaUrls.length <= 1) {
-      return;
-    }
+  const handleImageSwipe = (postId, direction) => {
+    const post = posts.find(p => p._id === postId);
+    if (!post || post.mediaUrls.length <= 1) return;
 
-    const postId = currentPost._id;
-    const currentImgIndex = currentImageIndex[postId] || 0;
-    const maxIndex = currentPost.mediaUrls.length - 1;
-
-    if (direction === "next" && currentImgIndex < maxIndex) {
-      setCurrentImageIndex(prev => ({ ...prev, [postId]: currentImgIndex + 1 }));
-    } else if (direction === "prev" && currentImgIndex > 0) {
-      setCurrentImageIndex(prev => ({ ...prev, [postId]: currentImgIndex - 1 }));
-    }
-  };
-
-  const handleImageDotClick = (imageIndex) => {
-    const currentPost = posts[currentIndex];
-    if (!currentPost) return;
-    
-    setCurrentImageIndex(prev => ({ ...prev, [currentPost._id]: imageIndex }));
-  };
-
-  const handleScroll = async (direction) => {
-    if (direction === "up" && currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    } else if (direction === "down" && currentIndex < posts.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else if (
-      direction === "down" &&
-      currentIndex === posts.length - 1 &&
-      hasMore
-    ) {
-      try {
-        const nextPage = page + 1;
-        const response = await fetch(
-          `/api/posts/feed?page=${nextPage}&limit=10`,
-          {
-            headers: getAuthHeaders(),
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setPosts((prev) => [...prev, ...(data.posts || [])]);
-          setHasMore(data.pagination?.hasMore || false);
-          setPage(nextPage);
-          setCurrentIndex(currentIndex + 1);
-        }
-      } catch (error) {
-        console.error("Failed to load more posts:", error);
+    setCurrentImageIndex(prev => {
+      const currentIndex = prev[postId] || 0;
+      const maxIndex = post.mediaUrls.length - 1;
+      
+      if (direction === "next" && currentIndex < maxIndex) {
+        return { ...prev, [postId]: currentIndex + 1 };
+      } else if (direction === "prev" && currentIndex > 0) {
+        return { ...prev, [postId]: currentIndex - 1 };
       }
-    }
+      return prev;
+    });
   };
 
   const formatNumber = (num) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
+  };
+
+  const formatTimeAgo = (date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
+    if (diffInSeconds < 60) return `${diffInSeconds}s`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    return `${Math.floor(diffInSeconds / 86400)}d`;
   };
 
   const handleProductClick = (product) => {
@@ -432,6 +880,29 @@ const SocialFeed = () => {
     const video = videoRefs.current[postId];
     if (video) {
       video.load();
+    }
+  };
+
+  const loadMorePosts = async () => {
+    if (loading || !hasMore) return;
+
+    try {
+      const nextPage = page + 1;
+      const response = await fetch(
+        `${API_BASE_URL}/api/posts/feed?page=${nextPage}&limit=10`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setPosts((prev) => [...prev, ...(data.posts || [])]);
+        setHasMore(data.pagination?.hasMore || false);
+        setPage(nextPage);
+      }
+    } catch (error) {
+      console.error("Failed to load more posts:", error);
     }
   };
 
@@ -490,418 +961,353 @@ const SocialFeed = () => {
     );
   }
 
-  const currentPost = posts[currentIndex];
-  const postImageIndex = currentImageIndex[currentPost?._id] || 0;
-
   return (
-    <div className="h-screen bg-black relative overflow-hidden">
-      {/* Top Navigation */}
-      <nav className="absolute top-0 left-0 right-0 p-4 md:p-6 flex justify-between items-center text-white z-30">
-        <div className="flex items-center space-x-6 md:space-x-8">
-          <div className="text-2xl md:text-3xl font-bold tracking-wider">
-            AIO
+    <div className="min-h-screen bg-black">
+      {/* Header */}
+      <nav className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl border-b border-gray-800/50">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center space-x-6">
+            <h1 className="text-2xl font-bold text-white tracking-wider">AIO</h1>
+            <div className="hidden md:flex space-x-6">
+              <button className="text-sm font-medium text-white">Following</button>
+              <button className="text-sm font-medium text-gray-400 hover:text-white transition-colors">For You</button>
+            </div>
           </div>
-          <div className="hidden md:flex space-x-6">
-            <button className="text-sm font-medium text-white hover:text-gray-300 transition-colors relative group">
-              Following
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white group-hover:w-full transition-all duration-300"></div>
-            </button>
-            <button className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
-              For You
+          <div className="flex items-center space-x-3">
+            <button className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <User className="w-5 h-5 text-white" />
             </button>
           </div>
-        </div>
-
-        <div className="flex items-center space-x-3 md:space-x-4">
-          <button className="hidden md:flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 hover:bg-white/20 transition-all duration-300 border border-gray-700">
-            <span className="text-sm">✨</span>
-            <span className="text-sm font-medium">Premium</span>
-          </button>
-          <button className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/10 border border-gray-700 flex items-center justify-center hover:bg-white/20 transition-all duration-300">
-            <User className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
         </div>
       </nav>
 
-      {/* Main Content */}
-      <div className="h-full flex items-center justify-center px-4 md:px-8">
-        <div className="relative w-full max-w-sm h-[85vh] mx-auto">
-          {/* Media Container */}
-          <div className="relative w-full h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-gray-900 border border-gray-800">
-            {currentPost && (
-              <>
-                {/* Media Loading Overlay */}
-                {(mediaLoadingStates[currentPost._id] ||
-                  (!preloadedPosts.has(currentPost._id) &&
-                    !mediaErrors[currentPost._id])) && (
-                  <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400 mx-auto mb-4"></div>
-                      <p className="text-gray-400 text-sm">Loading...</p>
-                    </div>
+      {/* Feed */}
+      <div className="max-w-lg mx-auto pb-20">
+        {posts.map((post) => (
+          <div key={post._id} className="bg-black border-b border-gray-800/30 mb-6">
+            {/* Post Header */}
+            <div className="px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <img
+                  src={post.user?.profilePicture || ""}
+                  alt={post.user?.username}
+                  className="w-8 h-8 rounded-full object-cover ring-1 ring-gray-700"
+                />
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-semibold text-white text-sm">{post.user?.username}</h3>
+                    <span className="text-gray-500 text-xs">•</span>
+                    <span className="text-gray-500 text-xs">{formatTimeAgo(post.createdAt)}</span>
+                  </div>
+                  {post.views && (
+                    <p className="text-xs text-gray-400 flex items-center mt-0.5">
+                      <Eye className="w-2.5 h-2.5 mr-1" />
+                      {formatNumber(post.views)} views
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center space-x-1">
+                <button className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                  <UserPlus className="w-4 h-4 text-white" />
+                </button>
+                <button className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                  <MoreHorizontal className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Post Content - Caption above media like Instagram */}
+            {(post.title || post.description || (post.hashtags && post.hashtags.length > 0)) && (
+              <div className="px-4 pb-3">
+                {post.title && (
+                  <h2 className="text-sm font-medium text-white mb-1">{post.title}</h2>
+                )}
+                {post.description && (
+                  <p className="text-sm text-white mb-2">{post.description}</p>
+                )}
+                
+                {/* Hashtags */}
+                {post.hashtags && post.hashtags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {post.hashtags.map((tag, index) => (
+                      <span key={index} className="text-blue-400 text-sm">#{tag}</span>
+                    ))}
                   </div>
                 )}
+              </div>
+            )}
 
-                {/* Media Error Overlay */}
-                {mediaErrors[currentPost._id] && (
-                  <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
+            {/* Media */}
+            <div className="relative bg-black rounded-lg overflow-hidden">
+              {/* Media Loading Overlay */}
+              {(mediaLoadingStates[post._id] ||
+                mediaErrors[post._id]) && (
+                <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
+                  {mediaErrors[post._id] ? (
                     <div className="text-center">
                       <div className="text-gray-400 text-4xl mb-4">⚠️</div>
                       <p className="text-gray-400 text-sm mb-4">
                         Failed to load media
                       </p>
                       <button
-                        onClick={() => retryMedia(currentPost._id)}
+                        onClick={() => retryMedia(post._id)}
                         className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors mx-auto"
                       >
                         <RotateCcw className="w-4 h-4" />
                         Retry
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {/* Video/Image Background */}
-                {currentPost.mediaType === "video" ? (
-                  <video
-                    ref={(el) => {
-                      if (el) videoRefs.current[currentPost._id] = el;
-                    }}
-                    src={currentPost.mediaUrls[0]}
-                    className="w-full h-full object-cover"
-                    loop
-                    muted={currentPost.isMuted !== false}
-                    playsInline
-                    onLoadStart={() => handleMediaLoadStart(currentPost._id)}
-                    onLoadedData={() => handleMediaLoad(currentPost._id)}
-                    onError={() => handleMediaError(currentPost._id)}
-                    onCanPlay={() => handleMediaLoad(currentPost._id)}
-                  />
-                ) : (
-                  <div className="relative w-full h-full">
-                    {/* Image Swiper Container */}
-                    <div className="w-full h-full relative overflow-hidden">
-                      <div 
-                        className="flex w-full h-full transition-transform duration-300 ease-out"
-                        style={{ 
-                          transform: `translateX(-${postImageIndex * 100}%)`,
-                          width: `${currentPost.mediaUrls.length * 100}%`
-                        }}
-                      >
-                        {currentPost.mediaUrls.map((url, index) => (
-                          <div key={index} className="w-full h-full flex-shrink-0">
-                            <img
-                              src={url}
-                              alt={`${currentPost.title} - Image ${index + 1}`}
-                              className="w-full h-full object-cover"
-                              onLoad={() => handleMediaLoad(currentPost._id)}
-                              onError={() => handleMediaError(currentPost._id)}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                  ) : (
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400 mx-auto mb-4"></div>
+                      <p className="text-gray-400 text-sm">Loading...</p>
                     </div>
+                  )}
+                </div>
+              )}
 
-                    {/* Image Navigation Arrows */}
-                    {currentPost.mediaUrls.length > 1 && (
-                      <>
-                        {postImageIndex > 0 && (
-                          <button
-                            onClick={() => handleImageSwipe("prev")}
-                            className="absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm border border-gray-600 flex items-center justify-center text-white hover:bg-black/70 transition-all duration-300 z-10"
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </button>
-                        )}
-                        
-                        {postImageIndex < currentPost.mediaUrls.length - 1 && (
-                          <button
-                            onClick={() => handleImageSwipe("next")}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm border border-gray-600 flex items-center justify-center text-white hover:bg-black/70 transition-all duration-300 z-10"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        )}
-                      </>
-                    )}
+              {post.mediaType === "video" ? (
+                <div className="relative w-full">
+                  <video
+                    ref={(el) => { if (el) videoRefs.current[post._id] = el; }}
+                    src={post.mediaUrls[0]}
+                    className="w-full h-auto max-h-[70vh] object-contain bg-black"
+                    loop
+                    muted
+                    playsInline
+                    onLoadStart={() => handleMediaLoadStart(post._id)}
+                    onLoadedData={() => handleMediaLoad(post._id)}
+                    onError={() => handleMediaError(post._id)}
+                    onCanPlay={() => handleMediaLoad(post._id)}
+                  />
+                  
+                  {/* Video Controls */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => togglePlayPause(post._id)}
+                      className="bg-black/50 backdrop-blur-sm rounded-full p-4 hover:bg-black/70 transition-colors"
+                    >
+                      {isPlaying[post._id] ? 
+                        <Pause className="w-8 h-8 text-white" /> : 
+                        <Play className="w-8 h-8 text-white ml-1" />
+                      }
+                    </button>
+                  </div>
 
-                    {/* Image Dots Indicator */}
-                    {currentPost.mediaUrls.length > 1 && (
-                      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex space-x-2 z-10">
-                        {currentPost.mediaUrls.map((_, index) => (
+                  <div className="absolute top-4 right-4">
+                    <button
+                      onClick={() => toggleMute(post._id)}
+                      className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition-colors"
+                    >
+                      {videoRefs.current[post._id]?.muted !== false ? (
+                        <VolumeX className="w-5 h-5 text-white" />
+                      ) : (
+                        <Volume2 className="w-5 h-5 text-white" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : post.mediaUrls?.length === 1 ? (
+                // Single Image - Instagram style
+                <div className="relative w-full">
+                  <img
+                    src={post.mediaUrls[0]}
+                    alt={post.title}
+                    className="w-full h-auto max-h-[70vh] object-contain bg-black"
+                    onLoad={() => handleMediaLoad(post._id)}
+                    onError={() => handleMediaError(post._id)}
+                  />
+                </div>
+              ) : (
+                // Multiple Images - Carousel
+                <div className="relative w-full">
+                  <div className="w-full overflow-hidden bg-black">
+                    <div 
+                      className="flex transition-transform duration-300"
+                      style={{ 
+                        transform: `translateX(-${(currentImageIndex[post._id] || 0) * 100}%)`,
+                      }}
+                    >
+                      {post.mediaUrls?.map((url, index) => (
+                        <div key={index} className="w-full flex-shrink-0">
+                          <img
+                            src={url}
+                            alt={`${post.title} - ${index + 1}`}
+                            className="w-full h-auto max-h-[70vh] object-contain bg-black"
+                            onLoad={() => handleMediaLoad(post._id)}
+                            onError={() => handleMediaError(post._id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Image Navigation */}
+                  {post.mediaUrls?.length > 1 && (
+                    <>
+                      {(currentImageIndex[post._id] || 0) > 0 && (
+                        <button
+                          onClick={() => handleImageSwipe(post._id, "prev")}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 bg-black/60 backdrop-blur-sm rounded-full p-2 hover:bg-black/80 transition-colors z-10"
+                        >
+                          <ChevronLeft className="w-5 h-5 text-white" />
+                        </button>
+                      )}
+                      
+                      {(currentImageIndex[post._id] || 0) < post.mediaUrls.length - 1 && (
+                        <button
+                          onClick={() => handleImageSwipe(post._id, "next")}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-black/60 backdrop-blur-sm rounded-full p-2 hover:bg-black/80 transition-colors z-10"
+                        >
+                          <ChevronRight className="w-5 h-5 text-white" />
+                        </button>
+                      )}
+
+                      {/* Dots Indicator */}
+                      <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex space-x-1.5 z-10">
+                        {post.mediaUrls.map((_, index) => (
                           <button
                             key={index}
-                            onClick={() => handleImageDotClick(index)}
-                            className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                              index === postImageIndex
-                                ? "bg-white scale-110"
-                                : "bg-white/50 hover:bg-white/75"
+                            onClick={() => setCurrentImageIndex(prev => ({ ...prev, [post._id]: index }))}
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${
+                              index === (currentImageIndex[post._id] || 0)
+                                ? "bg-white"
+                                : "bg-white/50"
                             }`}
                           />
                         ))}
                       </div>
-                    )}
 
-                    {/* Image Counter */}
-                    {currentPost.mediaUrls.length > 1 && (
-                      <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-white text-sm z-10">
-                        {postImageIndex + 1}/{currentPost.mediaUrls.length}
+                      {/* Image Counter */}
+                      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 z-10">
+                        <span className="text-white text-xs font-medium">
+                          {(currentImageIndex[post._id] || 0) + 1}/{post.mediaUrls.length}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Top Controls */}
-                <div className="absolute top-4 md:top-6 left-4 md:left-6 right-4 md:right-6 flex justify-between items-center z-10">
-                  {currentPost.mediaType === "video" && (
-                    <div className="flex space-x-2 md:space-x-3">
-                      <button
-                        onClick={togglePlayPause}
-                        className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-black/40 backdrop-blur-sm border border-gray-600 flex items-center justify-center text-white hover:bg-black/60 transition-all duration-300"
-                      >
-                        {isPlaying ? (
-                          <Pause className="w-3 h-3 md:w-4 md:h-4" />
-                        ) : (
-                          <Play className="w-3 h-3 md:w-4 md:h-4 ml-0.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => toggleMute(currentPost._id)}
-                        className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-black/40 backdrop-blur-sm border border-gray-600 flex items-center justify-center text-white hover:bg-black/60 transition-all duration-300"
-                      >
-                        {currentPost.isMuted !== false ? (
-                          <VolumeX className="w-3 h-3 md:w-4 md:h-4" />
-                        ) : (
-                          <Volume2 className="w-3 h-3 md:w-4 md:h-4" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                  <div className="flex-1"></div>
-                  <button className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-black/40 backdrop-blur-sm border border-gray-600 flex items-center justify-center text-white hover:bg-black/60 transition-all duration-300">
-                    <svg
-                      className="w-3 h-3 md:w-4 md:h-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Bottom Content */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white z-10">
-                  {/* User Info */}
-                  <div className="flex items-center mb-3 md:mb-4">
-                    <img
-                      src={
-                        currentPost.user?.profilePicture ||
-                        ""
-                      }
-                      alt={currentPost.user?.username}
-                      className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-gray-600 mr-3"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-base md:text-lg">
-                        {currentPost.user?.username}
-                      </h3>
-                      <p className="text-gray-300 text-xs md:text-sm flex items-center">
-                        <Eye className="w-3 h-3 mr-1" />
-                        {formatNumber(currentPost.views || 0)} views
-                      </p>
-                    </div>
-                    <button className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-white border border-gray-600 flex items-center justify-center hover:bg-gray-200 transition-all duration-300">
-                      <Plus className="w-3 h-3 md:w-4 md:h-4 text-black" />
-                    </button>
-                  </div>
-
-                  {/* Post Title */}
-                  <h2 className="text-lg md:text-xl font-bold mb-2 md:mb-3 leading-tight">
-                    {currentPost.title}
-                  </h2>
-
-                  {/* Hashtags */}
-                  <div className="mb-3 md:mb-4">
-                    {currentPost.hashtags &&
-                      currentPost.hashtags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="text-gray-300 mr-2 text-sm"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                  </div>
-
-                  {/* Tagged Products */}
-                  {currentPost.products && currentPost.products.length > 0 && (
-                    <div className="mb-3 md:mb-4">
-                      <button
-                        onClick={() =>
-                          setShowProducts((prev) => ({
-                            ...prev,
-                            [currentPost._id]: !prev[currentPost._id],
-                          }))
-                        }
-                        className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 hover:bg-white/20 transition-all duration-300 border border-gray-600 mb-3"
-                      >
-                        <ShoppingBag className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          {currentPost.products.length} Products
-                        </span>
-                      </button>
-
-                      {showProducts[currentPost._id] && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {currentPost.products.map((product) => (
-                            <button
-                              key={product._id}
-                              onClick={() => handleProductClick(product)}
-                              className="bg-white/10 backdrop-blur-sm rounded-xl p-3 hover:bg-white/20 transition-all duration-300 text-left border border-gray-600"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <img
-                                  src={product.image}
-                                  alt={product.name}
-                                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg object-cover"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm truncate">
-                                    {product.name}
-                                  </p>
-                                  <p className="text-gray-300 text-sm font-semibold">
-                                    {product.price}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    </>
                   )}
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* Action Buttons - Right Side */}
-          <div className="absolute right-2 md:right-4 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 md:space-y-4">
-            {/* Profile Picture */}
-            <div className="relative mb-2">
-              <img
-                src={
-                  currentPost?.user?.profilePicture || ""
-                }
-                alt={currentPost?.user?.username}
-                className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-gray-600"
-              />
-              <button className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-white text-black rounded-full p-1 hover:bg-gray-200 transition-colors">
-                <Plus className="w-3 h-3 md:w-4 md:h-4" />
-              </button>
+              )}
             </div>
 
-            {/* Like Button */}
-            <button
-              onClick={() => handleLike(currentPost._id)}
-              className="group flex flex-col items-center"
-            >
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-black/40 backdrop-blur-sm border border-gray-600 flex items-center justify-center hover:bg-black/60 transition-all duration-300 group-hover:scale-110">
-                <Heart
-                  className={`w-5 h-5 md:w-6 md:h-6 transition-all duration-300 ${
-                    currentPost.isLiked
-                      ? "text-red-500 fill-red-500 scale-110"
-                      : "text-white group-hover:text-red-400"
-                  }`}
-                />
+            {/* Action Buttons */}
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() => handleLike(post._id)}
+                    className="group"
+                  >
+                    <Heart
+                      className={`w-6 h-6 transition-all group-hover:scale-110 group-active:scale-95 ${
+                        post.isLiked
+                          ? "text-red-500 fill-red-500"
+                          : "text-white group-hover:text-red-400"
+                      }`}
+                    />
+                  </button>
+                  
+                  <button
+                    onClick={() => handleCommentClick(post._id)}
+                    className="group"
+                  >
+                    <MessageCircle className="w-6 h-6 text-white group-hover:scale-110 group-active:scale-95 transition-transform" />
+                  </button>
+                  
+                  <button 
+                    onClick={() => handleShare(post)}
+                    className="group"
+                  >
+                    <Share2 className="w-6 h-6 text-white group-hover:scale-110 group-active:scale-95 transition-transform" />
+                  </button>
+                </div>
+                
+                <button className="group">
+                  <Bookmark className="w-6 h-6 text-white group-hover:scale-110 group-active:scale-95 transition-transform" />
+                </button>
               </div>
-              <span className="text-white text-xs font-medium mt-1 md:mt-2 bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
-                {formatNumber(currentPost.likes)}
-              </span>
-            </button>
 
-            {/* Comment Button */}
-            <button
-              onClick={handleCommentClick}
-              className="group flex flex-col items-center"
-            >
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-black/40 backdrop-blur-sm border border-gray-600 flex items-center justify-center hover:bg-black/60 transition-all duration-300 group-hover:scale-110">
-                <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-white group-hover:text-gray-300 transition-colors duration-300" />
+              {/* Engagement Stats */}
+              <div className="space-y-1">
+                {(post.likes && post.likes > 0) && (
+                  <p className="text-white font-semibold text-sm">
+                    {formatNumber(post.likes)} {post.likes === 1 ? 'like' : 'likes'}
+                  </p>
+                )}
+                
+                {(post.comments && post.comments > 0) && (
+                  <button 
+                    onClick={() => handleCommentClick(post._id)}
+                    className="text-gray-400 text-sm hover:text-white transition-colors block"
+                  >
+                    View all {formatNumber(post.comments)} comments
+                  </button>
+                )}
               </div>
-              <span className="text-white text-xs font-medium mt-1 md:mt-2 bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
-                {formatNumber(currentPost.comments)}
-              </span>
-            </button>
 
-            {/* Share Button */}
-            <button
-              onClick={() => handleShare(currentPost)}
-              className="group flex flex-col items-center"
-            >
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-black/40 backdrop-blur-sm border border-gray-600 flex items-center justify-center hover:bg-black/60 transition-all duration-300 group-hover:scale-110">
-                <Share2 className="w-5 h-5 md:w-6 md:h-6 text-white group-hover:text-gray-300 transition-colors duration-300" />
-              </div>
-              <span className="text-white text-xs font-medium mt-1 md:mt-2 bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
-                {formatNumber(currentPost.shares)}
-              </span>
-            </button>
+              {/* Tagged Products */}
+              {post.taggedProducts && post.taggedProducts.length > 0 && (
+                <div className="mt-3">
+                  <button
+                    onClick={() => setShowProducts(prev => ({ ...prev, [post._id]: !prev[post._id] }))}
+                    className="flex items-center space-x-2 bg-gray-900/30 backdrop-blur-sm rounded-lg px-3 py-2 hover:bg-gray-800/30 transition-colors border border-gray-700/30"
+                  >
+                    <ShoppingBag className="w-4 h-4 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      {post.taggedProducts.length} Product{post.taggedProducts.length > 1 ? 's' : ''}
+                    </span>
+                  </button>
+
+                  {showProducts[post._id] && (
+                    <div className="mt-3 space-y-2">
+                      {post.taggedProducts.map((product) => (
+                        <button
+                          key={product._id}
+                          onClick={() => handleProductClick(product)}
+                          className="w-full bg-gray-900/30 backdrop-blur-sm rounded-lg p-3 border border-gray-700/30 hover:bg-gray-800/30 transition-colors text-left"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="w-10 h-10 rounded-lg object-cover"
+                            />
+                            <div className="flex-1">
+                              <p className="text-white font-medium text-sm">{product.name}</p>
+                              <p className="text-gray-300 font-semibold text-sm">{product.price}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-
-          {/* Navigation Arrows - Left Side */}
-          <div className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2 flex flex-col space-y-2 md:space-y-3">
-            <button
-              onClick={() => handleScroll("up")}
-              disabled={currentIndex === 0}
-              className={`w-10 h-10 md:w-12 md:h-12 rounded-full transition-all duration-300 flex items-center justify-center ${
-                currentIndex === 0
-                  ? "bg-black/20 text-gray-500 cursor-not-allowed border border-gray-700"
-                  : "bg-black/40 backdrop-blur-sm border border-gray-600 text-white hover:bg-black/60 hover:scale-110"
-              }`}
-            >
-              <ChevronUp className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <button
-              onClick={() => handleScroll("down")}
-              disabled={currentIndex === posts.length - 1 && !hasMore}
-              className={`w-10 h-10 md:w-12 md:h-12 rounded-full transition-all duration-300 flex items-center justify-center ${
-                currentIndex === posts.length - 1 && !hasMore
-                  ? "bg-black/20 text-gray-500 cursor-not-allowed border border-gray-700"
-                  : "bg-black/40 backdrop-blur-sm border border-gray-600 text-white hover:bg-black/60 hover:scale-110"
-              }`}
-            >
-              <ChevronDown className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Progress Indicator */}
-      <div className="absolute bottom-4 md:bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-1 md:space-x-2">
-        {posts.map((_, index) => (
-          <div
-            key={index}
-            className={`h-1 rounded-full transition-all duration-300 ${
-              index === currentIndex
-                ? "w-6 md:w-8 bg-white"
-                : "w-1.5 md:w-2 bg-gray-600"
-            }`}
-          />
         ))}
-      </div>
 
-      {/* Loading indicator */}
-      {loading && (
-        <div className="absolute bottom-16 md:bottom-20 left-1/2 transform -translate-x-1/2 text-white">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-        </div>
-      )}
+        {/* Load More Button */}
+        {hasMore && (
+          <div className="p-4 text-center">
+            <button
+              onClick={loadMorePosts}
+              disabled={loading}
+              className="bg-gray-900/50 backdrop-blur-xl text-white px-6 py-3 rounded-xl hover:bg-gray-800/50 transition-colors border border-gray-700/50 disabled:opacity-50"
+            >
+              {loading ? "Loading..." : "Load more posts"}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Comment Sidebar */}
       <CommentSidebar
         isOpen={showComments}
         onClose={() => setShowComments(false)}
-        postId={currentPost?._id}
-        commentCount={currentPost?.comments || 0}
+        postId={selectedPostId}
+        commentCount={posts.find(p => p._id === selectedPostId)?.comments || 0}
         onCommentAdded={handleCommentAdded}
       />
     </div>
