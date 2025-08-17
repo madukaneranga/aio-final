@@ -7,23 +7,29 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { Star, ArrowLeft } from "lucide-react";
-import { extractSocialInfo } from "../utils/helpers";
 import StoreHero from "../components/StoreHero";
 import StoreInfo from "../components/StoreInfo";
 
 const StoreDetail = () => {
+  const viewUpdateAttempted = useRef(new Set());
   const { user } = useAuth();
   const { id } = useParams();
   const [storeData, setStoreData] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [followData, setFollowData] = useState({
+    isFollowing: false,
+    isOwnStore: false,
+  });
 
   const handleExploreClick = () => {
     itemsRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
+
+    console.log("Explore button clicked");
   };
   const handleContactClick = () => {
     contactRef.current?.scrollIntoView({
@@ -34,13 +40,89 @@ const StoreDetail = () => {
   const itemsRef = useRef(null);
   const contactRef = useRef(null);
 
+  // Data fetching effect
   useEffect(() => {
     if (id) {
       fetchStoreData();
       fetchReviews();
+      fetchFollowData();
     }
   }, [id]);
 
+  // View tracking effect - separate and idempotent
+  useEffect(() => {
+    if (!id || viewUpdateAttempted.current.has(id)) return;
+
+    const updateViews = async () => {
+      try {
+        viewUpdateAttempted.current.add(id);
+        await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${id}/views`, {
+          method: "PATCH",
+        });
+      } catch (error) {
+        console.error("Error updating views:", error);
+        viewUpdateAttempted.current.delete(id);
+      }
+    };
+
+    const timeoutId = setTimeout(updateViews, 100);
+    return () => clearTimeout(timeoutId);
+  }, [id]);
+
+  const handleFollowChange = (newFollowStatus, newFollowersCount) => {
+    setStoreData((prev) => ({
+      ...prev,
+      isFollowing: newFollowStatus,
+      stats: {
+        ...prev.stats,
+        followersCount: newFollowersCount,
+      },
+    }));
+    setFollowData((prev) => ({
+      ...prev,
+      isFollowing: newFollowStatus,
+    }));
+  };
+
+  const fetchFollowData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        console.log("No token found - user not logged in");
+        setFollowData({ isFollowing: false, isOwnStore: false });
+        return;
+      }
+
+      const url = `${
+        import.meta.env.VITE_API_URL
+      }/api/stores/${id}/follow-check`;
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch follow data: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setFollowData(data); // { isFollowing: true/false, isOwnStore: true/false }
+    } catch (error) {
+      console.error("Error fetching follow data:", error);
+      setError("Failed to load follow data");
+      // Set defaults on error
+      setFollowData({ isFollowing: false, isOwnStore: false });
+    } finally {
+      setLoading(false);
+    }
+  };
   const fetchStoreData = async () => {
     try {
       setLoading(true);
@@ -62,8 +144,6 @@ const StoreDetail = () => {
       setLoading(false);
     }
   };
-
-  
 
   const fetchReviews = async () => {
     try {
@@ -193,14 +273,18 @@ const StoreDetail = () => {
 
       {/* Store Info */}
       <div ref={contactRef}>
-        <StoreInfo 
-        store={store}
-        user={user}
-        reviews={reviews}/>
+        <StoreInfo
+          followData={followData}
+          setFollowData={setFollowData}
+          store={store}
+          user={user}
+          reviews={reviews}
+          onFollowChange={handleFollowChange}
+        />
       </div>
 
       {/* Listings */}
-      <div className="py-16 bg-white">
+      <div className="py-16 bg-white" ref={itemsRef}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
             <h2 className="text-3xl font-bold mb-4 text-gray-900">

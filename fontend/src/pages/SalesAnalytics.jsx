@@ -41,7 +41,7 @@ const SalesAnalytics = () => {
 
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState("30");
-  const [monthRange, setMonthRange] = useState("1");
+  const [monthRange, setMonthRange] = useState("0");
   const [viewType, setViewType] = useState("overview");
 
   useEffect(() => {

@@ -23,11 +23,33 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
-  socialLinks: [
-    {
+  socialLinks: {
+    facebook: {
       type: String,
     },
-  ],
+    instagram: {
+      type: String,
+    },
+    youtube: {
+      type: String,
+    },
+    tiktok: {
+      type: String,
+    },
+    linkedin: {
+      type: String,
+    },
+    pinterest: {
+      type: String,
+    },
+    snapchat: {
+      type: String,
+    },
+    website: {
+      type: String,
+    },
+  },
+
   idImages: [
     {
       type: String,
@@ -42,24 +64,6 @@ const storeSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
-  timeSlots: [
-    {
-      day: {
-        type: String,
-        enum: [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday",
-        ],
-      },
-      startTime: String,
-      endTime: String,
-    },
-  ],
   ownerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -95,7 +99,7 @@ const storeSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: false,
+    default: true,
   },
   // NEW FIELDS ADDED FROM defaultStore
   isPremium: {
@@ -130,15 +134,19 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
-  operatingHours: {
-    weekdays: {
-      type: String,
-      default: "9:00 AM - 6:00 PM",
+  serviceSettings: {
+    workingHours: {
+      start: { type: String, default: "09:00" },
+      end: { type: String, default: "17:00" },
     },
-    weekends: {
-      type: String,
-      default: "10:00 AM - 4:00 PM",
+    workingDays: {
+      type: [String],
+      default: ["monday", "tuesday", "wednesday", "thursday", "friday"],
     },
+    excludedDates: { type: [Date], default: [] },
+    timeZone: { type: String, default: "Asia/Colombo" },
+    bookingBuffer: { type: Number, default: 0 },
+    advanceBookingDays: { type: Number, default: 30 },
   },
   shippingInfo: {
     freeShipping: {
@@ -159,25 +167,55 @@ const storeSchema = new mongoose.Schema({
       },
     ],
   },
+  followers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
   stats: {
-    totalOrders: {
+    totalOrdersOrBookings: {
       type: Number,
       default: 0,
     },
-    repeatCustomers: {
+    followersCount: {
       type: Number,
       default: 0,
     },
-    avgOrderValue: {
+    completionRate: {
+      type: Number,
+      default: 0,
+    },
+    views: {
+      type: Number,
+      default: 98,
+    },
+    impressions: {
       type: Number,
       default: 0,
     },
   },
-
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+// Virtual field for avgPurchaseAmount - automatically calculated
+storeSchema.virtual("stats.avgPurchaseAmount").get(function () {
+  if (
+    !this.stats.totalOrdersOrBookings ||
+    this.stats.totalOrdersOrBookings === 0
+  ) {
+    return 0;
+  }
+  return (
+    Math.round((this.totalSales / this.stats.totalOrdersOrBookings) * 100) / 100
+  );
+});
+
+// Ensure virtuals are included when converting to JSON/Object
+storeSchema.set("toJSON", { virtuals: true });
+storeSchema.set("toObject", { virtuals: true });
 
 export default mongoose.model("Store", storeSchema);

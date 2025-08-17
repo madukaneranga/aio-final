@@ -139,4 +139,167 @@ router.put('/:id/status', authenticate, authorize('store_owner'), async (req, re
 });
 
 
+// Get availability for a store on a specific date
+router.get("/availability/:storeId", async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ error: "Date parameter is required" });
+    }
+
+    // Parse the date and create date range for the entire day
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Find all bookings for this store on the specified date
+    // Only include confirmed bookings (not cancelled or pending cancellation)
+    const bookings = await Booking.find({
+      storeId: storeId,
+      "bookingDetails.date": {
+        $gte: startOfDay,
+        $lte: endOfDay
+      },
+      status: { $nin: ["cancelled"] } // Exclude cancelled bookings
+    })
+    .select("bookingDetails serviceId status")
+    .populate("serviceId", "title duration");
+
+    res.json({
+      success: true,
+      date: date,
+      storeId: storeId,
+      bookings: bookings,
+      totalBookings: bookings.length
+    });
+
+  } catch (error) {
+    console.error("Error fetching availability:", error);
+    res.status(500).json({ 
+      error: "Failed to fetch availability",
+      details: error.message 
+    });
+  }
+});
+
+// Alternative: Get availability for multiple dates at once
+router.get("/availability/:storeId/range", async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ 
+        error: "Both startDate and endDate parameters are required" 
+      });
+    }
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const bookings = await Booking.find({
+      storeId: storeId,
+      "bookingDetails.date": {
+        $gte: start,
+        $lte: end
+      },
+      status: { $nin: ["cancelled"] }
+    })
+    .select("bookingDetails serviceId status")
+    .populate("serviceId", "title duration")
+    .sort({ "bookingDetails.date": 1, "bookingDetails.startTime": 1 });
+
+    // Group bookings by date
+    const bookingsByDate = bookings.reduce((acc, booking) => {
+      const dateKey = booking.bookingDetails.date.toISOString().split('T')[0];
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(booking);
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      storeId: storeId,
+      dateRange: { startDate, endDate },
+      bookingsByDate: bookingsByDate,
+      totalBookings: bookings.length
+    });
+
+  } catch (error) {
+    console.error("Error fetching availability range:", error);
+    res.status(500).json({ 
+      error: "Failed to fetch availability range",
+      details: error.message 
+    });
+  }
+});
+
+// Get specific time slot availability
+router.get("/availability/:storeId/timeslot", async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { date, startTime, endTime } = req.query;
+
+    if (!date || !startTime || !endTime) {
+      return res.status(400).json({ 
+        error: "Date, startTime, and endTime parameters are required" 
+      });
+    }
+
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Check for overlapping bookings
+    const overlappingBookings = await Booking.find({
+      storeId: storeId,
+      "bookingDetails.date": {
+        $gte: startOfDay,
+        $lte: endOfDay
+      },
+      status: { $nin: ["cancelled"] },
+      $or: [
+        {
+          // Booking starts before our slot ends and ends after our slot starts
+          "bookingDetails.startTime": { $lt: endTime },
+          "bookingDetails.endTime": { $gt: startTime }
+        }
+      ]
+    })
+    .select("bookingDetails serviceId")
+    .populate("serviceId", "title");
+
+    const isAvailable = overlappingBookings.length === 0;
+
+    res.json({
+      success: true,
+      available: isAvailable,
+      date: date,
+      timeSlot: { startTime, endTime },
+      conflictingBookings: overlappingBookings,
+      storeId: storeId
+    });
+
+  } catch (error) {
+    console.error("Error checking timeslot availability:", error);
+    res.status(500).json({ 
+      error: "Failed to check timeslot availability",
+      details: error.message 
+    });
+  }
+});
+
 export default router;

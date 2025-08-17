@@ -15,22 +15,20 @@ const serviceSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
-  priceType: {
-    type: String,
-    enum: ["fixed", "hourly"],
-    default: "fixed",
+  oldPrice: {
+    type: Number,
+    min: 0,
+  },
+  duration: {
+    type: Number,
+    required: true,
+    min: 30,
   },
   images: [
     {
       type: String,
     },
   ],
-  // Updated category structure
-  categoryId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Category",
-    required: true,
-  },
   category: {
     type: String,
     required: true,
@@ -46,17 +44,27 @@ const serviceSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-
+  rating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5,
+  },
+  bookingSettings: {
+    maxAdvanceBookingDays: Number, // Override store setting if needed
+    minAdvanceBookingHours: {
+      type: Number,
+      default: 1,
+    },
+    maxBookingsPerDay: Number,
+    maxBookingsPerSlot: {
+      type: Number,
+      default: 1,
+    },
+  },
   duration: {
     type: Number, // in minutes
-    required: true,
   },
-  timeSlots: [
-    {
-      startTime: String,
-      endTime: String,
-    },
-  ],
   storeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Store",
@@ -67,9 +75,20 @@ const serviceSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  bookingCount: {
-    type: Number,
-    default: 0,
+
+  stats: {
+    totalBookings: {
+      type: Number,
+      default: 0,
+    },
+    views: {
+      type: Number,
+      default: 98,
+    },
+    impressions: {
+      type: Number,
+      default: 0,
+    },
   },
   isActive: {
     type: Boolean,

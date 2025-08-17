@@ -55,6 +55,12 @@ const userSchema = new mongoose.Schema({
     enum: ["active", "inactive", "expired"],
     default: "active",
   },
+  followingStores: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+    },
+  ],
   subscriptionId: String,
   createdAt: {
     type: Date,

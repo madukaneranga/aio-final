@@ -158,7 +158,7 @@ const CreateStore = () => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
-            packageName: selectedPackage.name,
+            packageName: selectedPackage,
           }),
         }
       );

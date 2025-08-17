@@ -142,19 +142,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             link: `/orders`,
           });
 
-          const customerNotification = await Notification.create({
-            userId: req.user._id,
-            title: `⏳ Order Pending`,
-            userType: "customer",
-            body: `Your order has been received and is awaiting processing. We’ll update you soon! Order ID  #${order._id
-              .toString()
-              .slice(-8)}`,
-            type: "order_update",
-            link: `/orders`,
-          });
-
           emitNotification(store.ownerId.toString(), storeNotification);
-          emitNotification(req.user._id.toString(), customerNotification);
         }
 
         createdEntities.order.push(order);
@@ -181,10 +169,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
           customerId: req.user._id,
           storeId: service.storeId,
           serviceId: service._id,
-          bookingDate: item.bookingDate,
-          startTime: item.startTime,
-          endTime: item.endTime,
-          notes: item.notes,
+          bookingDetails: item.bookingDetails,
           totalAmount: serviceAmount.toFixed(2),
           platformFee: commissionAmount.toFixed(2),
           storeAmount,
@@ -224,19 +209,7 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
             link: `/bookings`,
           });
 
-          const customerNotification = await Notification.create({
-            userId: req.user._id,
-            title: `⏳ booking Pending`,
-            userType: "customer",
-            body: `Your booking is now pending. We’ll notify you once it gets confirmed! Booking ID  #${booking._id
-              .toString()
-              .slice(-8)}`,
-            type: "booking_update",
-            link: `/bookings`,
-          });
-
           emitNotification(store.ownerId.toString(), storeNotification);
-          emitNotification(req.user._id.toString(), customerNotification);
         }
 
         createdEntities.bookings.push(booking);
@@ -440,7 +413,10 @@ router.post(
 
             // Update store total sales
             await Store.findByIdAndUpdate(order.storeId, {
-              $inc: { totalSales: order.storeAmount },
+              $inc: {
+                totalSales: order.storeAmount,
+                "stats.totalOrdersOrBookings": 1,
+              },
             });
 
             // Save commission record
@@ -472,7 +448,10 @@ router.post(
           for (const booking of bookings) {
             // Update store total sales
             await Store.findByIdAndUpdate(booking.storeId, {
-              $inc: { totalSales: booking.storeAmount },
+              $inc: {
+                totalSales: booking.storeAmount,
+                "stats.totalOrdersOrBookings": 1,
+              },
             });
 
             // Save commission record

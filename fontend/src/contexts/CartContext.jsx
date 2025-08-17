@@ -94,11 +94,12 @@ export const CartProvider = ({ children, showToast }) => {
         title: service.title,
         price: service.price,
         image: service.images?.[0],
+        bookingDetails,
         storeId:
           typeof service.storeId === 'object'
             ? service.storeId._id
             : service.storeId || service.storeId,
-        ...bookingDetails,
+        
       },
     ]);
   };

@@ -7,7 +7,6 @@ import Product from "../models/Product.js";
 import Service from "../models/Service.js";
 import User from "../models/User.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { Console } from "console";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,7 +58,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-
 // Search/filter stores via POST
 router.post("/listing", async (req, res) => {
   try {
@@ -72,7 +70,6 @@ router.post("/listing", async (req, res) => {
         { description: { $regex: search, $options: "i" } },
       ];
     }
-    
 
     const stores = await Store.find(query)
       .populate("ownerId", "name type")
@@ -112,10 +109,47 @@ router.get("/:id", async (req, res) => {
       console.log("Found services:", listings.length);
     }
 
-    console.log("Sending response with store and listings");
-    res.json({ store, listings });
+    res.json({
+      store: {
+        ...store.toObject(),
+      },
+      listings,
+    });
   } catch (error) {
     console.error("Error in store route:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/:id/follow-check", authenticate, async (req, res) => {
+  try {
+    console.log("Fetching store with ID:", req.params.id);
+
+    const store = await Store.findById(req.params.id).populate(
+      "ownerId",
+      "name email phone"
+    );
+
+    if (!store) {
+      console.log("Store not found");
+      return res.status(404).json({ error: "Store not found" });
+    }
+
+    console.log("Store found:", store.name, "Type:", store.type);
+
+    // Since authenticate middleware ensures req.user exists, no need to check
+    const user = await User.findById(req.user._id);
+    const isFollowing = user?.followingStores.includes(req.params.id) || false;
+    const isOwnStore = store.ownerId._id.toString() === req.user._id.toString();
+
+    console.log("Sending follow response:", { isFollowing, isOwnStore });
+
+    res.json({
+      isFollowing,
+      isOwnStore,
+    });
+  } catch (error) {
+    console.error("Error in follow-check route:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -190,10 +224,6 @@ router.put("/:id", authenticate, authorize("store_owner"), async (req, res) => {
 
     const updates = req.body;
 
-    //if (updates.contactInfo) {
-    //updates.contactInfo = JSON.parse(updates.contactInfo);
-    //}
-
     const updatedStore = await Store.findByIdAndUpdate(req.params.id, updates, {
       new: true,
     });
@@ -204,6 +234,24 @@ router.put("/:id", authenticate, authorize("store_owner"), async (req, res) => {
   }
 });
 
+// Increment store views
+router.patch("/:id/views", async (req, res) => {
+  try {
+    const updatedStore = await Store.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { "stats.views": 1 } },
+      { new: true }
+    );
+
+    if (!updatedStore) {
+      return res.status(404).json({ error: "Store not found" });
+    }
+
+    res.json({ views: updatedStore.views });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // Upload profile image for store
 router.put(
   "/:id/profile-image",
@@ -263,4 +311,63 @@ router.get("/:storeId/product-count", async (req, res) => {
   }
 });
 
+// Toggle follow/unfollow a store
+router.post("/:storeId/follow", authenticate, async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const userId = req.user._id;
+
+    // Check if store exists
+    const store = await Store.findById(storeId);
+    if (!store) {
+      return res.status(404).json({ error: "Store not found" });
+    }
+
+    // Check if user is trying to follow their own store
+    if (store.ownerId.toString() === userId.toString()) {
+      return res.status(400).json({ error: "Cannot follow your own store" });
+    }
+
+    // Check if already following
+    const user = await User.findById(userId);
+    const isFollowing = user.followingStores.includes(storeId);
+
+    if (isFollowing) {
+      // UNFOLLOW - Remove from both arrays
+      user.followingStores = user.followingStores.filter(
+        (id) => id.toString() !== storeId
+      );
+      store.followers = store.followers.filter(
+        (id) => id.toString() !== userId.toString()
+      );
+
+      await user.save();
+      store.stats.followersCount = store.followers.length;
+      await store.save();
+
+      res.status(200).json({
+        message: "Store unfollowed successfully",
+        followersCount: store.stats.followersCount,
+        isFollowing: false,
+      });
+    } else {
+      // FOLLOW - Add to both arrays
+      user.followingStores.push(storeId);
+      store.followers.push(userId);
+
+      await user.save();
+      store.stats.followersCount = store.followers.length;
+      await store.save();
+
+      res.status(200).json({
+        message: "Store followed successfully",
+        followersCount: store.stats.followersCount,
+        isFollowing: true,
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 export default router;

@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
-import ProductListing from "../components/ProductListing";
-import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
+import ServiceListing from "../components/ServiceListing";
+import ServicesFiltersSidebar from "../components/ServicesFiltersSidebar";
 
 // Custom debounce hook
 const useDebounce = (value, delay) => {
@@ -48,13 +48,13 @@ const useIntersectionObserver = (callback, options = {}) => {
   return targetRef;
 };
 
-const Products = () => {
+const Services = () => {
   // URL parameter hooks
   const [searchParams] = useSearchParams();
   const location = useLocation();
 
-  // Product data state
-  const [products, setProducts] = useState([]);
+  // Service data state
+  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
@@ -62,8 +62,8 @@ const Products = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [totalServices, setTotalServices] = useState(0);
+  const [hasMoreServices, setHasMoreServices] = useState(true);
   const PRODUCTS_PER_PAGE = 20;
 
   // Unified filters state
@@ -113,8 +113,8 @@ const Products = () => {
     }
   }, [searchParams, location]);
 
-  // Fetch products function with pagination
-  const fetchProducts = async (
+  // Fetch services function with pagination
+  const fetchServices = async (
     searchFilters = {},
     page = 1,
     append = false
@@ -122,14 +122,14 @@ const Products = () => {
     try {
       if (!append) {
         setLoading(true);
-        setProducts([]);
+        setServices([]);
       } else {
         setLoadingMore(true);
       }
       setError("");
 
       console.log(
-        "Fetching products with filters:",
+        "Fetching services with filters:",
         searchFilters,
         "Page:",
         page
@@ -153,7 +153,7 @@ const Products = () => {
       };
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/listing`,
+        `${import.meta.env.VITE_API_URL}/api/services/listing`,
         {
           method: "POST",
           headers: {
@@ -166,30 +166,30 @@ const Products = () => {
       if (response.ok) {
         const data = await response.json();
         console.log(
-          "Products fetched:",
-          data.products.length,
+          "Services fetched:",
+          data.services.length,
           "items",
           "Total:",
           data.total
         );
 
         if (append) {
-          setProducts((prev) => [...prev, ...data.products]);
+          setServices((prev) => [...prev, ...data.services]);
         } else {
-          setProducts(data.products);
+          setServices(data.services);
         }
 
-        setTotalProducts(data.total);
-        setHasMoreProducts(
-          data.products.length === PRODUCTS_PER_PAGE && data.hasMore
+        setTotalServices(data.total);
+        setHasMoreServices(
+          data.services.length === PRODUCTS_PER_PAGE && data.hasMore
         );
         setCurrentPage(page);
       } else {
-        setError("Failed to fetch products");
+        setError("Failed to fetch services");
         console.error("API Error:", response.status, response.statusText);
       }
     } catch (error) {
-      console.error("Error fetching products:", error);
+      console.error("Error fetching services:", error);
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -197,13 +197,13 @@ const Products = () => {
     }
   };
 
-  // Load more products
-  const loadMoreProducts = useCallback(() => {
-    if (!loadingMore && hasMoreProducts && !loading) {
+  // Load more services
+  const loadMoreServices = useCallback(() => {
+    if (!loadingMore && hasMoreServices && !loading) {
       const nextPage = currentPage + 1;
-      fetchProducts(debouncedFilters, nextPage, true);
+      fetchServices(debouncedFilters, nextPage, true);
     }
-  }, [loadingMore, hasMoreProducts, loading, currentPage, debouncedFilters]);
+  }, [loadingMore, hasMoreServices, loading, currentPage, debouncedFilters]);
 
   // Intersection observer for infinite scroll
   const loadMoreRef = useIntersectionObserver(
@@ -211,17 +211,17 @@ const Products = () => {
       (entries) => {
         const [entry] = entries;
         if (entry.isIntersecting) {
-          loadMoreProducts();
+          loadMoreServices();
         }
       },
-      [loadMoreProducts]
+      [loadMoreServices]
     )
   );
 
-  // Auto-fetch products when debounced filters change (reset to page 1)
+  // Auto-fetch services when debounced filters change (reset to page 1)
   useEffect(() => {
     setCurrentPage(1);
-    fetchProducts(debouncedFilters, 1, false);
+    fetchServices(debouncedFilters, 1, false);
   }, [debouncedFilters]);
 
   // Load categories
@@ -281,7 +281,7 @@ const Products = () => {
     e?.preventDefault?.();
 
     // Force immediate search without debounce
-    fetchProducts(filters, 1, false);
+    fetchServices(filters, 1, false);
   };
 
   // Check for active filters
@@ -314,15 +314,15 @@ const Products = () => {
   ].filter(Boolean).length;
 
   // Calculate display range for results counter
-  const startResult = products.length > 0 ? 1 : 0;
-  const endResult = products.length;
+  const startResult = services.length > 0 ? 1 : 0;
+  const endResult = services.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Products</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Services</h1>
 
           {/* Search Filters */}
           <div className="space-y-4">
@@ -367,7 +367,7 @@ const Products = () => {
                     updateFilter("search", e.target.value);
                     console.log("Search query changed to:", e.target.value);
                   }}
-                  placeholder="Search products..."
+                  placeholder="Search services..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                 />
               </div>
@@ -389,7 +389,7 @@ const Products = () => {
                     <span className="text-sm font-medium">
                       Showing {startResult.toLocaleString()}-
                       {endResult.toLocaleString()} of{" "}
-                      {totalProducts.toLocaleString()} results
+                      {totalServices.toLocaleString()} results
                     </span>
                   </div>
                   {hasActiveFilters && (
@@ -403,7 +403,7 @@ const Products = () => {
                   )}
                 </div>
 
-                {hasMoreProducts && (
+                {hasMoreServices && (
                   <div className="flex items-center space-x-2 text-xs text-gray-500">
                     <div className="animate-pulse w-2 h-2 bg-green-400 rounded-full"></div>
                     <span>More available</span>
@@ -413,7 +413,7 @@ const Products = () => {
             )}
 
             {/* Filters Side Drawer */}
-            <ProductsFiltersSidebar
+            <ServicesFiltersSidebar
               showFilters={showFilters}
               setShowFilters={setShowFilters}
               categorySet={categories}
@@ -462,13 +462,13 @@ const Products = () => {
         </button>
       )}
 
-      {/* Products Content */}
-      <ProductListing products={products} loading={loading} error={error} />
+      {/* Services Content */}
+      <ServiceListing services={services} loading={loading} error={error} />
 
       {/* Elegant Load More Section */}
-      {!loading && products.length > 0 && (
+      {!loading && services.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {hasMoreProducts ? (
+          {hasMoreServices ? (
             <div
               ref={loadMoreRef}
               className="flex flex-col items-center justify-center py-12 space-y-6"
@@ -487,7 +487,7 @@ const Products = () => {
                   </div>
                   <div className="text-center">
                     <p className="text-gray-600 font-medium">
-                      Loading more products...
+                      Loading more services...
                     </p>
                     <p className="text-sm text-gray-400">
                       Finding the perfect items for you
@@ -496,11 +496,11 @@ const Products = () => {
                 </div>
               ) : (
                 <button
-                  onClick={loadMoreProducts}
+                  onClick={loadMoreServices}
                   className="group relative overflow-hidden bg-gradient-to-r from-gray-900 to-black text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 ease-out"
                 >
                   <span className="relative z-10 flex items-center space-x-2">
-                    <span>Load More Products</span>
+                    <span>Load More Services</span>
                     <ChevronDown className="w-5 h-5 group-hover:animate-bounce" />
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-black to-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -518,7 +518,7 @@ const Products = () => {
                   You've seen it all! ✨
                 </h3>
                 <p className="text-gray-600 max-w-md">
-                  That's every product we have matching your criteria. Try
+                  That's every service we have matching your criteria. Try
                   adjusting your filters to discover more amazing items.
                 </p>
               </div>
@@ -528,7 +528,7 @@ const Products = () => {
       )}
 
       {/* Empty State */}
-      {!loading && products.length === 0 && !error && (
+      {!loading && services.length === 0 && !error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center space-y-6">
             <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto shadow-lg">
@@ -536,10 +536,10 @@ const Products = () => {
             </div>
             <div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                No products found
+                No services found
               </h3>
               <p className="text-gray-600 max-w-md mx-auto mb-6">
-                We couldn't find any products matching your search criteria. Try
+                We couldn't find any services matching your search criteria. Try
                 adjusting your filters or search terms.
               </p>
               {hasActiveFilters && (
@@ -559,4 +559,4 @@ const Products = () => {
   );
 };
 
-export default Products;
+export default Services;

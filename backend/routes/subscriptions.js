@@ -7,8 +7,6 @@ import { authenticate, authorize } from "../middleware/auth.js";
 import User from "../models/User.js";
 import Package from "../models/Package.js";
 
-
-
 // =================== 🔐 PAYHERE CONFIG ===================
 const PAYHERE_BASE_URL = "https://sandbox.payhere.lk";
 const PAYHERE_MERCHANT_ID = "1231188"; // Replace with live merchant ID when needed
@@ -66,13 +64,11 @@ async function getPayHereAccessToken() {
   return data.access_token;
 }
 
-// =================== 📦 ROUTES ===================
-
 // POST /api/subscriptions/create-subscription
 router.post("/create-subscription", authenticate, async (req, res) => {
   try {
-    const { packageName } = req.body; 
-
+    const { packageName } = req.body;
+    console.log(packageName);
     const userId = req.user._id;
     const store = await Store.findOne({ ownerId: userId });
     if (!store)
@@ -80,7 +76,6 @@ router.post("/create-subscription", authenticate, async (req, res) => {
 
     if (!packageName)
       return res.status(400).json({ error: "Package name is required" });
-
 
     const selectedPackage = await Package.findOne({ name: packageName });
 
@@ -326,7 +321,6 @@ router.post("/retry", authenticate, async (req, res) => {
   }
 });
 
-
 // GET /api/subscriptions/my-subscription
 router.get(
   "/my-subscription",
@@ -356,7 +350,6 @@ router.get(
     }
   }
 );
-
 
 // PUT /api/subscriptions/upgrade
 router.put("/upgrade", authenticate, async (req, res) => {

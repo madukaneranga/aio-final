@@ -34,10 +34,19 @@ const upload = multer({
 });
 
 // Get all services
+// Get all active services
 router.get("/", async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, storeId } = req.query;
     let query = { isActive: true };
+
+    console.log("Received search request:", {
+      category,
+      search,
+      minPrice,
+      maxPrice,
+      storeId,
+    });
 
     if (category) query.category = category;
     if (storeId) query.storeId = storeId;
@@ -63,36 +72,48 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Search/filter products via POST
+// Search/filter services via POST
 router.post("/listing", async (req, res) => {
   try {
     const {
+      search,
       category,
-      categoryId,
       subcategory,
       childCategory,
-      search,
+      rating,
       minPrice,
       maxPrice,
+      duration,
+      page = 1,
+      limit = 20,
     } = req.body;
 
-    const query = { isActive: true };
-
     console.log("Received search request:", {
+      search,
       category,
-      categoryId,
       subcategory,
       childCategory,
-      search,
+      rating,
       minPrice,
       maxPrice,
+      duration,
+      page,
+      limit,
     });
 
-    if (category) query.category = category;
-    if (categoryId) query.categoryId = categoryId;
-    if (subcategory) query.subcategory = subcategory;
-    if (childCategory) query.childCategory = childCategory;
+    // Build the base query
+    const query = { isActive: true };
 
+    // Category filters (hierarchical)
+    if (childCategory) query.childCategory = childCategory;
+    else if (subcategory) query.subcategory = subcategory;
+    else if (category) query.category = category;
+
+    // Other filters
+    if (rating) query.rating = { $gte: rating };
+    if (duration) query.duration = { $lte: parseFloat(duration) };
+
+    // Search filter (title and description)
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: "i" } },
@@ -100,20 +121,79 @@ router.post("/listing", async (req, res) => {
       ];
     }
 
+    // Price range filter
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = parseFloat(minPrice);
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
 
-    const services = await Service.find(query)
-      .populate("storeId", "name type")
-      .sort({ createdAt: -1 });
+    // Calculate pagination
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
 
-    res.json(services);
+    console.log("Executing query:", JSON.stringify(query, null, 2));
+    console.log("Pagination:", { page: pageNumber, limit: pageSize, skip });
+
+    // Execute queries in parallel for better performance
+    const [services, totalCount] = await Promise.all([
+      // Get paginated services
+      Service.find(query)
+        .populate("storeId", "name type")
+        .sort({ createdAt: -1 }) // Sort by newest first
+        .skip(skip)
+        .limit(pageSize)
+        .lean(), // Use lean() for better performance
+
+      // Get total count for pagination info
+      Service.countDocuments(query),
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const hasMore = pageNumber < totalPages;
+    const hasPrevious = pageNumber > 1;
+
+    // Enhanced response with pagination metadata
+    const response = {
+      services,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalServices: totalCount,
+        servicesPerPage: pageSize,
+        hasMore,
+        hasPrevious,
+        startIndex: skip + 1,
+        endIndex: Math.min(skip + pageSize, totalCount),
+      },
+      // Legacy support for frontend
+      total: totalCount,
+      hasMore,
+      // Performance metrics (optional - remove in serviceion)
+      meta: {
+        query: query,
+        executionTime: new Date(),
+        resultsFound: services.length,
+      },
+    };
+
+    console.log("Returning results:", {
+      servicesCount: services.length,
+      totalCount,
+      currentPage: pageNumber,
+      totalPages,
+      hasMore,
+    });
+
+    res.json(response);
   } catch (error) {
     console.error("Search error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      error: error.message,
+      details: "An error occurred while fetching services",
+    });
   }
 });
 
@@ -142,10 +222,11 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       title,
       description,
       price,
-      priceType,
+      oldPrice,
       category,
+      subcategory,
+      childCategory,
       duration,
-      availability,
       images,
     } = req.body;
 
@@ -155,6 +236,7 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       type: "service",
       isActive: true,
     });
+
     if (!store) {
       return res.status(403).json({
         error:
@@ -166,7 +248,7 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
     const userId = req.user._id;
     const userPackage = await getUserPackage(userId);
 
-    const currentItemCount = await Product.countDocuments({
+    const currentItemCount = await Service.countDocuments({
       ownerId: userId,
       isActive: true,
     });
@@ -177,30 +259,19 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       });
     }
 
-    if (variants?.length > 0 && !userPackage.itemVariants) {
-      return res
-        .status(403)
-        .json({ error: "Your current plan does not allow item variants" });
-    }
-
-    // Parse timeSlots if provided
-    const timeSlots = Array.isArray(req.body.timeSlots)
-      ? req.body.timeSlots
-      : [];
-
     const service = new Service({
       title,
       description,
       price: parseFloat(price),
-      priceType,
+      oldPrice: oldPrice ? parseFloat(oldPrice) : null, // or undefined
       images,
       category,
+      subcategory,
+      childCategory,
       duration: parseInt(duration),
-      timeSlots,
       ownerId: req.user._id,
       storeId: store._id,
     });
-
     await service.save();
     res.status(201).json(service);
   } catch (error) {

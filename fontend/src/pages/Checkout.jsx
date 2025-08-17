@@ -184,19 +184,15 @@ const Checkout = () => {
             })),
             bookingItems: bookingItems.map((item) => ({
               serviceId: item.id,
-              bookingDate: item.date,
-              startTime: item.time,
-              endTime:
-                item.endTime ||
-                (item.time
-                  ? item.time
-                      .split(":")
-                      .map((t, i) =>
-                        i === 0 ? String(parseInt(t) + 1).padStart(2, "0") : t
-                      )
-                      .join(":")
-                  : ""),
-              notes: item.notes,
+              storeId: item.storeId, 
+              bookingDetails: {
+                date: new Date(item.bookingDetails.date), 
+                startTime: item.bookingDetails.time, 
+                endTime: item.bookingDetails.endTime, 
+                duration: item.duration || item.bookingDetails.duration, 
+                timeZone: "Asia/Colombo", 
+              },
+              notes: item.bookingDetails.notes || item.notes, 
             })),
             shippingAddress,
             paymentMethod: selectedPaymentMethod,
