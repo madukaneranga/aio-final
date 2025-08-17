@@ -12,6 +12,16 @@ import {
   Store,
   ArrowLeft,
   Check,
+  Calendar as CalendarIcon,
+  Clock,
+  Users,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Tag,
+  MapPin,
+  Phone,
+  Mail,
 } from "lucide-react";
 
 const ProductDetail = () => {
@@ -29,7 +39,7 @@ const ProductDetail = () => {
 
   useEffect(() => {
     fetchProduct();
-    fetchReviews()
+    fetchReviews();
   }, [id]);
 
   useEffect(() => {
@@ -211,40 +221,138 @@ const ProductDetail = () => {
               <h1 className="text-4xl font-bold text-gray-900 mb-4">
                 {product.title}
               </h1>
-              <div className="flex items-center space-x-4 mb-6">
-                <span className="text-5xl font-bold text-black">
-                  {formatLKR(product.price)}
-                </span>
-                <div className="flex items-center space-x-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {product.title}
+                </h1>
+
+                {/* Category Breadcrumb */}
+                <div className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
+                  <Tag className="w-4 h-4" />
+                  <span className="capitalize">{product.category}</span>
+                  {product.subcategory && (
+                    <>
+                      <span>›</span>
+                      <span className="capitalize">{product.subcategory}</span>
+                    </>
+                  )}
+                  {product.childCategory && (
+                    <>
+                      <span>›</span>
+                      <span className="capitalize">
+                        {product.childCategory}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-4 mb-4">
                   <div className="flex items-center space-x-1">
                     <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    <span className="text-gray-600">{product.rating || 0} ({reviews.length} reviews)</span>
+                    <span className="text-gray-600">
+                      {product.rating || 0} ({reviews.length} reviews)
+                    </span>
                   </div>
                   <span className="text-gray-400">|</span>
-                  <span className="text-gray-600 capitalize bg-gray-100 px-3 py-1 rounded-full text-sm">
-                    {product.category}
-                  </span>
+                  <div className="flex items-center space-x-1">
+                    <Users className="w-4 h-4 text-gray-600" />
+                    <span className="text-gray-600">
+                      {product.orders || 0} orders
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-4 mb-4">
+                  <p className="text-4xl font-bold text-black">
+                    {formatLKR(product.price)}
+                    <span className="text-lg text-gray-500 ml-2">
+                      {product.priceType === "hourly" ? "/hour" : ""}
+                    </span>
+                  </p>
+                  {product.oldPrice && product.oldPrice > product.price && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-2xl text-gray-500 line-through">
+                        {formatLKR(product.oldPrice)}
+                      </span>
+                      <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-sm font-semibold">
+                        {Math.round(
+                          ((product.oldPrice - product.price) /
+                            product.oldPrice) *
+                            100
+                        )}
+                        % OFF
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Store Info */}
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                  <Store className="w-6 h-6 text-gray-600" />
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                    {store?.profileImage ? (
+                      <img
+                        src={store.profileImage}
+                        alt={product.storeId.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <Store className="w-6 h-6 text-gray-600" />
+                    )}
+                  </div>
+                  <div>
+                    <Link
+                      to={`/store/${product.storeId._id}`}
+                      className="font-semibold text-black hover:text-gray-700 transition-colors"
+                    >
+                      {product.storeId.name}
+                    </Link>
+                    <div className="flex items-center space-x-2 mt-1">
+                      {store?.isVerified && (
+                        <span className="flex items-center text-green-600 text-xs">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Verified
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                        {store?.storeLevel || "Bronze"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-
-                <div>
-                  <Link
-                    to={`/store/${product.storeId._id}`}
-                    className="font-semibold text-black hover:text-gray-700 transition-colors text-lg"
-                  >
-                    {product.storeId.name}
-                  </Link>
-                  <p className="text-sm text-gray-600">Visit Store</p>
+                <div className="text-right text-sm">
+                  <div className="flex items-center space-x-1 text-yellow-500">
+                    <Star className="w-4 h-4 fill-current" />
+                    <span>{store?.rating || 0}</span>
+                  </div>
+                  <p className="text-gray-600">
+                    {store?.completionRate || 0}% completion
+                  </p>
                 </div>
               </div>
+
+              {/* Store Contact Info */}
+              {store?.contactInfo && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <MapPin className="w-4 h-4" />
+                    <span>{store.contactInfo.address}</span>
+                  </div>
+                  <div className="flex items-center space-x-4 text-sm">
+                    <div className="flex items-center space-x-1 text-gray-600">
+                      <Phone className="w-4 h-4" />
+                      <span>{store.contactInfo.phone}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 text-gray-600">
+                      <Mail className="w-4 h-4" />
+                      <span>{store.contactInfo.email}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Product Description */}
@@ -619,7 +727,7 @@ const ProductDetail = () => {
                         )}
                         {review.bookingId && (
                           <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                            Service Booking
+                            product Booking
                           </span>
                         )}
                       </div>
