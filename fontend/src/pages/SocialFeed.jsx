@@ -1039,7 +1039,7 @@ const SocialFeed = () => {
             )}
 
             {/* Media */}
-            <div className="relative bg-black rounded-lg overflow-hidden">
+            <div className="relative bg-black">
               {/* Media Loading Overlay */}
               {(mediaLoadingStates[post._id] ||
                 mediaErrors[post._id]) && (
@@ -1068,11 +1068,11 @@ const SocialFeed = () => {
               )}
 
               {post.mediaType === "video" ? (
-                <div className="relative w-full">
+                <div className="relative w-full aspect-square">
                   <video
                     ref={(el) => { if (el) videoRefs.current[post._id] = el; }}
                     src={post.mediaUrls[0]}
-                    className="w-full h-auto max-h-[70vh] object-contain bg-black"
+                    className="w-full h-full object-cover"
                     loop
                     muted
                     playsInline
@@ -1109,32 +1109,32 @@ const SocialFeed = () => {
                   </div>
                 </div>
               ) : post.mediaUrls?.length === 1 ? (
-                // Single Image - Instagram style
-                <div className="relative w-full">
+                // Single Image - Instagram square format
+                <div className="relative w-full aspect-square">
                   <img
                     src={post.mediaUrls[0]}
                     alt={post.title}
-                    className="w-full h-auto max-h-[70vh] object-contain bg-black"
+                    className="w-full h-full object-cover"
                     onLoad={() => handleMediaLoad(post._id)}
                     onError={() => handleMediaError(post._id)}
                   />
                 </div>
               ) : (
-                // Multiple Images - Carousel
-                <div className="relative w-full">
-                  <div className="w-full overflow-hidden bg-black">
+                // Multiple Images - Carousel with square format
+                <div className="relative w-full aspect-square">
+                  <div className="w-full h-full overflow-hidden">
                     <div 
-                      className="flex transition-transform duration-300"
+                      className="flex h-full transition-transform duration-300"
                       style={{ 
                         transform: `translateX(-${(currentImageIndex[post._id] || 0) * 100}%)`,
                       }}
                     >
                       {post.mediaUrls?.map((url, index) => (
-                        <div key={index} className="w-full flex-shrink-0">
+                        <div key={index} className="w-full h-full flex-shrink-0">
                           <img
                             src={url}
                             alt={`${post.title} - ${index + 1}`}
-                            className="w-full h-auto max-h-[70vh] object-contain bg-black"
+                            className="w-full h-full object-cover"
                             onLoad={() => handleMediaLoad(post._id)}
                             onError={() => handleMediaError(post._id)}
                           />
