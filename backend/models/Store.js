@@ -23,11 +23,33 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
-  socialLinks: [
-    {
+  socialLinks: {
+    facebook: {
       type: String,
     },
-  ],
+    instagram: {
+      type: String,
+    },
+    youtube: {
+      type: String,
+    },
+    tiktok: {
+      type: String,
+    },
+    linkedin: {
+      type: String,
+    },
+    pinterest: {
+      type: String,
+    },
+    snapchat: {
+      type: String,
+    },
+    website: {
+      type: String,
+    },
+  },
+
   idImages: [
     {
       type: String,

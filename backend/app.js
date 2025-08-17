@@ -50,6 +50,8 @@ import adminRoutes from "./routes/admin.js";
 import analyticsRoutes from "./routes/analytics.js";
 import emailSubscriptionRoutes from "./routes/emailSubscriptions.js";
 import categoriesRoutes from "./routes/categories.js";
+import postRoutes from "./routes/posts.js";
+
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 console.log("Registering API routes");
@@ -73,6 +75,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/email-subscriptions", emailSubscriptionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/categories", categoriesRoutes);
+app.use("/api/posts", postRoutes);
 
 
 // React frontend serving

@@ -27,6 +27,17 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import {
+  FaFacebook,
+  FaInstagram,
+  FaYoutube,
+  FaTiktok,
+  FaLinkedin,
+  FaPinterest,
+  FaSnapchat,
+  FaTwitter,
+  FaGlobe,
+} from "react-icons/fa";
 
 const StoreInfo = ({
   store = {},
@@ -44,62 +55,6 @@ const StoreInfo = ({
 
   const [followLoading, setFollowLoading] = useState(false);
   const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
-
-  // Default store data with all features
-  const defaultStore = {
-    _id: "default_id",
-    name: "default_name",
-    rating: 0,
-    type: "product",
-    themeColor: "#000000ff",
-    description:
-      "default_description_default_description_default_description_default_description_default",
-    profileImage: "/api/placeholder/120/120",
-    totalSales: 2450000,
-    isPremium: false,
-    isVerified: false,
-    isFeatured: false,
-    storeLevel: "Gold",
-    createdAt: "2020-03-15",
-    responseTime: "2 hours",
-    completionRate: 98,
-    badges: ["Top Seller", "Fast Shipping", "Excellent Service"],
-    operatingHours: {
-      weekdays: "9:00 AM - 8:00 PM",
-      weekends: "10:00 AM - 6:00 PM",
-    },
-    shippingInfo: {
-      freeShipping: true,
-      deliveryDaysMin: 3,
-      deliveryDaysMax: 5,
-      areas: ["default1", "defaultr2", "default3"],
-    },
-    ownerId: {
-      name: "default_owner_name",
-      email: "default_owner_email",
-      phone: "default_owner_phone",
-      verified: true,
-    },
-    contactInfo: {
-      email: "default_email",
-      phone: "default_phone",
-      whatsapp: "default_whatsapp",
-      address: "default_address",
-    },
-    socialLinks: ["www.intergram.com", , "www.x.com", "www.facebook.com"],
-    stats: {
-      totalOrders: 300,
-      repeatCustomers: 78,
-      avgOrderValue: 15500,
-    },
-  };
-
-  // Default user data
-  const defaultUser = {
-    id: "user_456",
-    subscriptionLevel: "Premium",
-    favoriteStores: ["store_123"],
-  };
 
   const formatFollowersCount = (count) => {
     if (count >= 1000000) {
@@ -191,8 +146,8 @@ const StoreInfo = ({
     }
   };
 
-  const storeData = { ...defaultStore, ...store };
-  const userData = { ...defaultUser, ...user };
+  const storeData = store;
+  const userData = user;
   const reviewsData = reviews.length > 0 ? reviews : Array(0).fill({});
 
   const isColorLight = (color) => {
@@ -347,67 +302,110 @@ const StoreInfo = ({
     },
   ].filter((item) => item.available);
 
-  // Simple helper to get platform from URL
-  const getPlatform = (url) => {
-    console.log("URL:", url);
-    if (url.includes("instagram")) return "instagram";
-    if (url.includes("twitter") || url.includes("x.com")) return "twitter";
-    if (url.includes("facebook")) return "facebook";
-    if (url.includes("youtube")) return "youtube";
-    if (url.includes("tiktok")) return "tiktok";
-    if (url.includes("wa.me")) return "whatsapp";
-    if (url.includes("snapchat")) return "snapchat";
-    return null;
-  };
-
-  // Get icon for platform
-  const getIcon = (platform) => {
-    const icons = {
-      instagram: Instagram,
-      twitter: Twitter,
-      facebook: Facebook,
-      youtube: Youtube,
-      tiktok: Music,
-      whatsapp: MessageCircle,
-      snapchat: Camera,
+  // Helper function to get platform icon
+  const getPlatformData = (platform) => {
+    const platformData = {
+      facebook: {
+        icon: FaFacebook,
+        color: "#1877F2",
+        hoverColor: "#166FE5",
+      },
+      instagram: {
+        icon: FaInstagram,
+        color: "#E4405F",
+        hoverColor: "#D93B55",
+      },
+      youtube: {
+        icon: FaYoutube,
+        color: "#FF0000",
+        hoverColor: "#E60000",
+      },
+      tiktok: {
+        icon: FaTiktok,
+        color: "#000000",
+        hoverColor: "#333333",
+      },
+      linkedin: {
+        icon: FaLinkedin,
+        color: "#0A66C2",
+        hoverColor: "#0958A5",
+      },
+      pinterest: {
+        icon: FaPinterest,
+        color: "#BD081C",
+        hoverColor: "#A8071A",
+      },
+      snapchat: {
+        icon: FaSnapchat,
+        color: "#FFFC00",
+        hoverColor: "#E6E300",
+        textColor: "#000000", // Black text for yellow background
+      },
+      website: {
+        icon: FaGlobe,
+        color: "#6B7280",
+        hoverColor: "#4B5563",
+      },
+      twitter: {
+        icon: FaTwitter,
+        color: "#1DA1F2",
+        hoverColor: "#1A91DA",
+      },
     };
-    return icons[platform];
+    return (
+      platformData[platform] || {
+        icon: FaGlobe,
+        color: "#6B7280",
+        hoverColor: "#4B5563",
+      }
+    );
   };
 
-  // Get label for platform
-  const getLabel = (platform) => {
+  // Helper function to get platform label (keep this the same)
+  const getPlatformLabel = (platform) => {
     const labels = {
-      instagram: "Instagram",
-      twitter: "Twitter/X",
       facebook: "Facebook",
+      instagram: "Instagram",
       youtube: "YouTube",
       tiktok: "TikTok",
-      whatsapp: "WhatsApp",
+      linkedin: "LinkedIn",
+      pinterest: "Pinterest",
       snapchat: "Snapchat",
+      website: "Website",
+      twitter: "Twitter",
     };
-    return labels[platform];
+    return (
+      labels[platform] || platform.charAt(0).toUpperCase() + platform.slice(1)
+    );
   };
 
-  // Create social links from your array
-  const socialLinks = Array.isArray(storeData.socialLinks)
-    ? storeData.socialLinks
-        .map((url) => {
-          const platform = getPlatform(url);
-          if (!platform) return null;
+  // Create social links from the object structure - updated with brand data
+  const socialLinks =
+    storeData.socialLinks && typeof storeData.socialLinks === "object"
+      ? Object.entries(storeData.socialLinks)
+          .filter(([platform, url]) => {
+            return (
+              url &&
+              typeof url === "string" &&
+              url.trim() !== "" &&
+              url.trim() !== "undefined" &&
+              url.trim() !== "null"
+            );
+          })
+          .map(([platform, url]) => {
+            const platformData = getPlatformData(platform);
+            return {
+              icon: platformData.icon,
+              label: getPlatformLabel(platform),
+              url: url.startsWith("http") ? url : `https://${url}`,
+              platform: platform,
+              color: platformData.color,
+              hoverColor: platformData.hoverColor,
+              available: true,
+            };
+          })
+      : [];
 
-          return {
-            icon: getIcon(platform),
-            label: getLabel(platform),
-            url: url,
-            available: true,
-          };
-        })
-        .filter(Boolean)
-    : [];
-
-  const toggleFavorite = () => {
-    setIsFavorited(!isFavorited);
-  };
   return (
     <div className="py-8" style={themeStyles}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -573,7 +571,9 @@ const StoreInfo = ({
                             }}
                           >
                             <Users className="w-4 h-4" />
-                            <span>{formatFollowersCount(followersCount)} followers</span>
+                            <span>
+                              {formatFollowersCount(followersCount)} followers
+                            </span>
                           </span>
                         </div>
                       )}
@@ -750,35 +750,44 @@ const StoreInfo = ({
                 {/* Social Links */}
                 {socialLinks.length > 0 && (
                   <div className="flex justify-center space-x-3 pt-3">
-                    {socialLinks.map((social, index) => {
-                      const Icon = social.icon;
+                    {socialLinks.map((social) => {
+                      const IconComponent = social.icon;
+
                       return (
                         <a
-                          key={index}
+                          key={social.platform}
                           href={social.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-7 h-7 rounded-full bg-gray-100 hover:scale-110 flex items-center justify-center transition-all duration-300 group"
+                          className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group transform hover:scale-110 hover:shadow-lg"
                           style={{
-                            ":hover": {
-                              backgroundColor: colors.light,
-                            },
+                            background:
+                              social.platform === "instagram"
+                                ? "linear-gradient(45deg, #833ab4, #fd1d1d, #fcb045)"
+                                : social.backgroundColor || social.color,
+                            color: social.textColor || "#ffffff",
                           }}
-                          onMouseEnter={(e) =>
-                            (e.target.style.backgroundColor = colors.light)
-                          }
-                          onMouseLeave={(e) =>
-                            (e.target.style.backgroundColor = "#f3f4f6")
-                          }
+                          onMouseEnter={(e) => {
+                            if (social.platform !== "instagram") {
+                              e.target.style.backgroundColor =
+                                social.hoverColor;
+                            }
+                            e.target.style.transform = "scale(1.1)";
+                            e.target.style.boxShadow = `0 8px 25px ${
+                              social.backgroundColor || social.color
+                            }40`;
+                          }}
+                          onMouseLeave={(e) => {
+                            if (social.platform !== "instagram") {
+                              e.target.style.backgroundColor =
+                                social.backgroundColor || social.color;
+                            }
+                            e.target.style.transform = "scale(1)";
+                            e.target.style.boxShadow = "none";
+                          }}
+                          title={social.label}
                         >
-                          <Icon
-                            className="w-3 h-3 text-gray-500 group-hover:transition-colors duration-300"
-                            style={{
-                              ":hover": {
-                                color: colors.primary,
-                              },
-                            }}
-                          />
+                          <IconComponent className="w-5 h-5" />
                         </a>
                       );
                     })}
@@ -864,8 +873,11 @@ const StoreInfo = ({
                                 ? "text-gray-900"
                                 : "text-gray-600"
                             }`}
+                            title={hoveredContact === index ? item.label : ""}
                           >
-                            {item.type === "email"
+                            {hoveredContact === index
+                              ? item.label
+                              : item.type === "email"
                               ? "Email"
                               : item.type === "phone"
                               ? "Phone"
@@ -883,7 +895,7 @@ const StoreInfo = ({
               {/* Business Hours & Performance */}
               <div className="mb-4 grid grid-cols-2 gap-4">
                 {/* Business Hours */}
-                {storeData.operatingHours && (
+                {storeData.serviceSettings?.workingHours && (
                   <div>
                     <h4
                       className="text-xs font-medium mb-2 flex items-center space-x-1"
@@ -895,15 +907,74 @@ const StoreInfo = ({
                       />
                       <span>Hours</span>
                     </h4>
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <div>
-                        Mon-Fri:{" "}
-                        {storeData.operatingHours.weekdays.split(" - ")[1]}
-                      </div>
-                      <div>
-                        Weekends:{" "}
-                        {storeData.operatingHours.weekends.split(" - ")[1]}
-                      </div>
+                    <div className="text-xs text-gray-600">
+                      {(() => {
+                        const workingDays =
+                          storeData.serviceSettings.workingDays || [];
+                        const { start, end } =
+                          storeData.serviceSettings.workingHours;
+
+                        if (workingDays.length === 0) return "Closed";
+
+                        // Group consecutive days
+                        const dayOrder = [
+                          "monday",
+                          "tuesday",
+                          "wednesday",
+                          "thursday",
+                          "friday",
+                          "saturday",
+                          "sunday",
+                        ];
+                        const dayAbbr = {
+                          monday: "Mon",
+                          tuesday: "Tue",
+                          wednesday: "Wed",
+                          thursday: "Thu",
+                          friday: "Fri",
+                          saturday: "Sat",
+                          sunday: "Sun",
+                        };
+
+                        const sortedDays = workingDays.sort(
+                          (a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b)
+                        );
+
+                        // Simple grouping for common patterns
+                        const isWeekdays =
+                          sortedDays.length === 5 &&
+                          [
+                            "monday",
+                            "tuesday",
+                            "wednesday",
+                            "thursday",
+                            "friday",
+                          ].every((day) => sortedDays.includes(day));
+
+                        if (isWeekdays) {
+                          return (
+                            <div>
+                              <div>Mon-Fri</div>
+                              <div>
+                                {start} - {end}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // For other patterns, show abbreviated list
+                        const daysList = sortedDays
+                          .map((day) => dayAbbr[day])
+                          .join(", ");
+                        return (
+                          <div>
+                            <div>{daysList}</div>
+                            <div>
+                              {start} - {end}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -923,21 +994,26 @@ const StoreInfo = ({
                         className="font-medium"
                         style={{ color: colors.primary }}
                       >
-                        {storeData.responseTime}
+                        {storeData.responseTime >= 24
+                          ? `${Math.floor(storeData.responseTime / 24)} days`
+                          : `${storeData.responseTime || 0}h`}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Avg. delivery:</span>
-                      <span className="font-medium text-green-600">
-                        {storeData.shippingInfo.deleveryDaysMin} -{" "}
-                        {storeData.shippingInfo.deleveryDaysMax}
-                      </span>
-                    </div>
+                    {store.type === "product" && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Avg. delivery:</span>
+                        <span className="font-medium text-green-600">
+                          {storeData.shippingInfo?.deliveryDaysMin || 0} -{" "}
+                          {storeData.shippingInfo?.deliveryDaysMax || 0} days
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
           {/* Unfollow Confirmation Modal */}
           {showUnfollowConfirm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
