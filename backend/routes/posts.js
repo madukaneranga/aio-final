@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import Post from "../models/Post.js";
 import PostLike from "../models/PostLike.js";
 import PostComment from "../models/PostComment.js";
@@ -289,71 +290,17 @@ router.post("/:postId/like", authenticate, async (req, res) => {
   }
 });
 
-// ADD COMMENT
-router.post("/:postId/comment", authenticate, async (req, res) => {
+// INCREMENT VIEW COUNT
+router.post("/:postId/view", async (req, res) => {
   try {
     const { postId } = req.params;
-    const { text, parentComment } = req.body;
-    const userId = req.user.id;
 
-    if (!text?.trim()) {
-      return res.status(400).json({ error: "Comment text is required" });
-    }
+    await Post.findByIdAndUpdate(postId, { $inc: { views: 1 } });
 
-    const comment = new PostComment({
-      userId,
-      postId,
-      text: text.trim(),
-      parentComment: parentComment || null,
-    });
-
-    await comment.save();
-    await Post.findByIdAndUpdate(postId, { $inc: { comments: 1 } });
-
-    const populatedComment = await PostComment.findById(comment._id).populate(
-      "userId",
-      "username profilePicture"
-    );
-
-    res.status(201).json({
-      success: true,
-      comment: populatedComment,
-    });
+    res.json({ success: true });
   } catch (error) {
-    console.error("Add comment error:", error);
-    res.status(500).json({ error: "Failed to add comment" });
-  }
-});
-
-// GET POST COMMENTS
-router.get("/:postId/comments", async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-
-    const comments = await PostComment.find({
-      postId,
-      parentComment: null,
-    })
-      .populate("userId", "username profilePicture")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    res.json({
-      success: true,
-      comments,
-      pagination: {
-        page,
-        limit,
-        hasMore: comments.length === limit,
-      },
-    });
-  } catch (error) {
-    console.error("Get comments error:", error);
-    res.status(500).json({ error: "Failed to fetch comments" });
+    console.error("View increment error:", error);
+    res.status(500).json({ error: "Failed to update view count" });
   }
 });
 
@@ -387,40 +334,61 @@ router.get("/products/search", authenticate, async (req, res) => {
   }
 });
 
-// INCREMENT VIEW COUNT
-router.post("/:postId/view", async (req, res) => {
-  try {
-    const { postId } = req.params;
-
-    await Post.findByIdAndUpdate(postId, { $inc: { views: 1 } });
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error("View increment error:", error);
-    res.status(500).json({ error: "Failed to update view count" });
-  }
-});
-
-router.get("/:postId/comments", async (req, res) => {
+// GET POST COMMENTS - FIXED VERSION WITH PROPER REPLY COUNT
+router.get("/:postId/comments", authenticate, async (req, res) => {
   try {
     const { postId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
-    const userId = req.user?.id; // Optional user for like status
+    const userId = req.user?.id;
 
-    // Get top-level comments (no parent)
-    const comments = await PostComment.find({
-      postId,
-      parentComment: null,
-    })
-      .populate("userId", "username profilePicture")
-      .sort({ createdAt: -1 }) // Newest first
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    // Get top-level comments with replyCount using aggregation
+    const comments = await PostComment.aggregate([
+      {
+        $match: {
+          postId: new mongoose.Types.ObjectId(postId),
+          parentComment: null
+        }
+      },
+      {
+        $lookup: {
+          from: "postcomments",
+          localField: "_id",
+          foreignField: "parentComment",
+          as: "repliesData"
+        }
+      },
+      {
+        $addFields: {
+          replyCount: { $size: "$repliesData" }
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "userId",
+          pipeline: [{ $project: { username: 1, profilePicture: 1 } }]
+        }
+      },
+      {
+        $addFields: {
+          userId: { $arrayElemAt: ["$userId", 0] }
+        }
+      },
+      {
+        $project: {
+          repliesData: 0 // Remove the temporary replies data
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ]);
 
-    // Get user's comment likes if authenticated
+    // Get user's comment likes and reactions if authenticated
     let userCommentLikes = [];
     let userReactions = [];
     if (userId) {
@@ -446,6 +414,8 @@ router.get("/:postId/comments", async (req, res) => {
         userReactions.find(
           (reaction) => reaction.commentId.toString() === comment._id.toString()
         )?.reactionType || null,
+      replies: [], // Initialize empty replies array
+      repliesLoaded: false // Mark as not loaded initially
     }));
 
     res.json({
@@ -463,14 +433,16 @@ router.get("/:postId/comments", async (req, res) => {
   }
 });
 
-// GET COMMENT REPLIES
-router.get("/comments/:commentId/replies", async (req, res) => {
+// GET COMMENT REPLIES - FIXED WITH AUTHENTICATION
+router.get("/comments/:commentId/replies", authenticate, async (req, res) => {
   try {
     const { commentId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     const userId = req.user?.id;
+
+    console.log(`Loading replies for comment: ${commentId}, user: ${userId}`);
 
     const replies = await PostComment.find({
       parentComment: commentId,
@@ -480,6 +452,8 @@ router.get("/comments/:commentId/replies", async (req, res) => {
       .skip(skip)
       .limit(limit)
       .lean();
+
+    console.log(`Found ${replies.length} replies`);
 
     // Get user's likes and reactions for replies
     let userCommentLikes = [];
@@ -523,7 +497,7 @@ router.get("/comments/:commentId/replies", async (req, res) => {
   }
 });
 
-// ADD COMMENT (UPDATED)
+// ADD COMMENT - ENHANCED VERSION
 router.post("/:postId/comment", authenticate, async (req, res) => {
   try {
     const { postId } = req.params;
@@ -584,95 +558,87 @@ router.post("/:postId/comment", authenticate, async (req, res) => {
 });
 
 // LIKE/UNLIKE COMMENT
-router.post(
-  "/comments/:commentId/like",
-  authenticate,
-  async (req, res) => {
-    try {
-      const { commentId } = req.params;
-      const userId = req.user.id;
+router.post("/comments/:commentId/like", authenticate, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.user.id;
 
-      const existingLike = await CommentLike.findOne({ userId, commentId });
+    const existingLike = await CommentLike.findOne({ userId, commentId });
 
-      if (existingLike) {
-        // Unlike
-        await CommentLike.deleteOne({ userId, commentId });
-        await PostComment.findByIdAndUpdate(commentId, { $inc: { likes: -1 } });
+    if (existingLike) {
+      // Unlike
+      await CommentLike.deleteOne({ userId, commentId });
+      await PostComment.findByIdAndUpdate(commentId, { $inc: { likes: -1 } });
 
-        res.json({ success: true, liked: false });
-      } else {
-        // Like
-        await CommentLike.create({ userId, commentId });
-        await PostComment.findByIdAndUpdate(commentId, { $inc: { likes: 1 } });
+      res.json({ success: true, liked: false });
+    } else {
+      // Like
+      await CommentLike.create({ userId, commentId });
+      await PostComment.findByIdAndUpdate(commentId, { $inc: { likes: 1 } });
 
-        res.json({ success: true, liked: true });
-      }
-    } catch (error) {
-      console.error("Like comment error:", error);
-      res.status(500).json({ error: "Failed to update like" });
+      res.json({ success: true, liked: true });
     }
+  } catch (error) {
+    console.error("Like comment error:", error);
+    res.status(500).json({ error: "Failed to update like" });
   }
-);
+});
 
 // ADD/UPDATE COMMENT REACTION
-router.post(
-  "/comments/:commentId/reaction",
-  authenticate,
-  async (req, res) => {
-    try {
-      const { commentId } = req.params;
-      const { reactionType } = req.body;
-      const userId = req.user.id;
+router.post("/comments/:commentId/reaction", authenticate, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { reactionType } = req.body;
+    const userId = req.user.id;
 
-      const validReactions = ["like", "love", "laugh", "wow", "sad", "angry"];
-      if (!validReactions.includes(reactionType)) {
-        return res.status(400).json({ error: "Invalid reaction type" });
-      }
+    const validReactions = ["like", "love", "laugh", "wow", "sad", "angry"];
+    if (!validReactions.includes(reactionType)) {
+      return res.status(400).json({ error: "Invalid reaction type" });
+    }
 
-      const existingReaction = await CommentReaction.findOne({
-        userId,
-        commentId,
-      });
+    const existingReaction = await CommentReaction.findOne({
+      userId,
+      commentId,
+    });
 
-      if (existingReaction) {
-        if (existingReaction.reactionType === reactionType) {
-          // Remove reaction if same type
-          await CommentReaction.deleteOne({ userId, commentId });
-          await PostComment.findByIdAndUpdate(commentId, {
-            $inc: { [`reactions.${reactionType}`]: -1 },
-          });
-
-          res.json({ success: true, reaction: null });
-        } else {
-          // Update reaction type
-          const oldType = existingReaction.reactionType;
-          existingReaction.reactionType = reactionType;
-          await existingReaction.save();
-
-          await PostComment.findByIdAndUpdate(commentId, {
-            $inc: {
-              [`reactions.${oldType}`]: -1,
-              [`reactions.${reactionType}`]: 1,
-            },
-          });
-
-          res.json({ success: true, reaction: reactionType });
-        }
-      } else {
-        // Add new reaction
-        await CommentReaction.create({ userId, commentId, reactionType });
+    if (existingReaction) {
+      if (existingReaction.reactionType === reactionType) {
+        // Remove reaction if same type
+        await CommentReaction.deleteOne({ userId, commentId });
         await PostComment.findByIdAndUpdate(commentId, {
-          $inc: { [`reactions.${reactionType}`]: 1 },
+          $inc: { [`reactions.${reactionType}`]: -1 },
+        });
+
+        res.json({ success: true, reaction: null });
+      } else {
+        // Update reaction type
+        const oldType = existingReaction.reactionType;
+        existingReaction.reactionType = reactionType;
+        await existingReaction.save();
+
+        await PostComment.findByIdAndUpdate(commentId, {
+          $inc: {
+            [`reactions.${oldType}`]: -1,
+            [`reactions.${reactionType}`]: 1,
+          },
         });
 
         res.json({ success: true, reaction: reactionType });
       }
-    } catch (error) {
-      console.error("Reaction error:", error);
-      res.status(500).json({ error: "Failed to update reaction" });
+    } else {
+      // Add new reaction
+      await CommentReaction.create({ userId, commentId, reactionType });
+      await PostComment.findByIdAndUpdate(commentId, {
+        $inc: { [`reactions.${reactionType}`]: 1 },
+      });
+
+      res.json({ success: true, reaction: reactionType });
     }
+  } catch (error) {
+    console.error("Reaction error:", error);
+    res.status(500).json({ error: "Failed to update reaction" });
   }
-);
+});
 
 // DELETE COMMENT
 router.delete("/comments/:commentId", authenticate, async (req, res) => {
