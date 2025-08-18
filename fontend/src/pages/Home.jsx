@@ -6,6 +6,7 @@ import ServiceCard from "../components/ServiceCard";
 import StoreCard from "../components/StoreCard";
 import LuxuryHeroSection from "../components/LuxuryHeroSection";
 import CategorySection from "../components/CategorySection";
+import FlashDealsBanner from "../components/FlashDealSection";
 import {
   ArrowRight,
   Package,
@@ -24,10 +25,13 @@ const Home = () => {
   const [featuredStores, setFeaturedStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
+  const [flashDeal, setFlashDeal] = useState(null);
+  const [showFlashDeal, setShowFlashDeal] = useState(false);
 
   useEffect(() => {
     fetchFeaturedContent();
     loadCategories();
+    fetchFlashDeal();
   }, []);
 
   const fetchFeaturedContent = async () => {
@@ -88,6 +92,40 @@ const Home = () => {
     }
   };
 
+  const fetchFlashDeal = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/flash-deals/current`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setFlashDeal(result.data);
+          setShowFlashDeal(true);
+        }
+      } else {
+        setShowFlashDeal(false);
+      }
+    } catch (error) {
+      console.error("Error fetching flash deal:", error);
+      setShowFlashDeal(false);
+    }
+  };
+
+  const trackFlashDealClick = async (flashDealId) => {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_API_URL}/api/flash-deals/${flashDealId}/click`,
+        {
+          method: "POST",
+        }
+      );
+    } catch (error) {
+      console.error("Error tracking click:", error);
+    }
+  };
+
   const loadCategories = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
@@ -98,6 +136,45 @@ const Home = () => {
       console.error("Error loading categories:", err);
     }
   };
+
+  const handleFlashDealClick = () => {
+    if (flashDeal) {
+      trackFlashDealClick(flashDeal._id);
+      // Add your navigation logic
+      window.location.href = "/deals";
+    }
+  };
+
+  // Function to get timer values based on sale status
+  const getFlashDealProps = () => {
+    if (!flashDeal) return null;
+
+    const { timeRemaining, saleStatus } = flashDeal;
+
+    if (saleStatus === "upcoming") {
+      return {
+        saleStartsInHours: timeRemaining.hours,
+        saleStartsInMinutes: timeRemaining.minutes,
+        saleStartsInSeconds: timeRemaining.seconds,
+        saleEndsInHours: 0,
+        saleEndsInMinutes: 0,
+        saleEndsInSeconds: 0,
+        timerLabel: flashDeal.timerLabel,
+      };
+    } else {
+      return {
+        saleStartsInHours: 0,
+        saleStartsInMinutes: 0,
+        saleStartsInSeconds: 0,
+        saleEndsInHours: timeRemaining.hours,
+        saleEndsInMinutes: timeRemaining.minutes,
+        saleEndsInSeconds: timeRemaining.seconds,
+        timerLabel: "Sale Ends In:",
+      };
+    }
+  };
+
+    const flashDealProps = getFlashDealProps();
 
   if (loading) {
     return (
@@ -149,7 +226,31 @@ const Home = () => {
       <section className="py-0 bg-white">
         <CategorySection categories={categories} />
       </section>
+      {showFlashDeal && flashDeal && flashDealProps && (
+        <section className="py-0 bg-white">
 
+            <FlashDealsBanner
+              // Timer props from backend
+              {...flashDealProps}
+              // Content from backend
+              saleName={flashDeal.saleName}
+              saleSubtitle={flashDeal.saleSubtitle}
+              discountText={flashDeal.discountText}
+              buttonText={flashDeal.buttonText}
+              // Design from backend
+              backgroundColor={flashDeal.backgroundColor}
+              backgroundImage={flashDeal.backgroundImage}
+              textColor={flashDeal.textColor}
+              accentColor={flashDeal.accentColor}
+              // Image from backend
+              heroImage={flashDeal.heroImage}
+              showHeroImage={flashDeal.showHeroImage}
+              // Custom click handler
+              onButtonClick={handleFlashDealClick}
+            />
+      
+        </section>
+      )}
       {/* Featured Products */}
       <section className="py-5 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

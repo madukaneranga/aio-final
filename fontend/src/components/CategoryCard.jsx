@@ -26,8 +26,8 @@ const CategoryCard = ({ category }) => {
     category.image && category.image.length > 0 ? category.image[0] : null;
 
   return (
-    <div className="group cursor-pointer flex-shrink-0" onClick={handleClick}>
-      <div className="relative w-64 h-32 bg-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-105">
+    <div className="group cursor-pointer" onClick={handleClick}>
+      <div className="relative w-64 h-32 bg-gray-100 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-black/10 hover:scale-105">
         {/* Background Image */}
         {imageUrl && !imageError ? (
           <img

@@ -51,6 +51,7 @@ import analyticsRoutes from "./routes/analytics.js";
 import emailSubscriptionRoutes from "./routes/emailSubscriptions.js";
 import categoriesRoutes from "./routes/categories.js";
 import postRoutes from "./routes/posts.js";
+import flashDealRoutes from "./routes/flashDeals.js";
 
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
@@ -76,6 +77,7 @@ app.use("/api/email-subscriptions", emailSubscriptionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/posts", postRoutes);
+app.use('/api/flash-deals', flashDealRoutes);
 
 
 // React frontend serving
