@@ -1,4 +1,4 @@
-// ============ PRODUCTS.JSX (WITH ELEGANT PAGINATION) ============
+// ============ PRODUCTS.JSX (FIXED DOUBLE LOADING - ROBUST SOLUTION) ============
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
@@ -83,8 +83,12 @@ const Products = () => {
   // UI state
   const [showFilters, setShowFilters] = useState(false);
 
-  // Debounced filters for API calls
-  const debouncedFilters = useDebounce(filters, 300);
+  // Track initialization state
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const initializationRef = useRef(false);
+
+  // Don't debounce on first load to prevent double fetch
+  const debouncedFilters = useDebounce(filters, hasInitialized ? 300 : 0);
 
   // Derived state for backwards compatibility
   const selectedCategoryObj = categories.find(
@@ -95,23 +99,45 @@ const Products = () => {
     subcategories.find((sub) => sub.name === filters.subcategory)
       ?.childCategories || [];
 
-  // Read URL parameters and set initial state
+  // Initialize filters from URL parameters ONCE on mount
   useEffect(() => {
+    if (initializationRef.current) return; // Prevent multiple initializations
+    
     const searchFromUrl = searchParams.get("search");
+    const categoryFromUrl = searchParams.get("category");
 
-    console.log("=== URL PARAMS DEBUG ===");
+    console.log("=== INITIALIZING FROM URL ===");
     console.log("Current URL:", location.pathname + location.search);
     console.log("Search from URL:", searchFromUrl);
+    console.log("Category from URL:", categoryFromUrl);
     console.log("All URL params:", Object.fromEntries(searchParams.entries()));
 
-    // Set state from URL parameters
-    if (searchFromUrl) {
-      setFilters((prev) => ({
-        ...prev,
-        search: searchFromUrl,
-      }));
-    }
-  }, [searchParams, location]);
+    // Build initial filters from URL
+    const initialFilters = {
+      search: searchFromUrl || "",
+      category: categoryFromUrl || "",
+      subcategory: "",
+      childCategory: "",
+      priceRange: { min: "", max: "" },
+      stock: "",
+      rating: "",
+      shipping: "",
+      condition: "",
+      warrantyMonths: "",
+    };
+
+    console.log("Setting initial filters:", initialFilters);
+    
+    // Set filters and mark as initialized
+    setFilters(initialFilters);
+    initializationRef.current = true;
+    
+    // Immediately fetch with initial filters (no debounce)
+    fetchProducts(initialFilters, 1, false).then(() => {
+      setHasInitialized(true);
+    });
+
+  }, []); // Empty dependency array - only run once on mount
 
   // Fetch products function with pagination
   const fetchProducts = async (
@@ -218,11 +244,15 @@ const Products = () => {
     )
   );
 
-  // Auto-fetch products when debounced filters change (reset to page 1)
+  // Handle filter changes AFTER initialization
   useEffect(() => {
-    setCurrentPage(1);
-    fetchProducts(debouncedFilters, 1, false);
-  }, [debouncedFilters]);
+    // Only respond to filter changes after initial load
+    if (hasInitialized && initializationRef.current) {
+      console.log("Filter changed after initialization:", debouncedFilters);
+      setCurrentPage(1);
+      fetchProducts(debouncedFilters, 1, false);
+    }
+  }, [debouncedFilters, hasInitialized]);
 
   // Load categories
   const loadCategories = async () => {

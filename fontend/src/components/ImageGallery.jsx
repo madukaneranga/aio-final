@@ -1,12 +1,16 @@
+// ImageGalleryPro.jsx
 import React, { useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination } from "swiper/modules";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
+import Zoom from "react-medium-image-zoom";
+import "react-medium-image-zoom/dist/styles.css";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 
-const ImageGallery = ({ images, title }) => {
+const ImageGalleryPro = ({ images, title }) => {
   const [selectedImage, setSelectedImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (!images || images.length === 0) {
     return (
@@ -16,44 +20,41 @@ const ImageGallery = ({ images, title }) => {
     );
   }
 
+  const formatSrc = (image) =>
+    image?.startsWith("http")
+      ? image
+      : `${import.meta.env.VITE_API_URL}${image}`;
+
   return (
     <div className="space-y-4">
       {/* Main Image */}
-      <div className="relative">
+      <div className="relative group">
         <img
-          src={
-            images[selectedImage]
-              ? images[selectedImage].startsWith("http")
-                ? images[selectedImage]
-                : `${import.meta.env.VITE_API_URL}${images[selectedImage]}`
-              : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
-          }
+          src={formatSrc(images[selectedImage])}
           alt={title}
-          className="hidden sm:block w-full h-96 object-cover rounded-lg"
+          loading="lazy"
+          className="hidden md:block w-full h-96 object-cover rounded-lg cursor-zoom-in transition-transform duration-300 group-hover:scale-105"
+          onClick={() => setLightboxOpen(true)}
         />
 
-        {/* Mobile Swiper for single image view */}
+        {/* Mobile Swiper with autoplay */}
         <div className="md:hidden">
           <Swiper
-            modules={[Navigation, Pagination]}
+            modules={[Navigation, Pagination, Autoplay]}
             spaceBetween={10}
             slidesPerView={1}
             navigation
             pagination={{ clickable: true }}
+            autoplay={{ delay: 3500, disableOnInteraction: false }}
             onSlideChange={(swiper) => setSelectedImage(swiper.activeIndex)}
             className="w-full h-96 rounded-lg"
           >
             {images.map((image, index) => (
               <SwiperSlide key={index}>
                 <img
-                  src={
-                    image
-                      ? image.startsWith("http")
-                        ? image
-                        : `${import.meta.env.VITE_API_URL}${image}`
-                      : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
-                  }
+                  src={formatSrc(image)}
                   alt={`${title} ${index + 1}`}
+                  loading="lazy"
                   className="w-full h-full object-cover rounded-lg"
                 />
               </SwiperSlide>
@@ -62,7 +63,7 @@ const ImageGallery = ({ images, title }) => {
         </div>
       </div>
 
-      {/* Thumbnail Navigation - Hidden on mobile */}
+      {/* Thumbnail Navigation */}
       {images.length > 1 && (
         <div className="hidden md:flex space-x-2 overflow-x-auto">
           {images.map((image, index) => (
@@ -76,22 +77,66 @@ const ImageGallery = ({ images, title }) => {
               }`}
             >
               <img
-                src={
-                  image
-                    ? image.startsWith("http")
-                      ? image
-                      : `${import.meta.env.VITE_API_URL}${image}`
-                    : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
-                }
+                src={formatSrc(image)}
                 alt={`${title} ${index + 1}`}
+                loading="lazy"
                 className="w-full h-full object-cover"
               />
             </button>
           ))}
         </div>
       )}
+
+      {/* Fullscreen Lightbox */}
+     {lightboxOpen && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
+    onClick={() => setLightboxOpen(false)} // closes if you click background
+  >
+    {/* Inner wrapper stops propagation so clicks on swiper don’t bubble up */}
+    <div
+      className="relative w-full max-w-4xl h-[80vh]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Swiper
+        modules={[Navigation, Pagination]}
+        spaceBetween={30}
+        slidesPerView={1}
+        navigation
+        pagination={{ clickable: true }}
+        initialSlide={selectedImage}
+        onSlideChange={(swiper) => setSelectedImage(swiper.activeIndex)}
+        className="w-full h-full"
+      >
+        {images.map((image, index) => (
+          <SwiperSlide
+            key={index}
+            className="flex items-center justify-center"
+          >
+            <Zoom>
+              <img
+                src={formatSrc(image)}
+                alt={`${title} ${index + 1}`}
+                className="max-h-[80vh] object-contain rounded-lg"
+              />
+            </Zoom>
+          </SwiperSlide>
+        ))}
+      </Swiper>
+
+      {/* Close button */}
+      <button
+  className="absolute top-5 right-5 text-white text-3xl font-bold z-50 cursor-pointer"
+  onClick={() => setLightboxOpen(false)}
+>
+  ✕
+</button>
+
+    </div>
+  </div>
+)}
     </div>
   );
 };
 
-export default ImageGallery;
+export default ImageGalleryPro;
