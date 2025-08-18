@@ -1,4 +1,4 @@
-// ============ PRODUCTS.JSX (WITH ELEGANT PAGINATION) ============
+// ============ SERVICES.JSX (FIXED DOUBLE LOADING - ROBUST SOLUTION) ============
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
@@ -64,7 +64,7 @@ const Services = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalServices, setTotalServices] = useState(0);
   const [hasMoreServices, setHasMoreServices] = useState(true);
-  const PRODUCTS_PER_PAGE = 20;
+  const SERVICES_PER_PAGE = 20;
 
   // Unified filters state
   const [filters, setFilters] = useState({
@@ -80,8 +80,12 @@ const Services = () => {
   // UI state
   const [showFilters, setShowFilters] = useState(false);
 
-  // Debounced filters for API calls
-  const debouncedFilters = useDebounce(filters, 300);
+  // Track initialization state
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const initializationRef = useRef(false);
+
+  // Don't debounce on first load to prevent double fetch
+  const debouncedFilters = useDebounce(filters, hasInitialized ? 300 : 0);
 
   // Derived state for backwards compatibility
   const selectedCategoryObj = categories.find(
@@ -92,23 +96,42 @@ const Services = () => {
     subcategories.find((sub) => sub.name === filters.subcategory)
       ?.childCategories || [];
 
-  // Read URL parameters and set initial state
+  // Initialize filters from URL parameters ONCE on mount
   useEffect(() => {
+    if (initializationRef.current) return; // Prevent multiple initializations
+    
     const searchFromUrl = searchParams.get("search");
+    const categoryFromUrl = searchParams.get("category");
 
-    console.log("=== URL PARAMS DEBUG ===");
+    console.log("=== INITIALIZING SERVICES FROM URL ===");
     console.log("Current URL:", location.pathname + location.search);
     console.log("Search from URL:", searchFromUrl);
+    console.log("Category from URL:", categoryFromUrl);
     console.log("All URL params:", Object.fromEntries(searchParams.entries()));
 
-    // Set state from URL parameters
-    if (searchFromUrl) {
-      setFilters((prev) => ({
-        ...prev,
-        search: searchFromUrl,
-      }));
-    }
-  }, [searchParams, location]);
+    // Build initial filters from URL
+    const initialFilters = {
+      search: searchFromUrl || "",
+      category: categoryFromUrl || "",
+      subcategory: "",
+      childCategory: "",
+      priceRange: { min: "", max: "" },
+      rating: "",
+      duration: "",
+    };
+
+    console.log("Setting initial service filters:", initialFilters);
+    
+    // Set filters and mark as initialized
+    setFilters(initialFilters);
+    initializationRef.current = true;
+    
+    // Immediately fetch with initial filters (no debounce)
+    fetchServices(initialFilters, 1, false).then(() => {
+      setHasInitialized(true);
+    });
+
+  }, []); // Empty dependency array - only run once on mount
 
   // Fetch services function with pagination
   const fetchServices = async (
@@ -143,7 +166,7 @@ const Services = () => {
         rating: searchFilters.rating || "",
         duration: searchFilters.duration || "",
         page: page,
-        limit: PRODUCTS_PER_PAGE,
+        limit: SERVICES_PER_PAGE,
       };
 
       const response = await fetch(
@@ -175,7 +198,7 @@ const Services = () => {
 
         setTotalServices(data.total);
         setHasMoreServices(
-          data.services.length === PRODUCTS_PER_PAGE && data.hasMore
+          data.services.length === SERVICES_PER_PAGE && data.hasMore
         );
         setCurrentPage(page);
       } else {
@@ -212,11 +235,15 @@ const Services = () => {
     )
   );
 
-  // Auto-fetch services when debounced filters change (reset to page 1)
+  // Handle filter changes AFTER initialization
   useEffect(() => {
-    setCurrentPage(1);
-    fetchServices(debouncedFilters, 1, false);
-  }, [debouncedFilters]);
+    // Only respond to filter changes after initial load
+    if (hasInitialized && initializationRef.current) {
+      console.log("Service filter changed after initialization:", debouncedFilters);
+      setCurrentPage(1);
+      fetchServices(debouncedFilters, 1, false);
+    }
+  }, [debouncedFilters, hasInitialized]);
 
   // Load categories
   const loadCategories = async () => {
@@ -475,7 +502,7 @@ const Services = () => {
                       Loading more services...
                     </p>
                     <p className="text-sm text-gray-400">
-                      Finding the perfect items for you
+                      Finding the perfect services for you
                     </p>
                   </div>
                 </div>
@@ -504,7 +531,7 @@ const Services = () => {
                 </h3>
                 <p className="text-gray-600 max-w-md">
                   That's every service we have matching your criteria. Try
-                  adjusting your filters to discover more amazing items.
+                  adjusting your filters to discover more amazing services.
                 </p>
               </div>
             </div>

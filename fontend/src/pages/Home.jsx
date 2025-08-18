@@ -5,6 +5,8 @@ import ProductCard from "../components/ProductCard";
 import ServiceCard from "../components/ServiceCard";
 import StoreCard from "../components/StoreCard";
 import LuxuryHeroSection from "../components/LuxuryHeroSection";
+import CategorySection from "../components/CategorySection";
+import FlashDealsBanner from "../components/FlashDealSection";
 import {
   ArrowRight,
   Package,
@@ -22,9 +24,14 @@ const Home = () => {
   const [featuredServices, setFeaturedServices] = useState([]);
   const [featuredStores, setFeaturedStores] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState([]);
+  const [flashDeal, setFlashDeal] = useState(null);
+  const [showFlashDeal, setShowFlashDeal] = useState(false);
 
   useEffect(() => {
     fetchFeaturedContent();
+    loadCategories();
+    fetchFlashDeal();
   }, []);
 
   const fetchFeaturedContent = async () => {
@@ -85,6 +92,90 @@ const Home = () => {
     }
   };
 
+  const fetchFlashDeal = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/flash-deals/current`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setFlashDeal(result.data);
+          setShowFlashDeal(true);
+        }
+      } else {
+        setShowFlashDeal(false);
+      }
+    } catch (error) {
+      console.error("Error fetching flash deal:", error);
+      setShowFlashDeal(false);
+    }
+  };
+
+  const trackFlashDealClick = async (flashDealId) => {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_API_URL}/api/flash-deals/${flashDealId}/click`,
+        {
+          method: "POST",
+        }
+      );
+    } catch (error) {
+      console.error("Error tracking click:", error);
+    }
+  };
+
+  const loadCategories = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      const data = await res.json();
+      setCategories(data);
+    } catch (err) {
+      console.error("Error loading categories:", err);
+    }
+  };
+
+  const handleFlashDealClick = () => {
+    if (flashDeal) {
+      trackFlashDealClick(flashDeal._id);
+      // Add your navigation logic
+      window.location.href = "/deals";
+    }
+  };
+
+  // Function to get timer values based on sale status
+  const getFlashDealProps = () => {
+    if (!flashDeal) return null;
+
+    const { timeRemaining, saleStatus } = flashDeal;
+
+    if (saleStatus === "upcoming") {
+      return {
+        saleStartsInHours: timeRemaining.hours,
+        saleStartsInMinutes: timeRemaining.minutes,
+        saleStartsInSeconds: timeRemaining.seconds,
+        saleEndsInHours: 0,
+        saleEndsInMinutes: 0,
+        saleEndsInSeconds: 0,
+        timerLabel: flashDeal.timerLabel,
+      };
+    } else {
+      return {
+        saleStartsInHours: 0,
+        saleStartsInMinutes: 0,
+        saleStartsInSeconds: 0,
+        saleEndsInHours: timeRemaining.hours,
+        saleEndsInMinutes: timeRemaining.minutes,
+        saleEndsInSeconds: timeRemaining.seconds,
+        timerLabel: "Sale Ends In:",
+      };
+    }
+  };
+
+    const flashDealProps = getFlashDealProps();
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -132,17 +223,41 @@ const Home = () => {
           </div>
         </section>
       )}
+      <section className="py-0 bg-white">
+        <CategorySection categories={categories} />
+      </section>
+      {showFlashDeal && flashDeal && flashDealProps && (
+        <section className="py-0 bg-white">
 
+            <FlashDealsBanner
+              // Timer props from backend
+              {...flashDealProps}
+              // Content from backend
+              saleName={flashDeal.saleName}
+              saleSubtitle={flashDeal.saleSubtitle}
+              discountText={flashDeal.discountText}
+              buttonText={flashDeal.buttonText}
+              // Design from backend
+              backgroundColor={flashDeal.backgroundColor}
+              backgroundImage={flashDeal.backgroundImage}
+              textColor={flashDeal.textColor}
+              accentColor={flashDeal.accentColor}
+              // Image from backend
+              heroImage={flashDeal.heroImage}
+              showHeroImage={flashDeal.showHeroImage}
+              // Custom click handler
+              onButtonClick={handleFlashDealClick}
+            />
+      
+        </section>
+      )}
       {/* Featured Products */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-5 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Featured Products
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Handpicked premium products from top-rated stores
-            </p>
           </div>
 
           {featuredProducts.length > 0 ? (
@@ -172,15 +287,12 @@ const Home = () => {
       </section>
 
       {/* Featured Services */}
-      <section className="py-20 bg-white">
+      <section className="py-5 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Featured Services
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Professional services from certified experts and specialists
-            </p>
           </div>
 
           {featuredServices.length > 0 ? (
@@ -209,52 +321,8 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Why Choose AIO */}
-      {/*<section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose AIO?</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              The all-in-one platform that connects buyers and sellers seamlessly
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center p-8 bg-white rounded-2xl shadow-sm">
-              <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Secure & Trusted</h3>
-              <p className="text-gray-600">
-                All transactions are protected with bank-level security. Shop with confidence knowing your data is safe.
-              </p>
-            </div>
-            
-            <div className="text-center p-8 bg-white rounded-2xl shadow-sm">
-              <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Star className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Quality Guaranteed</h3>
-              <p className="text-gray-600">
-                Every store is verified and products are quality-checked. Get exactly what you expect, every time.
-              </p>
-            </div>
-            
-            <div className="text-center p-8 bg-white rounded-2xl shadow-sm">
-              <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Users className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">24/7 Support</h3>
-              <p className="text-gray-600">
-                Our dedicated support team is here to help you anytime. Get assistance when you need it most.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>*/}
-
       {/* Call to Action */}
-      <section className="py-20 bg-black text-white">
+      <section className="py-10 bg-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-bold mb-6">
             Start Your Business Journey
@@ -283,16 +351,12 @@ const Home = () => {
       </section>
 
       {/* Premium Stores */}
-      <section className="py-20 bg-white">
+      <section className="py-5 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Premium Stores
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Explore our curated collection of top-performing stores with
-              excellent customer reviews
-            </p>
           </div>
 
           {featuredStores.length > 0 ? (

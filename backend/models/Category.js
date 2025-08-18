@@ -37,7 +37,16 @@ const categorySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["physical", "digital", "service"],
+      enum: ["product", "service", "common"],
+      required: true,
+    },
+    image: [
+      {
+        type: String,
+      },
+    ],
+    description: {
+      type: String,
       required: true,
     },
     subcategories: {

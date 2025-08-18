@@ -80,27 +80,28 @@ const isExcludedDate = (date, excludedDates) => {
   if (!excludedDates || excludedDates.length === 0) return false;
   // Fix timezone issue by using local date comparison
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   const dateString = `${year}-${month}-${day}`;
-  
-  return excludedDates.some(
-    (excludedDate) => {
-      const excludedDateObj = new Date(excludedDate);
-      const excludedYear = excludedDateObj.getFullYear();
-      const excludedMonth = String(excludedDateObj.getMonth() + 1).padStart(2, '0');
-      const excludedDay = String(excludedDateObj.getDate()).padStart(2, '0');
-      const excludedDateString = `${excludedYear}-${excludedMonth}-${excludedDay}`;
-      return excludedDateString === dateString;
-    }
-  );
+
+  return excludedDates.some((excludedDate) => {
+    const excludedDateObj = new Date(excludedDate);
+    const excludedYear = excludedDateObj.getFullYear();
+    const excludedMonth = String(excludedDateObj.getMonth() + 1).padStart(
+      2,
+      "0"
+    );
+    const excludedDay = String(excludedDateObj.getDate()).padStart(2, "0");
+    const excludedDateString = `${excludedYear}-${excludedMonth}-${excludedDay}`;
+    return excludedDateString === dateString;
+  });
 };
 
 // Helper function to format date consistently (fixes timezone issues)
 const formatDateForAPI = (date) => {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
@@ -417,21 +418,21 @@ const ServiceDetail = () => {
     const today = new Date();
     const selectedDateFormatted = formatDateForAPI(selectedDate);
     const todayFormatted = formatDateForAPI(today);
-    
+
     // If selected date is not today, no slots are in the past
     if (selectedDateFormatted !== todayFormatted) {
       return false;
     }
-    
+
     // If it's today, check if the slot time has passed
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    const [slotHour, slotMinute] = slot.start.split(':').map(Number);
+
+    const [slotHour, slotMinute] = slot.start.split(":").map(Number);
     const slotTimeInMinutes = slotHour * 60 + slotMinute;
-    
+
     return slotTimeInMinutes <= currentTimeInMinutes;
   };
 
@@ -441,8 +442,10 @@ const ServiceDetail = () => {
     if (isSlotInPast(slot)) {
       return false;
     }
-    
-    return availableTimeSlots.some(availableSlot => availableSlot.start === slot.start);
+
+    return availableTimeSlots.some(
+      (availableSlot) => availableSlot.start === slot.start
+    );
   };
 
   if (loading) {
@@ -652,7 +655,7 @@ const ServiceDetail = () => {
             </div>
 
             {/* Service Description */}
-            <div>
+            <div className="bg-white rounded-xl p-6 border border-gray-200">
               <h3 className="text-lg font-semibold mb-3">Description</h3>
               <p className="text-gray-700 leading-relaxed">
                 {service.description}
@@ -787,11 +790,13 @@ const ServiceDetail = () => {
                       const isAvailable = isSlotAvailable(slot);
                       const isBooked = bookedSlots.includes(slot.start);
                       const isPast = isSlotInPast(slot);
-                      
+
                       return (
                         <button
                           key={slot.start}
-                          onClick={() => isAvailable ? setSelectedTime(slot.start) : null}
+                          onClick={() =>
+                            isAvailable ? setSelectedTime(slot.start) : null
+                          }
                           disabled={!isAvailable}
                           className={`p-3 text-sm rounded-lg border transition-colors ${
                             selectedTime === slot.start
@@ -803,11 +808,17 @@ const ServiceDetail = () => {
                         >
                           <div className="font-medium">{slot.label}</div>
                           {isBooked ? (
-                            <div className="text-xs text-red-500 mt-1">Booked</div>
+                            <div className="text-xs text-red-500 mt-1">
+                              Booked
+                            </div>
                           ) : isPast ? (
-                            <div className="text-xs text-gray-400 mt-1">Past</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              Past
+                            </div>
                           ) : !isAvailable ? (
-                            <div className="text-xs text-gray-400 mt-1">Unavailable</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              Unavailable
+                            </div>
                           ) : null}
                         </button>
                       );
