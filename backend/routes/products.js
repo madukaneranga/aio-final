@@ -215,13 +215,14 @@ router.post("/listing", async (req, res) => {
   }
 });
 
-
 // Get product by ID
 router.get("/:id", async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id).populate(
-      "storeId",
-      "name type ownerId profileImage"
+    const id = req.params.id;
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { $inc: { "stats.views": 1 } }, // increment views
+      { new: true }
     );
 
     if (!product) {
@@ -380,5 +381,23 @@ router.delete(
     }
   }
 );
+
+// POST /api/products/impression
+router.post("/impression", async (req, res) => {
+  try {
+    const { productId } = req.body;
+    if (!productId)
+      return res.status(400).json({ message: "Product ID required" });
+
+    await Product.findByIdAndUpdate(
+      productId,
+      { $inc: { "stats.impressions": 1 } } // increment impressions
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 export default router;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   ShoppingCart,
@@ -14,12 +14,39 @@ import { useAuth } from "../contexts/AuthContext";
 import { formatLKR } from "../utils/currency";
 
 const ProductCard = ({ product }) => {
+  const cardRef = useRef(null);
   const { addToOrder } = useCart();
   const { user } = useAuth();
 
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // Send impression
+            fetch(`${import.meta.env.VITE_API_URL}/api/products/impression`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ productId: product._id }),
+            }).catch((err) => console.error("Impression error:", err));
+
+            observer.unobserve(entry.target); // stop observing after first impression
+          }
+        });
+      },
+      { threshold: 0.5 } // 50% of the card visible = impression
+    );
+
+    if (cardRef.current) observer.observe(cardRef.current);
+
+    return () => {
+      if (cardRef.current) observer.unobserve(cardRef.current);
+    };
+  }, [product._id]);
 
   //const formatLKR = (price) => `LKR ${price.toLocaleString()}`;
 
@@ -68,7 +95,7 @@ const ProductCard = ({ product }) => {
   return (
     <>
       <Link to={`/product/${product._id}`} className="block">
-        <div className="relative w-full ">
+        <div className="relative w-full" ref={cardRef}>
           {/* Product Card */}
           <div className="group relative bg-white rounded-xl sm:rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full max-w-xs mx-auto">
             {/* Badges */}

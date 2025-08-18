@@ -112,6 +112,14 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
 
         await order.save();
 
+        // Increment product orderCount
+        for (const item of storeData.items) {
+          await Product.findByIdAndUpdate(
+            item.productId,
+            { $inc: { "stats.orderCount": item.quantity } } // increment by qty
+          );
+        }
+
         const store = await Store.findById(storeId);
 
         if (order) {
@@ -178,6 +186,12 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
         });
 
         await booking.save();
+
+        
+        // Increment service bookingCount
+        await Service.findByIdAndUpdate(service._id, {
+          $inc: { "stats.bookingCount": 1 },
+        });
 
         const store = await Store.findById(service.storeId);
 

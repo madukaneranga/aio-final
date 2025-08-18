@@ -19,6 +19,10 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     min: 0,
   },
+  discount: {
+    type: Number,
+    min: 0,
+  },
   duration: {
     type: Number,
     required: true,

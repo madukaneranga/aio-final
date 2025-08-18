@@ -18,7 +18,7 @@ const CategorySection = ({ categories, title = "Categories" }) => {
 
   return (
     <section className="py-6 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
           <h2 className="text-xl sm:text-2xl font-medium text-black">

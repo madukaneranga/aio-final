@@ -200,9 +200,11 @@ router.post("/listing", async (req, res) => {
 // Get service by ID
 router.get("/:id", async (req, res) => {
   try {
-    const service = await Service.findById(req.params.id).populate(
-      "storeId",
-      "name type ownerId profileImage"
+    const id = req.params.id;
+    const service = await Service.findByIdAndUpdate(
+      id,
+      { $inc: { "stats.views": 1 } }, // increment views
+      { new: true }
     );
 
     if (!service) {
@@ -335,5 +337,23 @@ router.delete(
     }
   }
 );
+
+// POST /api/services/impression
+router.post("/impression", async (req, res) => {
+  try {
+    const { serviceId } = req.body;
+    if (!serviceId) return res.status(400).json({ message: "Service ID required" });
+
+    await Service.findByIdAndUpdate(
+      serviceId,
+      { $inc: { "stats.impressions": 1 } } // increment impressions
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 export default router;

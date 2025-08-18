@@ -174,7 +174,7 @@ const Home = () => {
     }
   };
 
-    const flashDealProps = getFlashDealProps();
+  const flashDealProps = getFlashDealProps();
 
   if (loading) {
     return (
@@ -228,32 +228,30 @@ const Home = () => {
       </section>
       {showFlashDeal && flashDeal && flashDealProps && (
         <section className="py-0 bg-white">
-
-            <FlashDealsBanner
-              // Timer props from backend
-              {...flashDealProps}
-              // Content from backend
-              saleName={flashDeal.saleName}
-              saleSubtitle={flashDeal.saleSubtitle}
-              discountText={flashDeal.discountText}
-              buttonText={flashDeal.buttonText}
-              // Design from backend
-              backgroundColor={flashDeal.backgroundColor}
-              backgroundImage={flashDeal.backgroundImage}
-              textColor={flashDeal.textColor}
-              accentColor={flashDeal.accentColor}
-              // Image from backend
-              heroImage={flashDeal.heroImage}
-              showHeroImage={flashDeal.showHeroImage}
-              // Custom click handler
-              onButtonClick={handleFlashDealClick}
-            />
-      
+          <FlashDealsBanner
+            // Timer props from backend
+            {...flashDealProps}
+            // Content from backend
+            saleName={flashDeal.saleName}
+            saleSubtitle={flashDeal.saleSubtitle}
+            discountText={flashDeal.discountText}
+            buttonText={flashDeal.buttonText}
+            // Design from backend
+            backgroundColor={flashDeal.backgroundColor}
+            backgroundImage={flashDeal.backgroundImage}
+            textColor={flashDeal.textColor}
+            accentColor={flashDeal.accentColor}
+            // Image from backend
+            heroImage={flashDeal.heroImage}
+            showHeroImage={flashDeal.showHeroImage}
+            // Custom click handler
+            onButtonClick={handleFlashDealClick}
+          />
         </section>
       )}
       {/* Featured Products */}
       <section className="py-5 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Featured Products
@@ -262,7 +260,7 @@ const Home = () => {
 
           {featuredProducts.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-8">
                 {featuredProducts.map((product) => (
                   <ProductCard key={product._id} product={product} />
                 ))}
@@ -288,7 +286,7 @@ const Home = () => {
 
       {/* Featured Services */}
       <section className="py-5 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Featured Services
@@ -297,7 +295,7 @@ const Home = () => {
 
           {featuredServices.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-8">
                 {featuredServices.map((service) => (
                   <ServiceCard key={service._id} service={service} />
                 ))}
