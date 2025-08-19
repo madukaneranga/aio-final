@@ -4,8 +4,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Service from "../models/Service.js";
 import Store from "../models/Store.js";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 import { getUserPackage } from "../utils/getUserPackage.js";
+import SearchHistory from "../models/SearchHistory.js";
+import User from "../models/User.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,9 +35,8 @@ const upload = multer({
   },
 });
 
-// Get all services
 // Get all active services
-router.get("/", async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, storeId } = req.query;
     let query = { isActive: true };
@@ -55,6 +56,7 @@ router.get("/", async (req, res) => {
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
       ];
+      await saveSearchToHistory(req.user, search.trim());s
     }
     if (minPrice || maxPrice) {
       query.price = {};
@@ -73,7 +75,7 @@ router.get("/", async (req, res) => {
 });
 
 // Search/filter services via POST
-router.post("/listing", async (req, res) => {
+router.post("/listing", optionalAuth, async (req, res) => {
   try {
     const {
       search,
@@ -86,6 +88,7 @@ router.post("/listing", async (req, res) => {
       duration,
       page = 1,
       limit = 20,
+      sortBy,
     } = req.body;
 
     console.log("Received search request:", {
@@ -99,6 +102,7 @@ router.post("/listing", async (req, res) => {
       duration,
       page,
       limit,
+      sortBy,
     });
 
     // Build the base query
@@ -120,6 +124,8 @@ router.post("/listing", async (req, res) => {
         { description: { $regex: search, $options: "i" } },
         { tags: { $in: [new RegExp(search, 'i')] } },
       ];
+
+      await saveSearchToHistory(req.user, search.trim());
     }
 
     // Price range filter
@@ -358,5 +364,55 @@ router.post("/impression", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+const saveSearchToHistory = async (user, query) => {
+  try {
+    // Don't save empty or very short queries
+    if (!query || query.length < 3) return;
+    
+    let searchHistory;
+    
+    if (user.isGuest) {
+      // Check if this exact query already exists for this guest recently (last 24 hours)
+      const existingSearch = await SearchHistory.findOne({
+        guestId: user.guestId,
+        query: query,
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      });
+      
+      if (!existingSearch) {
+        searchHistory = await SearchHistory.create({
+          guestId: user.guestId,
+          query: query
+        });
+      }
+    } else {
+      // Check if this exact query already exists for this user recently (last 24 hours)
+      const existingSearch = await SearchHistory.findOne({
+        userId: user._id,
+        query: query,
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      });
+      
+      if (!existingSearch) {
+        searchHistory = await SearchHistory.create({
+          userId: user._id,
+          query: query
+        });
+        
+        // Add to user's searchHistory array
+        await User.findByIdAndUpdate(
+          user._id,
+          { $push: { searchHistory: searchHistory._id } }
+        );
+      }
+    }
+  } catch (error) {
+    // Don't let search history errors break the search functionality
+    console.error("Error saving search history:", error);
+  }
+};
+
 
 export default router;

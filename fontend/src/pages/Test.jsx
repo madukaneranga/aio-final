@@ -1,561 +1,300 @@
-// ============ PRODUCTS.JSX (WITH ELEGANT PAGINATION) ============
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
-import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
-import ServicesFiltersSidebar from "../components/ServicesFiltersSidebar";
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, Star, ArrowRight, Play, Sparkles } from 'lucide-react';
 
-// Custom debounce hook
-const useDebounce = (value, delay) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
+// Simulating Chakra UI components with Tailwind (since Chakra isn't available in this environment)
+// In a real project, you would import these from '@chakra-ui/react'
+const Box = ({ children, className, ...props }) => <div className={className} {...props}>{children}</div>;
+const Flex = ({ children, className, ...props }) => <div className={`flex ${className}`} {...props}>{children}</div>;
+const Text = ({ children, className, ...props }) => <span className={className} {...props}>{children}</span>;
+const Button = ({ children, variant, size, className, ...props }) => {
+  const baseClass = "px-6 py-3 rounded-full font-semibold transition-all duration-300 flex items-center justify-center space-x-2";
+  const variantClass = variant === 'solid' ? 'bg-white text-gray-900 hover:bg-gray-100' : 'bg-transparent border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur-sm';
+  return <button className={`${baseClass} ${variantClass} ${className}`} {...props}>{children}</button>;
+};
+const Badge = ({ children, className }) => <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${className}`}>{children}</span>;
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
+// Framer Motion simulation (in real project: import { motion } from 'framer-motion')
+const motion = {
+  div: ({ children, initial, animate, transition, className, ...props }) => (
+    <div className={className} {...props}>{children}</div>
+  ),
+  h1: ({ children, initial, animate, transition, className, ...props }) => (
+    <h1 className={className} {...props}>{children}</h1>
+  )
 };
 
-// Custom intersection observer hook for infinite scroll
-const useIntersectionObserver = (callback, options = {}) => {
-  const targetRef = useRef(null);
+const EcommerceHero = () => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+
+  const heroSlides = [
+    {
+      title: "Elevate Your Style",
+      subtitle: "Premium Collection 2025",
+      description: "Discover our curated selection of luxury fashion pieces that define modern elegance and sophistication.",
+      image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=600&fit=crop",
+      badge: "New Arrivals",
+      color: "purple"
+    },
+    {
+      title: "Sustainable Fashion", 
+      subtitle: "Eco-Conscious Design",
+      description: "Join the movement towards sustainable luxury with our environmentally responsible fashion collection.",
+      image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=800&h=600&fit=crop",
+      badge: "Eco-Friendly",
+      color: "green"
+    },
+    {
+      title: "Exclusive Drops",
+      subtitle: "Limited Edition", 
+      description: "Be among the first to own our limited edition pieces crafted by renowned designers worldwide.",
+      image: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800&h=600&fit=crop",
+      badge: "Limited",
+      color: "red"
+    }
+  ];
 
   useEffect(() => {
-    const observer = new IntersectionObserver(callback, {
-      threshold: 0.1,
-      rootMargin: "100px",
-      ...options,
-    });
+    setIsVisible(true);
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const currentTarget = targetRef.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
-    }
+  const features = [
+    { icon: "🚚", text: "Free worldwide shipping", delay: 0 },
+    { icon: "💎", text: "Premium quality guarantee", delay: 0.1 },
+    { icon: "🔄", text: "30-day easy returns", delay: 0.2 },
+    { icon: "⚡", text: "24/7 customer support", delay: 0.3 }
+  ];
 
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.8,
+        staggerChildren: 0.2
       }
-    };
-  }, [callback, options]);
-
-  return targetRef;
-};
-
-const Services = () => {
-  // URL parameter hooks
-  const [searchParams] = useSearchParams();
-  const location = useLocation();
-
-  // Service data state
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
-  const [categories, setCategories] = useState([]);
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalServices, setTotalServices] = useState(0);
-  const [hasMoreServices, setHasMoreServices] = useState(true);
-  const PRODUCTS_PER_PAGE = 20;
-
-  // Unified filters state
-  const [filters, setFilters] = useState({
-    search: "",
-    category: "",
-    subcategory: "",
-    childCategory: "",
-    priceRange: { min: "", max: "" },
-    stock: "",
-    rating: "",
-    shipping: "",
-    condition: "",
-    warrantyMonths: "",
-  });
-
-  // UI state
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Debounced filters for API calls
-  const debouncedFilters = useDebounce(filters, 300);
-
-  // Derived state for backwards compatibility
-  const selectedCategoryObj = categories.find(
-    (cat) => cat.name === filters.category
-  );
-  const subcategories = selectedCategoryObj?.subcategories || [];
-  const childCategories =
-    subcategories.find((sub) => sub.name === filters.subcategory)
-      ?.childCategories || [];
-
-  // Read URL parameters and set initial state
-  useEffect(() => {
-    const searchFromUrl = searchParams.get("search");
-
-    console.log("=== URL PARAMS DEBUG ===");
-    console.log("Current URL:", location.pathname + location.search);
-    console.log("Search from URL:", searchFromUrl);
-    console.log("All URL params:", Object.fromEntries(searchParams.entries()));
-
-    // Set state from URL parameters
-    if (searchFromUrl) {
-      setFilters((prev) => ({
-        ...prev,
-        search: searchFromUrl,
-      }));
-    }
-  }, [searchParams, location]);
-
-  // Fetch services function with pagination
-  const fetchServices = async (
-    searchFilters = {},
-    page = 1,
-    append = false
-  ) => {
-    try {
-      if (!append) {
-        setLoading(true);
-        setServices([]);
-      } else {
-        setLoadingMore(true);
-      }
-      setError("");
-
-      console.log(
-        "Fetching services with filters:",
-        searchFilters,
-        "Page:",
-        page
-      );
-
-      // Convert filters to API format
-      const apiFilters = {
-        search: searchFilters.search || "",
-        category: searchFilters.category || "",
-        subcategory: searchFilters.subcategory || "",
-        childCategory: searchFilters.childCategory || "",
-        minPrice: searchFilters.priceRange?.min || "",
-        maxPrice: searchFilters.priceRange?.max || "",
-        stock: searchFilters.stock || "",
-        rating: searchFilters.rating || "",
-        shipping: searchFilters.shipping || "",
-        condition: searchFilters.condition || "",
-        warrantyMonths: searchFilters.warrantyMonths || "",
-        page: page,
-        limit: PRODUCTS_PER_PAGE,
-      };
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/services/listing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(apiFilters),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log(
-          "Services fetched:",
-          data.services.length,
-          "items",
-          "Total:",
-          data.total
-        );
-
-        if (append) {
-          setServices((prev) => [...prev, ...data.services]);
-        } else {
-          setServices(data.services);
-        }
-
-        setTotalServices(data.total);
-        setHasMoreServices(
-          data.services.length === PRODUCTS_PER_PAGE && data.hasMore
-        );
-        setCurrentPage(page);
-      } else {
-        setError("Failed to fetch services");
-        console.error("API Error:", response.status, response.statusText);
-      }
-    } catch (error) {
-      console.error("Error fetching services:", error);
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
     }
   };
 
-  // Load more services
-  const loadMoreServices = useCallback(() => {
-    if (!loadingMore && hasMoreServices && !loading) {
-      const nextPage = currentPage + 1;
-      fetchServices(debouncedFilters, nextPage, true);
-    }
-  }, [loadingMore, hasMoreServices, loading, currentPage, debouncedFilters]);
-
-  // Intersection observer for infinite scroll
-  const loadMoreRef = useIntersectionObserver(
-    useCallback(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting) {
-          loadMoreServices();
-        }
-      },
-      [loadMoreServices]
-    )
-  );
-
-  // Auto-fetch services when debounced filters change (reset to page 1)
-  useEffect(() => {
-    setCurrentPage(1);
-    fetchServices(debouncedFilters, 1, false);
-  }, [debouncedFilters]);
-
-  // Load categories
-  const loadCategories = async () => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
-      setCategories(data);
-    } catch (err) {
-      console.error("Error loading categories:", err);
+  const itemVariants = {
+    hidden: { y: 50, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.6, ease: "easeOut" }
     }
   };
-
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // Filter update functions
-  const updateFilter = useCallback((key, value) => {
-    setFilters((prev) => {
-      const newFilters = { ...prev, [key]: value };
-
-      // Auto-clear dependent filters
-      if (key === "category") {
-        newFilters.subcategory = "";
-        newFilters.childCategory = "";
-      } else if (key === "subcategory") {
-        newFilters.childCategory = "";
-      }
-
-      return newFilters;
-    });
-  }, []);
-
-  const updateFilters = useCallback((updates) => {
-    setFilters((prev) => ({ ...prev, ...updates }));
-  }, []);
-
-  const clearAllFilters = useCallback(() => {
-    setFilters({
-      search: "",
-      category: "",
-      subcategory: "",
-      childCategory: "",
-      priceRange: { min: "", max: "" },
-      stock: "",
-      rating: "",
-      shipping: "",
-      condition: "",
-      warrantyMonths: "",
-    });
-  }, []);
-
-  // Manual search handler (for search form)
-  const handleSearch = (e) => {
-    e?.preventDefault?.();
-
-    // Force immediate search without debounce
-    fetchServices(filters, 1, false);
-  };
-
-  // Check for active filters
-  const hasActiveFilters = Boolean(
-    filters.search ||
-      filters.category ||
-      filters.subcategory ||
-      filters.childCategory ||
-      filters.priceRange.min ||
-      filters.priceRange.max ||
-      filters.stock ||
-      filters.rating ||
-      filters.shipping ||
-      filters.condition ||
-      filters.warrantyMonths
-  );
-
-  const activeFiltersCount = [
-    filters.search,
-    filters.category,
-    filters.subcategory,
-    filters.childCategory,
-    filters.priceRange.min,
-    filters.priceRange.max,
-    filters.stock,
-    filters.rating,
-    filters.shipping,
-    filters.condition,
-    filters.warrantyMonths,
-  ].filter(Boolean).length;
-
-  // Calculate display range for results counter
-  const startResult = services.length > 0 ? 1 : 0;
-  const endResult = services.length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Services</h1>
+    <Box className="relative min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
+      {/* Animated Background Blobs */}
+      <Box className="absolute inset-0 pointer-events-none">
+        <Box className="absolute top-20 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+        <Box className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <Box className="absolute top-1/2 left-1/3 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }} />
+      </Box>
 
-          {/* Search Filters */}
-          <div className="space-y-4">
-            {/* Breadcrumb */}
-            {(filters.subcategory || filters.childCategory) && (
-              <nav
-                aria-label="breadcrumb"
-                className="text-sm text-gray-600 mt-2 select-none"
-              >
-                <ol className="list-reset flex space-x-2">
-                  {filters.category && (
-                    <li>
-                      {categories.find(
-                        (c) => c.name.toString() === filters.category
-                      )?.name || "Category"}
-                    </li>
-                  )}
-                  {filters.subcategory && (
-                    <>
-                      <li>→</li>
-                      <li>{filters.subcategory}</li>
-                    </>
-                  )}
-                  {filters.childCategory && (
-                    <>
-                      <li>→</li>
-                      <li>{filters.childCategory}</li>
-                    </>
-                  )}
-                </ol>
-              </nav>
-            )}
+      {/* Navigation Bar */}
+      <Flex className="relative z-20 items-center justify-between px-6 lg:px-12 py-6">
+        <Flex className="items-center space-x-3">
+          <Box className="p-2 bg-white/10 rounded-full backdrop-blur-sm">
+            <Sparkles className="w-6 h-6 text-white" />
+          </Box>
+          <Text className="text-2xl font-bold text-white tracking-tight">LUXE</Text>
+        </Flex>
+        
+        <Flex className="hidden md:flex items-center space-x-8">
+          {['Collections', 'About', 'Contact'].map((item) => (
+            <Text key={item} className="text-white/80 hover:text-white transition-colors cursor-pointer font-medium">
+              {item}
+            </Text>
+          ))}
+        </Flex>
+        
+        <Flex className="items-center space-x-4">
+          <Box className="relative p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer">
+            <ShoppingBag className="w-6 h-6 text-white" />
+            <Box className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+              <Text className="text-xs text-white font-bold">3</Text>
+            </Box>
+          </Box>
+          <Button variant="solid" size="sm" className="transform hover:scale-105">
+            Sign In
+          </Button>
+        </Flex>
+      </Flex>
 
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => {
-                    updateFilter("search", e.target.value);
-                    console.log("Search query changed to:", e.target.value);
-                  }}
-                  placeholder="Search services..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                Search
-              </button>
-            </form>
-
-            {/* Elegant Results Counter */}
-            {!loading && (
-              <div className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl shadow-sm">
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2 text-gray-700">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium">
-                      Showing {startResult.toLocaleString()}-
-                      {endResult.toLocaleString()} of{" "}
-                      {totalServices.toLocaleString()} results
-                    </span>
-                  </div>
-                  {hasActiveFilters && (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-                      <span className="text-xs text-gray-500 font-medium">
-                        {activeFiltersCount} filter
-                        {activeFiltersCount !== 1 ? "s" : ""} applied
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {hasMoreServices && (
-                  <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <div className="animate-pulse w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span>More available</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Filters Side Drawer */}
-            <ServicesFiltersSidebar
-              showFilters={showFilters}
-              setShowFilters={setShowFilters}
-              categorySet={categories}
-              filters={filters}
-              updateFilter={updateFilter}
-              updateFilters={updateFilters}
-              clearAllFilters={clearAllFilters}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Floating Filter Button */}
-      {!showFilters && (
-        <button
-          onClick={() => setShowFilters(true)}
-          className="
-            fixed 
-            left-0 
-            top-1/2 
-            -translate-y-1/2
-            z-40 
-            bg-gradient-to-b from-black via-gray-800 to-white
-            text-white px-3 py-6 rounded-r-xl shadow-xl 
-            flex flex-col items-center justify-center space-y-2
-            hover:scale-105 hover:shadow-2xl transition-all duration-300 ease-out
-            border border-gray-700
-            writing-mode-vertical
-            min-h-[120px]
-          "
+      {/* Main Hero Content */}
+      <Box className="relative z-10 container mx-auto px-6 lg:px-12">
+        <motion.div
+          className="grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]"
+          initial="hidden"
+          animate={isVisible ? "visible" : "hidden"}
+          variants={containerVariants}
         >
-          <Filter className="w-5 h-5" />
+          
+          {/* Left Content */}
+          <motion.div className="space-y-8" variants={itemVariants}>
+            {/* Status Badge */}
+            <Badge className={`bg-${heroSlides[currentSlide].color}-600/20 border border-${heroSlides[currentSlide].color}-500/30 backdrop-blur-sm text-${heroSlides[currentSlide].color}-300`}>
+              <Box className={`w-2 h-2 bg-${heroSlides[currentSlide].color}-400 rounded-full mr-3 animate-pulse`} />
+              {heroSlides[currentSlide].badge}
+            </Badge>
 
-          <span
-            className="font-medium text-sm transform -rotate-90 whitespace-nowrap"
-            style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-          >
-            Filters
-          </span>
-
-          {hasActiveFilters && (
-            <span className="bg-white text-black text-xs font-semibold px-2 py-1 rounded-full shadow-md min-w-[24px] text-center">
-              {activeFiltersCount}
-            </span>
-          )}
-        </button>
-      )}
-
-      {/* Services Content */}
-      <ServiceListing services={services} loading={loading} error={error} />
-
-      {/* Elegant Load More Section */}
-      {!loading && services.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {hasMoreServices ? (
-            <div
-              ref={loadMoreRef}
-              className="flex flex-col items-center justify-center py-12 space-y-6"
-            >
-              {loadingMore ? (
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="relative">
-                    <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
-                    <div
-                      className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-gray-400 rounded-full animate-spin"
-                      style={{
-                        animationDirection: "reverse",
-                        animationDuration: "1.5s",
-                      }}
-                    ></div>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-gray-600 font-medium">
-                      Loading more services...
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Finding the perfect items for you
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={loadMoreServices}
-                  className="group relative overflow-hidden bg-gradient-to-r from-gray-900 to-black text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 ease-out"
-                >
-                  <span className="relative z-10 flex items-center space-x-2">
-                    <span>Load More Services</span>
-                    <ChevronDown className="w-5 h-5 group-hover:animate-bounce" />
+            {/* Main Headlines */}
+            <Box>
+              <motion.h1 
+                className="text-5xl lg:text-7xl font-black text-white leading-[0.9] mb-4"
+                variants={itemVariants}
+              >
+                {heroSlides[currentSlide].title.split(' ').map((word, index) => (
+                  <span 
+                    key={index} 
+                    className={`inline-block ${index === 1 ? 'bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent' : ''} mr-4`}
+                  >
+                    {word}
                   </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-black to-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center shadow-lg">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
+                ))}
+              </motion.h1>
+              
+              <Text className="text-xl lg:text-2xl text-purple-300 font-light">
+                {heroSlides[currentSlide].subtitle}
+              </Text>
+            </Box>
 
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  You've seen it all! ✨
-                </h3>
-                <p className="text-gray-600 max-w-md">
-                  That's every service we have matching your criteria. Try
-                  adjusting your filters to discover more amazing items.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+            <Text className="text-lg text-gray-300 max-w-xl leading-relaxed">
+              {heroSlides[currentSlide].description}
+            </Text>
 
-      {/* Empty State */}
-      {!loading && services.length === 0 && !error && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center space-y-6">
-            <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto shadow-lg">
-              <Search className="w-12 h-12 text-gray-500" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                No services found
-              </h3>
-              <p className="text-gray-600 max-w-md mx-auto mb-6">
-                We couldn't find any services matching your search criteria. Try
-                adjusting your filters or search terms.
-              </p>
-              {hasActiveFilters && (
-                <button
-                  onClick={clearAllFilters}
-                  className="inline-flex items-center space-x-2 bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+            {/* Social Proof */}
+            <Flex className="items-center space-x-3">
+              <Flex className="space-x-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                ))}
+              </Flex>
+              <Text className="text-white font-medium">4.9/5</Text>
+              <Text className="text-gray-400">from 2,847 reviews</Text>
+            </Flex>
+
+            {/* CTA Buttons */}
+            <Flex className="flex-col sm:flex-row gap-4">
+              <Button variant="solid" className="group transform hover:scale-105 shadow-2xl">
+                <ShoppingBag className="w-5 h-5" />
+                <span>Shop Collection</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+              
+              <Button variant="outline" className="group backdrop-blur-sm">
+                <Play className="w-5 h-5" />
+                <span>Watch Story</span>
+              </Button>
+            </Flex>
+
+            {/* Feature Grid */}
+            <Box className="grid grid-cols-2 gap-6 pt-8">
+              {features.map((feature, index) => (
+                <motion.div
+                  key={index}
+                  className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all"
+                  variants={itemVariants}
+                  style={{ animationDelay: `${feature.delay}s` }}
                 >
-                  <X className="w-4 h-4" />
-                  <span>Clear All Filters</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+                  <Text className="text-2xl">{feature.icon}</Text>
+                  <Text className="text-sm text-gray-300 font-medium">{feature.text}</Text>
+                </motion.div>
+              ))}
+            </Box>
+          </motion.div>
+
+          {/* Right Content - Product Showcase */}
+          <motion.div className="relative" variants={itemVariants}>
+            <Box className="relative group">
+              {/* Main Product Card */}
+              <Box className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 p-8 backdrop-blur-xl border border-white/10 transform group-hover:scale-[1.02] transition-all duration-500">
+                <img 
+                  src={heroSlides[currentSlide].image} 
+                  alt="Featured Product"
+                  className="w-full h-96 object-cover rounded-2xl transition-all duration-700 group-hover:scale-110"
+                />
+                
+                {/* Floating Quality Badge */}
+                <Box className="absolute top-6 right-6 bg-white/90 backdrop-blur-sm rounded-full p-4 animate-bounce shadow-xl">
+                  <span className="text-2xl">💎</span>
+                </Box>
+                
+                {/* Premium Label */}
+                <Box className="absolute bottom-6 left-6 bg-black/70 backdrop-blur-md text-white px-6 py-3 rounded-full border border-white/20">
+                  <Text className="text-sm font-semibold">Premium Quality</Text>
+                </Box>
+              </Box>
+
+              {/* Floating Discount Card */}
+              <Box className="absolute -top-6 -left-6 bg-gradient-to-r from-red-500 to-pink-600 text-white p-6 rounded-2xl shadow-2xl transform rotate-3 hover:rotate-0 transition-transform">
+                <Text className="text-3xl font-black">50%</Text>
+                <Text className="text-sm opacity-90">OFF</Text>
+              </Box>
+
+              {/* Floating Customer Stats */}
+              <Box className="absolute -bottom-8 -right-8 bg-white text-gray-900 p-6 rounded-2xl shadow-2xl border border-gray-200">
+                <Flex className="items-center space-x-4">
+                  <Box className="w-12 h-12 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                    <Text className="text-white text-lg font-bold">✓</Text>
+                  </Box>
+                  <Box>
+                    <Text className="text-xl font-black text-gray-900">2.8K+</Text>
+                    <Text className="text-sm text-gray-600">Happy Customers</Text>
+                  </Box>
+                </Flex>
+              </Box>
+            </Box>
+          </motion.div>
+        </motion.div>
+      </Box>
+
+      {/* Slide Navigation */}
+      <Box className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20">
+        <Flex className="space-x-3 bg-black/30 backdrop-blur-md p-2 rounded-full border border-white/10">
+          {heroSlides.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`w-12 h-3 rounded-full transition-all duration-300 ${
+                index === currentSlide 
+                  ? 'bg-white shadow-lg' 
+                  : 'bg-white/30 hover:bg-white/50'
+              }`}
+            />
+          ))}
+        </Flex>
+      </Box>
+
+      {/* Custom Animations */}
+      <style jsx>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideRight {
+          from { opacity: 0; transform: translateX(-30px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+
+        .animate-slide-up {
+          animation: slideUp 0.8s ease-out forwards;
+        }
+        
+        .animate-slide-right {
+          animation: slideRight 0.8s ease-out 0.3s forwards;
+        }
+      `}</style>
+    </Box>
   );
 };
 
-export default Services;
+export default EcommerceHero;

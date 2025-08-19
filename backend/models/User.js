@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -68,6 +67,10 @@ const userSchema = new mongoose.Schema({
       ref: "SearchHistory",
     },
   ],
+
+  refreshTokenHash: String,
+  refreshTokenId: String,
+
   subscriptionId: String,
   createdAt: {
     type: Date,

@@ -65,7 +65,7 @@ const ProductDetail = () => {
       // Fetch store details separately
       if (data.storeId) {
         const storeResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId._id}`
+          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
         );
         const storeData = await storeResponse.json();
         //console.log("Fetched store data:", storeData); // ADD THIS
@@ -218,9 +218,6 @@ const ProductDetail = () => {
           {/* Product Details */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                {product.title}
-              </h1>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {product.title}

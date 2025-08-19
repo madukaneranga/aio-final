@@ -50,9 +50,10 @@ const Bookings = () => {
         `${import.meta.env.VITE_API_URL}/api/bookings/${bookingId}/status`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            
           },
           body: JSON.stringify({ status }),
         }

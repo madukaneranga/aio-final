@@ -21,7 +21,7 @@
     "express": "^4.18.2",
     "file-saver": "^2.0.5",
     "firebase": "^11.10.0",
-    "framer-motion": "^12.23.6",
+    "framer-motion": "^12.23.12",
     "google-auth-library": "^9.4.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.344.0",
