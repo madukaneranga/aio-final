@@ -41,9 +41,7 @@ const SubscriptionManagement = () => {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 
@@ -64,9 +62,7 @@ const SubscriptionManagement = () => {
   const fetchPackages = async () => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/packages/`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch packages");
       const data = await res.json();
@@ -82,9 +78,7 @@ const SubscriptionManagement = () => {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/packages/user-package`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
       if (!res.ok) throw new Error("Failed to fetch packages");
@@ -193,9 +187,7 @@ const SubscriptionManagement = () => {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/users/usage-summary`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 
@@ -266,9 +258,9 @@ const SubscriptionManagement = () => {
         `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({ packageName: selectedPackage }),
         }
@@ -305,9 +297,9 @@ const SubscriptionManagement = () => {
         `${import.meta.env.VITE_API_URL}/api/subscriptions/upgrade`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({ packageName: selectedPackage }),
         }
@@ -358,9 +350,7 @@ const SubscriptionManagement = () => {
         `${import.meta.env.VITE_API_URL}/api/subscriptions/cancel`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 

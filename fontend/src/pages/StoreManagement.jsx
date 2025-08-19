@@ -176,9 +176,7 @@ const StoreManagement = () => {
       const subscriptionResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
       if (!subscriptionResponse.ok) {
@@ -199,9 +197,7 @@ const StoreManagement = () => {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/reviews/manage`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
       if (response.ok) {
@@ -257,9 +253,9 @@ const StoreManagement = () => {
         `${import.meta.env.VITE_API_URL}/api/stores/${store._id}`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         }
@@ -306,9 +302,9 @@ const StoreManagement = () => {
         `${import.meta.env.VITE_API_URL}/api/stores/${store._id}/profile-image`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         }
@@ -365,9 +361,9 @@ const StoreManagement = () => {
         }/verification-docs`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         }
@@ -539,9 +535,9 @@ const StoreManagement = () => {
           `${import.meta.env.VITE_API_URL}/api/reviews/${reviewId}/visibility`,
           {
             method: "PUT",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify({ isVisible }),
           }
@@ -567,9 +563,9 @@ const StoreManagement = () => {
         `${import.meta.env.VITE_API_URL}/api/reviews/${reviewId}/respond`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({ message }),
         }

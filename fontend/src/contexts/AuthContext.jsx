@@ -1,4 +1,4 @@
-﻿﻿﻿import React, { createContext, useContext, useState, useEffect } from "react";
+﻿﻿import React, { createContext, useContext, useState, useEffect } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -21,22 +21,18 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetchUser(token);
-    } else {
-      setLoading(false);
-    }
+    // Check if user is authenticated by trying to fetch user data
+    // No need to check localStorage anymore - cookies are handled automatically
+    fetchUser();
   }, []);
 
-  const fetchUser = async (token) => {
+  const fetchUser = async () => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/auth/me`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          method: "GET",
+          credentials: "include", // Include cookies in the request
         }
       );
 
@@ -44,11 +40,12 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         setUser(data.user);
       } else {
-        localStorage.removeItem("token");
+        // Token is invalid or expired, user will remain null
+        setUser(null);
       }
     } catch (error) {
       console.error("Error fetching user:", error);
-      localStorage.removeItem("token");
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -56,6 +53,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      // First try Firebase sign-in
+      try {
+        await signInWithEmailAndPassword(firebaseAuth, email, password);
+      } catch (firebaseError) {
+        return { success: false, error: "Firebase login failed" };
+      }
+
+      // Then proceed with backend login
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/auth/login`,
         {
@@ -63,6 +68,7 @@ export const AuthProvider = ({ children }) => {
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include", // Include cookies
           body: JSON.stringify({ email, password }),
         }
       );
@@ -73,15 +79,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error };
       }
 
-      // ✅ First try Firebase sign-in
-      try {
-        await signInWithEmailAndPassword(firebaseAuth, email, password);
-      } catch (firebaseError) {
-        return { success: false, error: "Firebase login failed" };
-      }
-
-      // ✅ Then proceed only if Firebase login succeeds
-      localStorage.setItem("token", data.token);
+      // Cookie is automatically set by the server
       setUser(data.user);
       return { success: true };
     } catch (error) {
@@ -91,21 +89,21 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      // ✅ First create user in Firebase
+      // First create user in Firebase
       await createUserWithEmailAndPassword(
         firebaseAuth,
         userData.email,
         userData.password
       );
 
-      // ✅ Optionally sign in to Firebase (not strictly necessary if already signed in)
+      // Sign in to Firebase
       await signInWithEmailAndPassword(
         firebaseAuth,
         userData.email,
         userData.password
       );
 
-      // ✅ Then register user in your backend
+      // Then register user in your backend
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/auth/register`,
         {
@@ -113,6 +111,7 @@ export const AuthProvider = ({ children }) => {
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include", // Include cookies
           body: JSON.stringify(userData),
         }
       );
@@ -120,11 +119,11 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem("token", data.token);
+        // Cookie is automatically set by the server
         setUser(data.user);
         return { success: true };
       } else {
-        // Optionally clean up Firebase user if backend registration fails
+        // Clean up Firebase user if backend registration fails
         const currentUser = firebaseAuth.currentUser;
         if (currentUser) {
           await currentUser.delete();
@@ -137,16 +136,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshUser = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/auth/me`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          method: "GET",
+          credentials: "include", // Include cookies
         }
       );
 
@@ -154,32 +149,69 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         setUser(data.user);
       } else {
-        localStorage.removeItem("token");
+        // Token is invalid or expired
         setUser(null);
       }
     } catch (error) {
       console.error("Error refreshing user:", error);
-      localStorage.removeItem("token");
       setUser(null);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setUser(null);
-    firebaseSignOut(firebaseAuth);
+  const logout = async () => {
+    try {
+      // Call backend logout to clear the cookie
+      await fetch(`${import.meta.env.VITE_API_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include", // Include cookies
+      });
+    } catch (error) {
+      console.error("Error during logout:", error);
+    } finally {
+      // Clear local state regardless of backend response
+      setUser(null);
+      // Sign out from Firebase
+      firebaseSignOut(firebaseAuth);
+    }
+  };
+
+  // Switch role function (if needed)
+  const switchRole = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/switch-role`,
+        {
+          method: "PUT",
+          credentials: "include", // Include cookies
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update user with new role
+        setUser((prevUser) => ({
+          ...prevUser,
+          role: data.role,
+        }));
+        return { success: true, role: data.role };
+      } else {
+        const data = await response.json();
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      return { success: false, error: "Network error" };
+    }
   };
 
   const value = {
-  user,
-  token: localStorage.getItem("token"), // ✅ Expose token to NotificationContext
-  login,
-  register,
-  logout,
-  refreshUser,
-  loading,
-};
-
+    user,
+    login,
+    register,
+    logout,
+    refreshUser,
+    switchRole,
+    loading,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

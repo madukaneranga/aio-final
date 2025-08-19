@@ -78,8 +78,8 @@ const StoreInfo = ({
 
       const response = await fetch(`/api/stores/${storeData._id}/follow`, {
         method: "POST",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
@@ -115,8 +115,8 @@ const StoreInfo = ({
 
       const response = await fetch(`/api/stores/${storeData._id}/follow`, {
         method: "POST",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });

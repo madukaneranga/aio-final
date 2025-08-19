@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import SearchHistory from "./SearchHistory";
+
 
 const userSchema = new mongoose.Schema({
   name: {

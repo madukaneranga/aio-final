@@ -38,9 +38,7 @@ const useUserPackage = () => {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/users/usage-summary`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 

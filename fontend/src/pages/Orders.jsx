@@ -47,9 +47,7 @@ const Orders = () => {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}${endpoint}`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 
@@ -70,9 +68,9 @@ const Orders = () => {
         `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({ status, notes }),
         }
@@ -94,9 +92,9 @@ const Orders = () => {
         `${import.meta.env.VITE_API_URL}/api/payments/${orderId}/cancel`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({ status: "cancelled" }),
         }
@@ -127,9 +125,9 @@ const Orders = () => {
         `${import.meta.env.VITE_API_URL}/api/reviews`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
             storeId:

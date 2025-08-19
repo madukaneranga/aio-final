@@ -3,33 +3,66 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
+import cookieParser from "cookie-parser";
 
-
-// --- Express setup ---
+// --- Express App Setup ---
 const app = express();
 
-// Globals for __dirname, used for static files
+// Globals for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Middleware
-app.use(
-  cors({
-    credentials: true,
-    origin: process.env.CLIENT_URL || "*",
-  })
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// --- CORS Configuration ---
+const allowedOrigins = [
+  'http://localhost:5173',    // Vite dev server
+  'http://localhost:3000',    // React/Next.js dev
+  'http://127.0.0.1:5173',    // Alternative localhost
+  process.env.CLIENT_URL,     // Production frontend URL
+  process.env.FRONTEND_URL,   // Alternative env var
+].filter(Boolean); // Remove undefined values
 
+const corsOptions = {
+  origin: allowedOrigins,
+  credentials: true,          // Allow cookies
+  optionsSuccessStatus: 200,  // Legacy browser support
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Accept',
+    'X-Requested-With',
+    'Origin',
+    'Cache-Control'
+  ],
+  exposedHeaders: ['Set-Cookie'], // Allow frontend to see cookie headers
+};
+
+// --- Global Middleware ---
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cookieParser());
+
+// --- Development Logging ---
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - Origin: ${req.get('Origin')}`);
+    next();
+  });
+}
+
+// --- Health Check ---
 app.get("/ping", (req, res) => {
-  res.send("pong");
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
-// Serve uploaded files
+// --- Static File Serving ---
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// --- Routes (import and use them) ---
+// --- API Routes ---
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import storeRoutes from "./routes/stores.js";
@@ -53,9 +86,10 @@ import categoriesRoutes from "./routes/categories.js";
 import postRoutes from "./routes/posts.js";
 import flashDealRoutes from "./routes/flashDeals.js";
 
-import { errorHandler, notFound } from "./middleware/errorHandler.js";
+// Route Registration
+console.log("🔗 Registering API routes...");
+console.log("🌐 CORS origins configured:", allowedOrigins);
 
-console.log("Registering API routes");
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/stores", storeRoutes);
@@ -70,37 +104,37 @@ app.use("/api/commissions", commissionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
-app.use("/sitemap.xml", sitemapRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/email-subscriptions", emailSubscriptionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/posts", postRoutes);
-app.use('/api/flash-deals', flashDealRoutes);
+app.use("/api/flash-deals", flashDealRoutes);
 
+// Special routes
+app.use("/sitemap.xml", sitemapRoutes);
 
-// React frontend serving
+// --- Frontend Serving (Production) ---
 const distPath = path.resolve(__dirname, "../dist");
 const indexHtmlPath = path.join(distPath, "index.html");
 
 if (existsSync(indexHtmlPath)) {
+  console.log("📦 Serving frontend build from:", distPath);
   app.use(express.static(distPath));
-  app.get(/^\/(?!api).*/, (req, res) => {
+  
+  // Catch-all handler for React Router
+  app.get(/^\/(?!api|sitemap\.xml|uploads).*/, (req, res) => {
     res.sendFile(indexHtmlPath);
   });
+} else {
+  console.log("⚠️  Frontend build not found - API only mode");
 }
 
-app.get(/^\/(?!api|sitemap\.xml).*/, (req, res) => {
-  res.sendFile(indexHtmlPath);
-});
+// --- Error Handling ---
+import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
-// Error handling
 app.use(notFound);
 app.use(errorHandler);
-
-app.get("/ping", (req, res) => {
-  res.send("pong");
-});
 
 export default app;

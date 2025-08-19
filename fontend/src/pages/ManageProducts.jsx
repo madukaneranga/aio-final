@@ -36,9 +36,7 @@ const ManageProducts = () => {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/products?storeId=${user.storeId}`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 
@@ -64,9 +62,7 @@ const ManageProducts = () => {
         `${import.meta.env.VITE_API_URL}/api/products/${productId}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 
@@ -117,9 +113,9 @@ const ManageProducts = () => {
         `${import.meta.env.VITE_API_URL}/api/products/${editingProduct._id}`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         }

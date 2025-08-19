@@ -36,9 +36,7 @@ const Pricing = ({ selectedPackage, setSelectedPackage,  isUpgrade = false }) =>
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/packages`,
           {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
+            credentials: "include",
           }
         );
         if (!res.ok) throw new Error("Failed to fetch packages");

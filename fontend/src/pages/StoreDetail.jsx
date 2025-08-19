@@ -102,10 +102,7 @@ const StoreDetail = () => {
       }/api/stores/${id}/follow-check`;
 
       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        credentials: "include",
       });
 
       if (!response.ok) {

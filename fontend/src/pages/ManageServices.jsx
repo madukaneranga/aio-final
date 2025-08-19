@@ -26,9 +26,7 @@ const ManageServices = () => {
     try {
       setLoading(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services?storeId=${user.storeId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        credentials: "include",
       });
       
       if (response.ok) {
@@ -51,9 +49,7 @@ const ManageServices = () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services/${serviceId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -94,9 +90,9 @@ const ManageServices = () => {
 
     const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services/${editingService._id}`, {
       method: 'PUT',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
       body: JSON.stringify(updates)
     });

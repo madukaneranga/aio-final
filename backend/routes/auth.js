@@ -7,6 +7,27 @@ import { authenticate } from '../middleware/auth.js';
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Cookie configuration
+const COOKIE_OPTIONS = {
+  httpOnly: true,        // Prevents XSS attacks
+  secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+  sameSite: 'strict',    // CSRF protection
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+  path: '/'
+};
+
+// Helper function to generate and set JWT cookie
+const setTokenCookie = (res, userId) => {
+  const token = jwt.sign(
+    { userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  
+  res.cookie('token', token, COOKIE_OPTIONS);
+  return token;
+};
+
 // Register
 router.post('/register', async (req, res) => {
   try {
@@ -28,15 +49,10 @@ router.post('/register', async (req, res) => {
 
     await user.save();
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Set token cookie
+    setTokenCookie(res, user._id);
 
     res.status(201).json({
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -66,15 +82,10 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Set token cookie
+    setTokenCookie(res, user._id);
 
     res.json({
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -116,15 +127,10 @@ router.post('/google', async (req, res) => {
       await user.save();
     }
 
-    // Generate token
-    const jwtToken = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // Set token cookie
+    setTokenCookie(res, user._id);
 
     res.json({
-      token: jwtToken,
       user: {
         id: user._id,
         name: user.name,
@@ -186,6 +192,28 @@ router.put('/switch-role', authenticate, async (req, res) => {
   }
 });
 
+// Logout
+router.post('/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/'
+  });
+  
+  res.json({ message: 'Logged out successfully' });
+});
 
+// Refresh token (optional - extends session)
+router.post('/refresh', authenticate, (req, res) => {
+  try {
+    // Set new token cookie with extended expiry
+    setTokenCookie(res, req.user._id);
+    
+    res.json({ message: 'Token refreshed successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 export default router;

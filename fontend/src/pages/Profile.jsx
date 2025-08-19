@@ -40,9 +40,7 @@ const Profile = () => {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/users/profile`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 
@@ -103,9 +101,9 @@ const Profile = () => {
         `${import.meta.env.VITE_API_URL}/api/users/profile`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         }

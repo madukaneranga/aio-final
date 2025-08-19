@@ -67,14 +67,6 @@ const CommentSidebar = ({
     }
   }, [isOpen, postId, currentPostId, commentsLoaded, loading]);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    };
-  };
-
   const loadComments = async (pageNum = 1, targetPostId = postId) => {
     if (!targetPostId) return;
 
@@ -87,7 +79,7 @@ const CommentSidebar = ({
       const response = await fetch(
         `/api/posts/${targetPostId}/comments?page=${pageNum}&limit=20`,
         {
-          headers: getAuthHeaders(),
+          credentials: "include",
         }
       );
 
@@ -103,12 +95,12 @@ const CommentSidebar = ({
       console.log("Comments data:", data);
 
       // Process comments
-      const processedComments = (data.comments || []).map(comment => {
+      const processedComments = (data.comments || []).map((comment) => {
         return {
           ...comment,
           replyCount: comment.replyCount || 0,
           replies: [], // Start with empty replies array
-          repliesLoaded: false // Mark as not loaded initially
+          repliesLoaded: false, // Mark as not loaded initially
         };
       });
 
@@ -153,16 +145,19 @@ const CommentSidebar = ({
       const response = await fetch(
         `/api/posts/comments/${commentId}/replies?page=1&limit=10`,
         {
-          headers: getAuthHeaders(),
+          credentials: "include",
         }
       );
-      
       console.log(`Response status: ${response.status}`);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.log(`❌ Failed to load replies. Status: ${response.status}, Error: ${errorText}`);
-        throw new Error(`Failed to load replies (${response.status}): ${errorText}`);
+        console.log(
+          `❌ Failed to load replies. Status: ${response.status}, Error: ${errorText}`
+        );
+        throw new Error(
+          `Failed to load replies (${response.status}): ${errorText}`
+        );
       }
 
       const data = await response.json();
@@ -176,36 +171,36 @@ const CommentSidebar = ({
       setComments((prev) =>
         prev.map((comment) =>
           comment._id === commentId
-            ? { 
-                ...comment, 
-                replies: replies, 
+            ? {
+                ...comment,
+                replies: replies,
                 repliesLoaded: true,
                 repliesLoading: false,
                 repliesError: false,
-                replyCount: replies.length > 0 ? replies.length : comment.replyCount,
+                replyCount:
+                  replies.length > 0 ? replies.length : comment.replyCount,
               }
             : comment
         )
       );
 
       setShowReplies((prev) => ({ ...prev, [commentId]: true }));
-      
+
       console.log("=== REPLIES LOADED SUCCESSFULLY ===");
-      
     } catch (error) {
       console.error("=== FAILED TO LOAD REPLIES ===");
       console.error("Error details:", error);
-      
+
       // Show error state in UI
       setComments((prev) =>
         prev.map((comment) =>
           comment._id === commentId
-            ? { 
-                ...comment, 
+            ? {
+                ...comment,
                 repliesError: true,
                 repliesLoaded: true,
                 repliesLoading: false,
-                errorMessage: error.message
+                errorMessage: error.message,
               }
             : comment
         )
@@ -228,7 +223,10 @@ const CommentSidebar = ({
 
       const response = await fetch(`/api/posts/${currentPostId}/comment`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
         body: JSON.stringify({
           text: newComment.trim(),
           parentComment: replyingTo,
@@ -254,7 +252,7 @@ const CommentSidebar = ({
               ? {
                   ...comment,
                   replyCount: (comment.replyCount || 0) + 1,
-                  replies: comment.repliesLoaded 
+                  replies: comment.repliesLoaded
                     ? [data.comment, ...(comment.replies || [])]
                     : [], // Only add to local state if replies are already loaded
                   repliesLoaded: comment.repliesLoaded || false,
@@ -262,9 +260,9 @@ const CommentSidebar = ({
               : comment
           )
         );
-        
+
         // Show replies if they were already loaded
-        const parentComment = comments.find(c => c._id === replyingTo);
+        const parentComment = comments.find((c) => c._id === replyingTo);
         if (parentComment && parentComment.repliesLoaded) {
           setShowReplies((prev) => ({ ...prev, [replyingTo]: true }));
         }
@@ -296,7 +294,7 @@ const CommentSidebar = ({
     try {
       const response = await fetch(`/api/posts/comments/${commentId}/like`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -359,7 +357,10 @@ const CommentSidebar = ({
         `/api/posts/comments/${commentId}/reaction`,
         {
           method: "POST",
-          headers: getAuthHeaders(),
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({ reactionType }),
         }
       );
@@ -518,10 +519,11 @@ const CommentSidebar = ({
                   disabled={comment.repliesLoading}
                   className="text-xs font-semibold text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50"
                 >
-                  {comment.repliesLoading 
-                    ? "Loading..." 
-                    : `View ${comment.replyCount} ${comment.replyCount === 1 ? "reply" : "replies"}`
-                  }
+                  {comment.repliesLoading
+                    ? "Loading..."
+                    : `View ${comment.replyCount} ${
+                        comment.replyCount === 1 ? "reply" : "replies"
+                      }`}
                 </button>
               ) : (
                 <div>
@@ -530,7 +532,9 @@ const CommentSidebar = ({
                       <p className="text-red-400 text-xs mb-2">
                         Failed to load replies
                         {comment.errorMessage && (
-                          <span className="block text-gray-500">({comment.errorMessage})</span>
+                          <span className="block text-gray-500">
+                            ({comment.errorMessage})
+                          </span>
                         )}
                       </p>
                       <button
@@ -539,17 +543,20 @@ const CommentSidebar = ({
                           setComments((prev) =>
                             prev.map((c) =>
                               c._id === comment._id
-                                ? { 
-                                    ...c, 
-                                    repliesError: false, 
+                                ? {
+                                    ...c,
+                                    repliesError: false,
                                     repliesLoaded: false,
                                     repliesLoading: false,
-                                    errorMessage: null 
+                                    errorMessage: null,
                                   }
                                 : c
                             )
                           );
-                          setShowReplies((prev) => ({ ...prev, [comment._id]: false }));
+                          setShowReplies((prev) => ({
+                            ...prev,
+                            [comment._id]: false,
+                          }));
                           loadReplies(comment._id);
                         }}
                         className="text-gray-300 hover:text-gray-100 text-xs font-semibold"
@@ -568,7 +575,12 @@ const CommentSidebar = ({
                         />
                       ))}
                       <button
-                        onClick={() => setShowReplies((prev) => ({ ...prev, [comment._id]: false }))}
+                        onClick={() =>
+                          setShowReplies((prev) => ({
+                            ...prev,
+                            [comment._id]: false,
+                          }))
+                        }
                         className="text-xs font-semibold text-gray-400 hover:text-gray-200 transition-colors mt-2"
                       >
                         Hide replies

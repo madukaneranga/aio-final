@@ -4,7 +4,6 @@ const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
   //console.log(token);
   return {
-    Authorization: token ? `Bearer ${token}` : "",
     "Content-Type": "application/json",
   };
 };
@@ -22,6 +21,7 @@ const handleResponse = async (response) => {
 export const walletAPI = {
   getSummary: async () => {
     const response = await fetch(`${API_BASE_URL}/api/wallet/summary`, {
+      credentials: "include",
       headers: getAuthHeaders(),
     });
     return handleResponse(response);
@@ -32,6 +32,7 @@ export const walletAPI = {
     const response = await fetch(
       `${API_BASE_URL}/api/wallet/transactions?${queryString}`,
       {
+        credentials: "include",
         headers: getAuthHeaders(),
       }
     );
@@ -41,6 +42,7 @@ export const walletAPI = {
   requestWithdrawal: async (data) => {
     const response = await fetch(`${API_BASE_URL}/api/wallet/withdraw`, {
       method: "POST",
+      credentials: "include",
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
@@ -49,6 +51,7 @@ export const walletAPI = {
 
   getBankDetails: async () => {
     const response = await fetch(`${API_BASE_URL}/api/wallet/bank-details`, {
+      credentials: "include",
       headers: getAuthHeaders(),
     });
     return handleResponse(response);
@@ -57,6 +60,7 @@ export const walletAPI = {
   updateBankDetails: async (data) => {
     const response = await fetch(`${API_BASE_URL}/api/wallet/bank-details`, {
       method: "PUT",
+      credentials: "include",
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
@@ -70,6 +74,7 @@ export const adminAPI = {
     const response = await fetch(
       `${API_BASE_URL}/api/admin/withdrawals/pending?${queryString}`,
       {
+        credentials: "include",
         headers: getAuthHeaders(),
       }
     );
@@ -81,6 +86,7 @@ export const adminAPI = {
     const response = await fetch(
       `${API_BASE_URL}/api/admin/withdrawals?${queryString}`,
       {
+        credentials: "include",
         headers: getAuthHeaders(),
       }
     );
@@ -92,6 +98,7 @@ export const adminAPI = {
       `${API_BASE_URL}/api/admin/withdrawals/${id}/process`,
       {
         method: "PUT",
+        credentials: "include",
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
       }
@@ -104,6 +111,7 @@ export const adminAPI = {
     const response = await fetch(
       `${API_BASE_URL}/api/admin/analytics?${queryString}`,
       {
+        credentials: "include",
         headers: getAuthHeaders(),
       }
     );
