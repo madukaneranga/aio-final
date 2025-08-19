@@ -50,6 +50,7 @@ import NfcCardCustomizer from "./pages/NfcCardCustomizer";
 import Test from "./pages/Test";
 import NewPost from "./pages/NewPost";
 import SocialFeed from "./pages/SocialFeed";
+import CustomSales from "./pages/CustomSales";
 
 import "./App.css";
 
@@ -83,38 +84,102 @@ function App() {
                             <Route path="/stores" element={<Stores />} />
                             <Route path="/products" element={<Products />} />
                             <Route path="/services" element={<Services />} />
-                            <Route path="/product/:id" element={<ProductDetail />} />
-                            <Route path="/service/:id" element={<ServiceDetail />} />
-                            <Route path="/store/:id" element={<StoreDetail />} />
+                            <Route
+                              path="/product/:id"
+                              element={<ProductDetail />}
+                            />
+                            <Route
+                              path="/service/:id"
+                              element={<ServiceDetail />}
+                            />
+                            <Route
+                              path="/store/:id"
+                              element={<StoreDetail />}
+                            />
                             <Route path="/cart" element={<Cart />} />
-                            <Route path="/booking-summary" element={<BookingSummary />} />
+                            <Route
+                              path="/booking-summary"
+                              element={<BookingSummary />}
+                            />
                             <Route path="/checkout" element={<Checkout />} />
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
                             <Route path="/profile" element={<Profile />} />
-                            <Route path="/dashboard" element={<StoreDashboard />} />
-                            <Route path="/create-store" element={<CreateStore />} />
-                            <Route path="/create-product" element={<CreateProduct />} />
-                            <Route path="/create-service" element={<CreateService />} />
-                            <Route path="/manage-products" element={<ManageProducts />} />
-                            <Route path="/manage-services" element={<ManageServices />} />
+                            <Route
+                              path="/dashboard"
+                              element={<StoreDashboard />}
+                            />
+                            <Route
+                              path="/create-store"
+                              element={<CreateStore />}
+                            />
+                            <Route
+                              path="/create-product"
+                              element={<CreateProduct />}
+                            />
+                            <Route
+                              path="/create-service"
+                              element={<CreateService />}
+                            />
+                            <Route
+                              path="/manage-products"
+                              element={<ManageProducts />}
+                            />
+                            <Route
+                              path="/manage-services"
+                              element={<ManageServices />}
+                            />
                             <Route path="/orders" element={<Orders />} />
                             <Route path="/bookings" element={<Bookings />} />
-                            <Route path="/store-management" element={<StoreManagement />} />
-                            <Route path="/sales-analytics" element={<SalesAnalytics />} />
+                            <Route
+                              path="/store-management"
+                              element={<StoreManagement />}
+                            />
+                            <Route
+                              path="/sales-analytics"
+                              element={<SalesAnalytics />}
+                            />
                             <Route path="/admin" element={<Admin />} />
-                            <Route path="/platform-settings" element={<PlatformSettings />} />
-                            <Route path="/help-center" element={<HelpCenter />} />
+                            <Route
+                              path="/platform-settings"
+                              element={<PlatformSettings />}
+                            />
+                            <Route
+                              path="/help-center"
+                              element={<HelpCenter />}
+                            />
                             <Route path="/contact-us" element={<ContactUs />} />
-                            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                            <Route path="/terms-of-service" element={<TermsOfService />} />
-                            <Route path="/notifications" element={<Notifications />} />
-                            <Route path="/admin-withdrawals" element={<AdminWithdrawals />} />
-                            <Route path="/wallet-dashboard" element={<WalletDashboard />} />
-                            <Route path="/sub-management" element={<SubscriptionManagement />} />
+                            <Route
+                              path="/privacy-policy"
+                              element={<PrivacyPolicy />}
+                            />
+                            <Route
+                              path="/terms-of-service"
+                              element={<TermsOfService />}
+                            />
+                            <Route
+                              path="/notifications"
+                              element={<Notifications />}
+                            />
+                            <Route
+                              path="/admin-withdrawals"
+                              element={<AdminWithdrawals />}
+                            />
+                            <Route
+                              path="/wallet-dashboard"
+                              element={<WalletDashboard />}
+                            />
+                            <Route
+                              path="/sub-management"
+                              element={<SubscriptionManagement />}
+                            />
+                            <Route path="/sale" element={<CustomSales />} />
                             <Route path="/test" element={<Test />} />
                             <Route path="/new-post" element={<NewPost />} />
-                            <Route path="/NfcCard" element={<NfcCardCustomizer />} />
+                            <Route
+                              path="/NfcCard"
+                              element={<NfcCardCustomizer />}
+                            />
                             <Route path="*" element={<NotFound />} />
                           </Routes>
                         </main>

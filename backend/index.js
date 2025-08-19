@@ -14,6 +14,16 @@ console.log("Loaded RESEND_API_KEY:", process.env.RESEND_API_KEY);
 const SECRET = process.env.JWT_SECRET;
 
 const server = http.createServer(app);
+/*
+const io = new Server(server, {
+  cors: {
+    origin:"*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true,
+  },
+});
+*/
+
 const io = new Server(server, {
   cors: {
     origin: process.env.CLIENT_URL || "*",

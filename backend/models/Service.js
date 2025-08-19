@@ -79,7 +79,11 @@ const serviceSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-
+  tags: [
+    {
+      type: String,
+    },
+  ],
   stats: {
     totalBookings: {
       type: Number,

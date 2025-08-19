@@ -115,6 +115,12 @@ const productSchema = new mongoose.Schema({
       stock: { type: Number, min: 0 },
     },
   ],
+
+  tags: [
+    {
+      type: String,
+    },
+  ],
 });
 
 productSchema.pre("save", function (next) {

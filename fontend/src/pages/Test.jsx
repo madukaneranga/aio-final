@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
-import ServiceListing from "../components/ServiceListing";
 import ServicesFiltersSidebar from "../components/ServicesFiltersSidebar";
 
 // Custom debounce hook

@@ -1,9 +1,9 @@
-// ============ SERVICES.JSX (FIXED DOUBLE LOADING - ROBUST SOLUTION) ============
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
-import ServicesFiltersSidebar from "../components/ServicesFiltersSidebar";
 import CustomListing from "../components/CustomListing";
+import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
+import FlashDealsBanner from "../components/FlashDealSection";
 
 // Custom debounce hook
 const useDebounce = (value, delay) => {
@@ -48,13 +48,13 @@ const useIntersectionObserver = (callback, options = {}) => {
   return targetRef;
 };
 
-const Services = () => {
+const CustomSales = () => {
   // URL parameter hooks
   const [searchParams] = useSearchParams();
   const location = useLocation();
 
-  // Service data state
-  const [services, setServices] = useState([]);
+  // Product data state
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
@@ -62,9 +62,9 @@ const Services = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalServices, setTotalServices] = useState(0);
-  const [hasMoreServices, setHasMoreServices] = useState(true);
-  const SERVICES_PER_PAGE = 20;
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const PRODUCTS_PER_PAGE = 20;
 
   // Unified filters state
   const [filters, setFilters] = useState({
@@ -73,8 +73,11 @@ const Services = () => {
     subcategory: "",
     childCategory: "",
     priceRange: { min: "", max: "" },
+    stock: "",
     rating: "",
-    duration: "",
+    shipping: "",
+    condition: "",
+    warrantyMonths: "",
   });
 
   // UI state
@@ -83,6 +86,9 @@ const Services = () => {
   // Track initialization state
   const [hasInitialized, setHasInitialized] = useState(false);
   const initializationRef = useRef(false);
+
+  const [flashDeal, setFlashDeal] = useState(null);
+  const [showFlashDeal, setShowFlashDeal] = useState(false);
 
   // Don't debounce on first load to prevent double fetch
   const debouncedFilters = useDebounce(filters, hasInitialized ? 300 : 0);
@@ -103,7 +109,7 @@ const Services = () => {
     const searchFromUrl = searchParams.get("search");
     const categoryFromUrl = searchParams.get("category");
 
-    console.log("=== INITIALIZING SERVICES FROM URL ===");
+    console.log("=== INITIALIZING FROM URL ===");
     console.log("Current URL:", location.pathname + location.search);
     console.log("Search from URL:", searchFromUrl);
     console.log("Category from URL:", categoryFromUrl);
@@ -116,24 +122,27 @@ const Services = () => {
       subcategory: "",
       childCategory: "",
       priceRange: { min: "", max: "" },
+      stock: "",
       rating: "",
-      duration: "",
+      shipping: "",
+      condition: "",
+      warrantyMonths: "",
     };
 
-    console.log("Setting initial service filters:", initialFilters);
+    console.log("Setting initial filters:", initialFilters);
 
     // Set filters and mark as initialized
     setFilters(initialFilters);
     initializationRef.current = true;
 
     // Immediately fetch with initial filters (no debounce)
-    fetchServices(initialFilters, 1, false).then(() => {
+    fetchProducts(initialFilters, 1, false).then(() => {
       setHasInitialized(true);
     });
   }, []); // Empty dependency array - only run once on mount
 
-  // Fetch services function with pagination
-  const fetchServices = async (
+  // Fetch products function with pagination
+  const fetchProducts = async (
     searchFilters = {},
     page = 1,
     append = false
@@ -141,14 +150,14 @@ const Services = () => {
     try {
       if (!append) {
         setLoading(true);
-        setServices([]);
+        setProducts([]);
       } else {
         setLoadingMore(true);
       }
       setError("");
 
       console.log(
-        "Fetching services with filters:",
+        "Fetching products with filters:",
         searchFilters,
         "Page:",
         page
@@ -162,14 +171,17 @@ const Services = () => {
         childCategory: searchFilters.childCategory || "",
         minPrice: searchFilters.priceRange?.min || "",
         maxPrice: searchFilters.priceRange?.max || "",
+        stock: searchFilters.stock || "",
         rating: searchFilters.rating || "",
-        duration: searchFilters.duration || "",
+        shipping: searchFilters.shipping || "",
+        condition: searchFilters.condition || "",
+        warrantyMonths: searchFilters.warrantyMonths || "",
         page: page,
-        limit: SERVICES_PER_PAGE,
+        limit: PRODUCTS_PER_PAGE,
       };
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/services/listing`,
+        `${import.meta.env.VITE_API_URL}/api/products/sale-listing`,
         {
           method: "POST",
           headers: {
@@ -182,30 +194,30 @@ const Services = () => {
       if (response.ok) {
         const data = await response.json();
         console.log(
-          "Services fetched:",
-          data.services.length,
+          "Products fetched:",
+          data.products.length,
           "items",
           "Total:",
           data.total
         );
 
         if (append) {
-          setServices((prev) => [...prev, ...data.services]);
+          setProducts((prev) => [...prev, ...data.products]);
         } else {
-          setServices(data.services);
+          setProducts(data.products);
         }
 
-        setTotalServices(data.total);
-        setHasMoreServices(
-          data.services.length === SERVICES_PER_PAGE && data.hasMore
+        setTotalProducts(data.total);
+        setHasMoreProducts(
+          data.products.length === PRODUCTS_PER_PAGE && data.hasMore
         );
         setCurrentPage(page);
       } else {
-        setError("Failed to fetch services");
+        setError("Failed to fetch products");
         console.error("API Error:", response.status, response.statusText);
       }
     } catch (error) {
-      console.error("Error fetching services:", error);
+      console.error("Error fetching products:", error);
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -213,13 +225,13 @@ const Services = () => {
     }
   };
 
-  // Load more services
-  const loadMoreServices = useCallback(() => {
-    if (!loadingMore && hasMoreServices && !loading) {
+  // Load more products
+  const loadMoreProducts = useCallback(() => {
+    if (!loadingMore && hasMoreProducts && !loading) {
       const nextPage = currentPage + 1;
-      fetchServices(debouncedFilters, nextPage, true);
+      fetchProducts(debouncedFilters, nextPage, true);
     }
-  }, [loadingMore, hasMoreServices, loading, currentPage, debouncedFilters]);
+  }, [loadingMore, hasMoreProducts, loading, currentPage, debouncedFilters]);
 
   // Intersection observer for infinite scroll
   const loadMoreRef = useIntersectionObserver(
@@ -227,10 +239,10 @@ const Services = () => {
       (entries) => {
         const [entry] = entries;
         if (entry.isIntersecting) {
-          loadMoreServices();
+          loadMoreProducts();
         }
       },
-      [loadMoreServices]
+      [loadMoreProducts]
     )
   );
 
@@ -238,12 +250,9 @@ const Services = () => {
   useEffect(() => {
     // Only respond to filter changes after initial load
     if (hasInitialized && initializationRef.current) {
-      console.log(
-        "Service filter changed after initialization:",
-        debouncedFilters
-      );
+      console.log("Filter changed after initialization:", debouncedFilters);
       setCurrentPage(1);
-      fetchServices(debouncedFilters, 1, false);
+      fetchProducts(debouncedFilters, 1, false);
     }
   }, [debouncedFilters, hasInitialized]);
 
@@ -261,7 +270,29 @@ const Services = () => {
 
   useEffect(() => {
     loadCategories();
+    fetchFlashDeal();
   }, []);
+
+  const fetchFlashDeal = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/flash-deals/current`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setFlashDeal(result.data);
+          setShowFlashDeal(true);
+        }
+      } else {
+        setShowFlashDeal(false);
+      }
+    } catch (error) {
+      console.error("Error fetching flash deal:", error);
+      setShowFlashDeal(false);
+    }
+  };
 
   // Filter update functions
   const updateFilter = useCallback((key, value) => {
@@ -291,8 +322,11 @@ const Services = () => {
       subcategory: "",
       childCategory: "",
       priceRange: { min: "", max: "" },
+      stock: "",
       rating: "",
-      duration: "",
+      shipping: "",
+      condition: "",
+      warrantyMonths: "",
     });
   }, []);
 
@@ -301,7 +335,7 @@ const Services = () => {
     e?.preventDefault?.();
 
     // Force immediate search without debounce
-    fetchServices(filters, 1, false);
+    fetchProducts(filters, 1, false);
   };
 
   // Check for active filters
@@ -312,8 +346,11 @@ const Services = () => {
       filters.childCategory ||
       filters.priceRange.min ||
       filters.priceRange.max ||
+      filters.stock ||
       filters.rating ||
-      filters.duration
+      filters.shipping ||
+      filters.condition ||
+      filters.warrantyMonths
   );
 
   const activeFiltersCount = [
@@ -323,173 +360,87 @@ const Services = () => {
     filters.childCategory,
     filters.priceRange.min,
     filters.priceRange.max,
+    filters.stock,
     filters.rating,
-    filters.duration,
+    filters.shipping,
+    filters.condition,
+    filters.warrantyMonths,
   ].filter(Boolean).length;
 
+  const getFlashDealProps = () => {
+    if (!flashDeal) return null;
+
+    const { timeRemaining, saleStatus } = flashDeal;
+
+    if (saleStatus === "upcoming") {
+      return {
+        saleStartsInHours: timeRemaining.hours,
+        saleStartsInMinutes: timeRemaining.minutes,
+        saleStartsInSeconds: timeRemaining.seconds,
+        saleEndsInHours: 0,
+        saleEndsInMinutes: 0,
+        saleEndsInSeconds: 0,
+        timerLabel: flashDeal.timerLabel,
+      };
+    } else {
+      return {
+        saleStartsInHours: 0,
+        saleStartsInMinutes: 0,
+        saleStartsInSeconds: 0,
+        saleEndsInHours: timeRemaining.hours,
+        saleEndsInMinutes: timeRemaining.minutes,
+        saleEndsInSeconds: timeRemaining.seconds,
+        timerLabel: "Sale Ends In:",
+      };
+    }
+  };
+
+  const flashDealProps = getFlashDealProps();
+
   // Calculate display range for results counter
-  const startResult = services.length > 0 ? 1 : 0;
-  const endResult = services.length;
+  const startResult = products.length > 0 ? 1 : 0;
+  const endResult = products.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Services</h1>
-
-          {/* Search Filters */}
-          <div className="space-y-4">
-            {/* Breadcrumb */}
-            {(filters.subcategory || filters.childCategory) && (
-              <nav
-                aria-label="breadcrumb"
-                className="text-sm text-gray-600 mt-2 select-none"
-              >
-                <ol className="list-reset flex space-x-2">
-                  {filters.category && (
-                    <li>
-                      {categories.find(
-                        (c) => c.name.toString() === filters.category
-                      )?.name || "Category"}
-                    </li>
-                  )}
-                  {filters.subcategory && (
-                    <>
-                      <li>→</li>
-                      <li>{filters.subcategory}</li>
-                    </>
-                  )}
-                  {filters.childCategory && (
-                    <>
-                      <li>→</li>
-                      <li>{filters.childCategory}</li>
-                    </>
-                  )}
-                </ol>
-              </nav>
-            )}
-
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => {
-                    updateFilter("search", e.target.value);
-                    console.log("Search query changed to:", e.target.value);
-                  }}
-                  placeholder="Search services..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                Search
-              </button>
-            </form>
-
-            {/* Elegant Results Counter */}
-            {!loading && (
-              <div className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl shadow-sm">
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2 text-gray-700">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium">
-                      Showing {startResult.toLocaleString()}-
-                      {endResult.toLocaleString()} of{" "}
-                      {totalServices.toLocaleString()} results
-                    </span>
-                  </div>
-                  {hasActiveFilters && (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-                      <span className="text-xs text-gray-500 font-medium">
-                        {activeFiltersCount} filter
-                        {activeFiltersCount !== 1 ? "s" : ""} applied
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {hasMoreServices && (
-                  <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <div className="animate-pulse w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span>More available</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Filters Side Drawer */}
-            <ServicesFiltersSidebar
-              showFilters={showFilters}
-              setShowFilters={setShowFilters}
-              categorySet={categories}
-              filters={filters}
-              updateFilter={updateFilter}
-              updateFilters={updateFilters}
-              clearAllFilters={clearAllFilters}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Floating Filter Button */}
-      {!showFilters && (
-        <button
-          onClick={() => setShowFilters(true)}
-          className="
-            fixed 
-            left-0 
-            top-1/2 
-            -translate-y-1/2
-            z-40 
-            bg-gradient-to-b from-black via-gray-800 to-white
-            text-white px-3 py-6 rounded-r-xl shadow-xl 
-            flex flex-col items-center justify-center space-y-2
-            hover:scale-105 hover:shadow-2xl transition-all duration-300 ease-out
-            border border-gray-700
-            writing-mode-vertical
-            min-h-[120px]
-          "
-        >
-          <Filter className="w-5 h-5" />
-
-          <span
-            className="font-medium text-sm transform -rotate-90 whitespace-nowrap"
-            style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-          >
-            Filters
-          </span>
-
-          {hasActiveFilters && (
-            <span className="bg-white text-black text-xs font-semibold px-2 py-1 rounded-full shadow-md min-w-[24px] text-center">
-              {activeFiltersCount}
-            </span>
-          )}
-        </button>
+      {showFlashDeal && flashDeal && flashDealProps && (
+        <section className="py-0 bg-white">
+          <FlashDealsBanner
+            // Timer props from backend
+            {...flashDealProps}
+            // Content from backend
+            saleName={flashDeal.saleName}
+            saleSubtitle={flashDeal.saleSubtitle}
+            discountText={flashDeal.discountText}
+            buttonText={flashDeal.buttonText}
+            // Design from backend
+            backgroundColor={flashDeal.backgroundColor}
+            backgroundImage={flashDeal.backgroundImage}
+            textColor={flashDeal.textColor}
+            accentColor={flashDeal.accentColor}
+            // Image from backend
+            heroImage={flashDeal.heroImage}
+            showHeroImage={flashDeal.showHeroImage}
+            onPage={true}
+          />
+        </section>
       )}
 
-      {/* Services Content */}
-      {services && (
+
+      {/* Products Content */}
+      {products && (
         <CustomListing
-          items={services}
+          items={products}
           loading={loading}
           error={error}
-          type="service"
+          type="product"
         />
       )}
 
       {/* Elegant Load More Section */}
-      {!loading && services.length > 0 && (
+      {!loading && products.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {hasMoreServices ? (
+          {hasMoreProducts ? (
             <div
               ref={loadMoreRef}
               className="flex flex-col items-center justify-center py-12 space-y-6"
@@ -508,20 +459,20 @@ const Services = () => {
                   </div>
                   <div className="text-center">
                     <p className="text-gray-600 font-medium">
-                      Loading more services...
+                      Loading more products...
                     </p>
                     <p className="text-sm text-gray-400">
-                      Finding the perfect services for you
+                      Finding the perfect items for you
                     </p>
                   </div>
                 </div>
               ) : (
                 <button
-                  onClick={loadMoreServices}
+                  onClick={loadMoreProducts}
                   className="group relative overflow-hidden bg-gradient-to-r from-gray-900 to-black text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 ease-out"
                 >
                   <span className="relative z-10 flex items-center space-x-2">
-                    <span>Load More Services</span>
+                    <span>Load More Products</span>
                     <ChevronDown className="w-5 h-5 group-hover:animate-bounce" />
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-black to-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -539,8 +490,8 @@ const Services = () => {
                   You've seen it all! ✨
                 </h3>
                 <p className="text-gray-600 max-w-md">
-                  That's every service we have matching your criteria. Try
-                  adjusting your filters to discover more amazing services.
+                  That's every product we have matching your criteria. Try
+                  adjusting your filters to discover more amazing items.
                 </p>
               </div>
             </div>
@@ -549,7 +500,7 @@ const Services = () => {
       )}
 
       {/* Empty State */}
-      {!loading && services.length === 0 && !error && (
+      {!loading && products.length === 0 && !error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center space-y-6">
             <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto shadow-lg">
@@ -557,10 +508,10 @@ const Services = () => {
             </div>
             <div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                No services found
+                No products found
               </h3>
               <p className="text-gray-600 max-w-md mx-auto mb-6">
-                We couldn't find any services matching your search criteria. Try
+                We couldn't find any products matching your search criteria. Try
                 adjusting your filters or search terms.
               </p>
               {hasActiveFilters && (
@@ -580,4 +531,4 @@ const Services = () => {
   );
 };
 
-export default Services;
+export default CustomSales;

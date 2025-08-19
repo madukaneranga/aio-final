@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 
 const Home = () => {
-  const [productsOnSale, seProductsOnSale] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [featuredServices, setFeaturedServices] = useState([]);
   const [featuredStores, setFeaturedStores] = useState([]);
@@ -36,10 +35,9 @@ const Home = () => {
 
   const fetchFeaturedContent = async () => {
     try {
-      const [productsRes, productsOnSaleRes, servicesRes, storesRes] =
+      const [productsRes, servicesRes, storesRes] =
         await Promise.all([
           fetch(`${import.meta.env.VITE_API_URL}/api/products`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/products/on-sale`),
           fetch(`${import.meta.env.VITE_API_URL}/api/services`),
           fetch(`${import.meta.env.VITE_API_URL}/api/stores/featured/list`),
         ]);
@@ -51,15 +49,6 @@ const Home = () => {
         } catch (error) {
           console.error("Error parsing products JSON:", error);
           setFeaturedProducts([]);
-        }
-      }
-      if (productsOnSaleRes.ok) {
-        try {
-          const productsOnSale = await productsOnSaleRes.json();
-          seProductsOnSale(productsOnSale.slice(0, 12));
-        } catch (error) {
-          console.error("Error parsing products JSON:", error);
-          seProductsOnSale([]);
         }
       }
 
@@ -195,34 +184,7 @@ const Home = () => {
         ]}
       />
 
-      {productsOnSale?.length > 0 && (
-        <section className="py-20 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">On Sale</h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                Handpicked premium products from top-rated stores
-              </p>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {productsOnSale.map((product) => (
-                <ProductCard key={product._id} product={product} />
-              ))}
-            </div>
-
-            <div className="text-center mt-12">
-              <Link
-                to="/products-on-sale"
-                className="inline-flex items-center space-x-2 bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
-              >
-                <span>View All Products</span>
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
       <section className="py-0 bg-white">
         <CategorySection categories={categories} />
       </section>

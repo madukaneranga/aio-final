@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
-import ProductListing from "../components/ProductListing";
+import CustomListing from "../components/CustomListing";
 import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
 
 // Custom debounce hook
@@ -102,7 +102,7 @@ const Products = () => {
   // Initialize filters from URL parameters ONCE on mount
   useEffect(() => {
     if (initializationRef.current) return; // Prevent multiple initializations
-    
+
     const searchFromUrl = searchParams.get("search");
     const categoryFromUrl = searchParams.get("category");
 
@@ -127,16 +127,15 @@ const Products = () => {
     };
 
     console.log("Setting initial filters:", initialFilters);
-    
+
     // Set filters and mark as initialized
     setFilters(initialFilters);
     initializationRef.current = true;
-    
+
     // Immediately fetch with initial filters (no debounce)
     fetchProducts(initialFilters, 1, false).then(() => {
       setHasInitialized(true);
     });
-
   }, []); // Empty dependency array - only run once on mount
 
   // Fetch products function with pagination
@@ -493,7 +492,14 @@ const Products = () => {
       )}
 
       {/* Products Content */}
-      <ProductListing products={products} loading={loading} error={error} />
+      {products  && (
+        <CustomListing
+          items={products}
+          loading={loading}
+          error={error}
+          type="product"
+        />
+      )}
 
       {/* Elegant Load More Section */}
       {!loading && products.length > 0 && (

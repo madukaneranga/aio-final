@@ -118,6 +118,7 @@ router.post("/listing", async (req, res) => {
       query.$or = [
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
+        { tags: { $in: [new RegExp(search, 'i')] } },
       ];
     }
 
@@ -230,6 +231,7 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       childCategory,
       duration,
       images,
+      tags = [],
     } = req.body;
 
     // Verify store ownership
@@ -273,6 +275,7 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       duration: parseInt(duration),
       ownerId: req.user._id,
       storeId: store._id,
+      tags: tags || [],
     });
     await service.save();
     res.status(201).json(service);
@@ -342,7 +345,8 @@ router.delete(
 router.post("/impression", async (req, res) => {
   try {
     const { serviceId } = req.body;
-    if (!serviceId) return res.status(400).json({ message: "Service ID required" });
+    if (!serviceId)
+      return res.status(400).json({ message: "Service ID required" });
 
     await Service.findByIdAndUpdate(
       serviceId,
@@ -354,6 +358,5 @@ router.post("/impression", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 export default router;
