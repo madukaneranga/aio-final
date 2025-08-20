@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../test/testApp.js";
+import app from './testApp.js'
 
 describe("GET /ping", () => {
   it("should return health status", async () => {
