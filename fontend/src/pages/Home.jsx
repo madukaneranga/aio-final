@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import HeroSection from "../components/HeroSection";
 import ProductCard from "../components/ProductCard";
@@ -7,6 +7,7 @@ import StoreCard from "../components/StoreCard";
 import LuxuryHeroSection from "../components/LuxuryHeroSection";
 import CategorySection from "../components/CategorySection";
 import FlashDealsBanner from "../components/FlashDealSection";
+import HeroBanner from "../components/HeroBanner";
 import {
   ArrowRight,
   Package,
@@ -27,6 +28,16 @@ const Home = () => {
   const [flashDeal, setFlashDeal] = useState(null);
   const [showFlashDeal, setShowFlashDeal] = useState(false);
 
+  const shopNowRef = useRef(null);
+  const handlePrimaryButtonClick = () => {
+    shopNowRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    console.log("Explore button clicked");
+  };
+
   useEffect(() => {
     fetchFeaturedContent();
     loadCategories();
@@ -35,12 +46,11 @@ const Home = () => {
 
   const fetchFeaturedContent = async () => {
     try {
-      const [productsRes, servicesRes, storesRes] =
-        await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/api/products`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/services`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/stores/featured/list`),
-        ]);
+      const [productsRes, servicesRes, storesRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/products`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/services`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/stores/featured/list`),
+      ]);
 
       if (productsRes.ok) {
         try {
@@ -87,17 +97,25 @@ const Home = () => {
         `${import.meta.env.VITE_API_URL}/api/flash-deals/current`
       );
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setFlashDeal(result.data);
-          setShowFlashDeal(true);
-        }
+      if (!response.ok) {
+        console.error("Failed to fetch flash deal:", response.statusText);
+        setShowFlashDeal(false);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setFlashDeal(result.data);
+        setShowFlashDeal(true);
       } else {
+        // No deal available
+        setFlashDeal(null);
         setShowFlashDeal(false);
       }
     } catch (error) {
       console.error("Error fetching flash deal:", error);
+      setFlashDeal(null);
       setShowFlashDeal(false);
     }
   };
@@ -175,20 +193,7 @@ const Home = () => {
 
   return (
     <div>
-      {/* Hero Section */}
-      <LuxuryHeroSection
-        images={[
-          "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Fordinary-life-scene-from-mall-america%20(1).jpg?alt=media&token=fdb88ecc-68c6-49fb-8258-a5a3410393ee",
-          "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Ftwo-happy-girls-sweaters-having-fun-with-shopping-trolley-megaphone-white-wall.jpg?alt=media&token=886c6960-8622-4770-9afd-fc8dbcce99e7",
-          "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Felderly-woman-shopping-customer-day.jpg?alt=media&token=db76d51e-5d2b-44b3-b52a-21ee1b0533c0",
-        ]}
-      />
-
-
-      <section className="py-0 bg-white">
-        <CategorySection categories={categories} />
-      </section>
-      {showFlashDeal && flashDeal && flashDealProps && (
+      {showFlashDeal && flashDeal && flashDealProps ? (
         <section className="py-0 bg-white">
           <FlashDealsBanner
             // Timer props from backend
@@ -210,7 +215,17 @@ const Home = () => {
             onButtonClick={handleFlashDealClick}
           />
         </section>
+      ) : (
+        <HeroBanner
+          apiEndpoint={`${import.meta.env.VITE_API_URL}/api/products/trending`}
+          handlePrimaryButtonClick={handlePrimaryButtonClick}
+        />
       )}
+
+      <section className="py-0 bg-white" ref={shopNowRef}>
+        <CategorySection categories={categories} />
+      </section>
+
       {/* Featured Products */}
       <section className="py-5 bg-gray-50">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">

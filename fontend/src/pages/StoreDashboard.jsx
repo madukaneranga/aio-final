@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { formatLKR } from "../utils/currency";
 import {
@@ -50,17 +50,17 @@ const StoreDashboard = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (user?.role === "store_owner" && user?.storeId) {
-      fetchDashboardData();
-    }
+    if (user?.role !== "store_owner") return;
+
+    user?.storeId ? fetchDashboardData() : navigate("/create-store");
   }, [user]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     loadUsage();
-
 
     try {
       // --- Store ---

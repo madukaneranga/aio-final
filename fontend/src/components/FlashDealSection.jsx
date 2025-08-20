@@ -33,7 +33,7 @@ const FlashDealsBanner = ({
     {
       id: 1,
       image:
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&h=150&fit=crop",
+        "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/sales%2Fsale.png?alt=media&token=131461b9-f22b-41fc-b8e8-3d467401d3d7",
       title: "Top deals",
       price: "LKR926.18",
       category: "Electronics",
@@ -41,7 +41,7 @@ const FlashDealsBanner = ({
     {
       id: 2,
       image:
-        "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=200&h=150&fit=crop",
+        "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/sales%2Fsale.png?alt=media&token=131461b9-f22b-41fc-b8e8-3d467401d3d7",
       title: "Tech essentials",
       price: "LKR953.86",
       category: "Gadgets",
@@ -49,7 +49,7 @@ const FlashDealsBanner = ({
     {
       id: 3,
       image:
-        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=150&fit=crop",
+        "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/sales%2Fsale.png?alt=media&token=131461b9-f22b-41fc-b8e8-3d467401d3d7",
       title: "Top deals",
       price: "LKR14,184.05",
       category: "Fashion",
@@ -196,7 +196,7 @@ const FlashDealsBanner = ({
             </p>
 
             {/* CTA Button */}
-            {!onPage && (
+            {!onPage && saleStarted && (
               <Link to={`/sale`}>
                 <button
                   type="button"

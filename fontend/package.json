@@ -13,6 +13,7 @@
     "server:dev": "nodemon ./server/index.js"
   },
   "dependencies": {
+    "@react-three/fiber": "^8.15.19",
     "bcryptjs": "^2.4.3",
     "browser-image-compression": "^2.0.2",
     "cors": "^2.8.5",
@@ -39,6 +40,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "swiper": "^11.0.5",
+    "three": "^0.179.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

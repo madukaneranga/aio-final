@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Product from "../models/Product.js";
 import Store from "../models/Store.js";
-import { authenticate, authorize, optionalAuth} from "../middleware/auth.js";
+import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 import { Console } from "console";
 import { getUserPackage } from "../utils/getUserPackage.js";
 import SearchHistory from "../models/SearchHistory.js";
@@ -37,7 +37,7 @@ const upload = multer({
 });
 
 // Get all active products
-router.get("/",optionalAuth, async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
     const { category, search, minPrice, maxPrice, storeId } = req.query;
     let query = { isActive: true };
@@ -77,7 +77,7 @@ router.get("/",optionalAuth, async (req, res) => {
 });
 
 // Search/filter products via POST
-router.post("/listing",optionalAuth, async (req, res) => {
+router.post("/listing", optionalAuth, async (req, res) => {
   try {
     const {
       search,
@@ -146,7 +146,6 @@ router.post("/listing",optionalAuth, async (req, res) => {
       ];
 
       await saveSearchToHistory(req.user, search.trim());
-
     }
 
     // Price range filter
@@ -370,6 +369,23 @@ router.post("/sale-listing", async (req, res) => {
   }
 });
 
+router.get("/trending", async (req, res) => {
+  try {
+    const limit =  15; 
+
+    const products = await Product.find({ isActive: true })
+      .populate("storeId", "name type")
+      .limit(limit)
+      .lean();
+
+    res.json({ products });
+  } catch (error) {
+    console.error("Trending products error:", error);
+    res.status(500).json({ error: "Failed to fetch trending products" });
+  }
+});
+
+
 // Get product by ID
 router.get("/:id", async (req, res) => {
   try {
@@ -563,21 +579,21 @@ const saveSearchToHistory = async (user, query) => {
   try {
     // Don't save empty or very short queries
     if (!query || query.length < 3) return;
-    
+
     let searchHistory;
-    
+
     if (user.isGuest) {
       // Check if this exact query already exists for this guest recently (last 24 hours)
       const existingSearch = await SearchHistory.findOne({
         guestId: user.guestId,
         query: query,
-        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       });
-      
+
       if (!existingSearch) {
         searchHistory = await SearchHistory.create({
           guestId: user.guestId,
-          query: query
+          query: query,
         });
       }
     } else {
@@ -585,20 +601,19 @@ const saveSearchToHistory = async (user, query) => {
       const existingSearch = await SearchHistory.findOne({
         userId: user._id,
         query: query,
-        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       });
-      
+
       if (!existingSearch) {
         searchHistory = await SearchHistory.create({
           userId: user._id,
-          query: query
+          query: query,
         });
-        
+
         // Add to user's searchHistory array
-        await User.findByIdAndUpdate(
-          user._id,
-          { $push: { searchHistory: searchHistory._id } }
-        );
+        await User.findByIdAndUpdate(user._id, {
+          $push: { searchHistory: searchHistory._id },
+        });
       }
     }
   } catch (error) {

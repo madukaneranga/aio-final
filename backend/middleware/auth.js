@@ -6,9 +6,9 @@ import User from "../models/User.js";
 export const authenticate = async (req, res, next) => {
   try {
     const token = req.cookies.token;
-    console.log("token:", token);
     if (!token) {
-      return res.status(401).json({ error: "No token provided" });
+      return (req.user = null);
+      //return res.status(401).json({ error: "No token provided" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -42,7 +42,9 @@ export const optionalAuth = async (req, res, next) => {
 
     if (!token) {
       // No token provided, set up guest user
-      req.user = await setupGuestUser(req, res);
+      //req.user = await setupGuestUser(req, res);
+      req.user = null;
+
       return next();
     }
 
@@ -51,7 +53,8 @@ export const optionalAuth = async (req, res, next) => {
 
     if (!user) {
       // Invalid user, set up guest user
-      req.user = await setupGuestUser(req, res);
+      //req.user = await setupGuestUser(req, res);
+      req.user = null;
       return next();
     }
 
