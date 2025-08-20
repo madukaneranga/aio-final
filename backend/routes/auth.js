@@ -9,10 +9,10 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Cookie configuration
 const COOKIE_OPTIONS = {
-  httpOnly: true, // Prevents XSS attacks
-  secure: process.env.NODE_ENV === "production", // HTTPS only in production
-  sameSite: "strict", // CSRF protection
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+  httpOnly: true,
+  secure: true, // Must be true for HTTPS
+  sameSite: "none", // Required for cross-domain
+  maxAge: 7 * 24 * 60 * 60 * 1000,
   path: "/",
 };
 
@@ -195,8 +195,11 @@ router.post("/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
+    ...(process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN && {
+      domain: process.env.COOKIE_DOMAIN
+    })
   });
 
   res.json({ message: "Logged out successfully" });
