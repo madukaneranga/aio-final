@@ -92,8 +92,10 @@ import flashDealRoutes from "./routes/flashDeals.js";
 import chatRoutes from "./routes/chats.js";
 
 // Route Registration
-console.log("🔗 Registering API routes...");
-console.log("🌐 CORS origins configured:", allowedOrigins);
+if (process.env.NODE_ENV !== "test") {
+  console.log("🔗 Registering API routes...");
+  console.log("🌐 CORS origins configured:", allowedOrigins);
+}
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -126,14 +128,16 @@ const distPath = path.resolve(__dirname, "../dist");
 const indexHtmlPath = path.join(distPath, "index.html");
 
 if (existsSync(indexHtmlPath)) {
-  console.log("📦 Serving frontend build from:", distPath);
+  if (process.env.NODE_ENV !== "test") {
+    console.log("📦 Serving frontend build from:", distPath);
+  }
   app.use(express.static(distPath));
 
   // Catch-all handler for React Router
   app.get(/^\/(?!api|sitemap\.xml|uploads).*/, (req, res) => {
     res.sendFile(indexHtmlPath);
   });
-} else {
+} else if (process.env.NODE_ENV !== "test") {
   console.log("⚠️  Frontend build not found - API only mode");
 }
 
