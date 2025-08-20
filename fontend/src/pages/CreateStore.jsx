@@ -135,9 +135,9 @@ const CreateStore = () => {
         `${import.meta.env.VITE_API_URL}/api/stores`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         }
@@ -153,9 +153,9 @@ const CreateStore = () => {
         `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
             packageName: selectedPackage,

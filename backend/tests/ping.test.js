@@ -1,12 +1,12 @@
 import request from "supertest";
-import app from "../app.js";
-import { jest } from '@jest/globals';
-
+import app from './testApp.js'
 
 describe("GET /ping", () => {
-  it("should return pong", async () => {
-    const res = await request(app).get("/ping");
+  it("should return health status", async () => {
+    const res = await request(app)
+      .get("/ping")
+      .set("Origin", "http://localhost:5173"); 
     expect(res.statusCode).toBe(200);
-    expect(res.text).toBe("pong");
+    expect(res.body.status).toBe("ok");
   });
 });

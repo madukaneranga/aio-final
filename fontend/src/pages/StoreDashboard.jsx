@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { formatLKR } from "../utils/currency";
 import {
@@ -50,26 +50,24 @@ const StoreDashboard = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (user?.role === "store_owner" && user?.storeId) {
-      fetchDashboardData();
-    }
+    if (user?.role !== "store_owner") return;
+
+    user?.storeId ? fetchDashboardData() : navigate("/create-store");
   }, [user]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     loadUsage();
-    const authHeader = {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    };
 
     try {
       // --- Store ---
       if (user.storeId) {
         const storeResponse = await fetch(
           `${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`,
-          { headers: authHeader }
+          { credentials: "include" }
         );
 
         if (storeResponse.ok) {
@@ -82,7 +80,7 @@ const StoreDashboard = () => {
               `${import.meta.env.VITE_API_URL}/api/products?storeId=${
                 user.storeId
               }`,
-              { headers: authHeader }
+              { credentials: "include" }
             );
             if (productsResponse.ok) {
               const productsData = await productsResponse.json();
@@ -99,7 +97,7 @@ const StoreDashboard = () => {
               `${import.meta.env.VITE_API_URL}/api/services?storeId=${
                 user.storeId
               }`,
-              { headers: authHeader }
+              { credentials: "include" }
             );
             if (servicesResponse.ok) {
               const servicesData = await servicesResponse.json();
@@ -122,7 +120,7 @@ const StoreDashboard = () => {
       // --- Orders ---
       const ordersResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/orders/store`,
-        { headers: authHeader }
+        { credentials: "include" }
       );
       if (ordersResponse.ok) {
         const orders = await ordersResponse.json();
@@ -135,7 +133,7 @@ const StoreDashboard = () => {
       // --- Bookings ---
       const bookingsResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/bookings/store`,
-        { headers: authHeader }
+        { credentials: "include" }
       );
       if (bookingsResponse.ok) {
         const bookings = await bookingsResponse.json();
@@ -148,12 +146,11 @@ const StoreDashboard = () => {
       // --- Subscription ---
       const subscriptionResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
-        { headers: authHeader }
+        { credentials: "include" }
       );
       if (subscriptionResponse.ok) {
         const data = await subscriptionResponse.json();
         setSubscription(data.subscription);
-
       } else {
         setSubscription(null);
       }
@@ -209,9 +206,9 @@ const StoreDashboard = () => {
         `${import.meta.env.VITE_API_URL}/api/${endpoint}/${editingItem._id}`,
         {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(updates),
         }
@@ -251,9 +248,7 @@ const StoreDashboard = () => {
         `${import.meta.env.VITE_API_URL}/api/${endpoint}/${itemId}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          credentials: "include",
         }
       );
 

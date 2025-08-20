@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import HeroSection from "../components/HeroSection";
 import ProductCard from "../components/ProductCard";
@@ -7,6 +7,7 @@ import StoreCard from "../components/StoreCard";
 import LuxuryHeroSection from "../components/LuxuryHeroSection";
 import CategorySection from "../components/CategorySection";
 import FlashDealsBanner from "../components/FlashDealSection";
+import HeroBanner from "../components/HeroBanner";
 import {
   ArrowRight,
   Package,
@@ -19,7 +20,6 @@ import {
 } from "lucide-react";
 
 const Home = () => {
-  const [productsOnSale, seProductsOnSale] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [featuredServices, setFeaturedServices] = useState([]);
   const [featuredStores, setFeaturedStores] = useState([]);
@@ -27,6 +27,16 @@ const Home = () => {
   const [categories, setCategories] = useState([]);
   const [flashDeal, setFlashDeal] = useState(null);
   const [showFlashDeal, setShowFlashDeal] = useState(false);
+
+  const shopNowRef = useRef(null);
+  const handlePrimaryButtonClick = () => {
+    shopNowRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    console.log("Explore button clicked");
+  };
 
   useEffect(() => {
     fetchFeaturedContent();
@@ -36,13 +46,11 @@ const Home = () => {
 
   const fetchFeaturedContent = async () => {
     try {
-      const [productsRes, productsOnSaleRes, servicesRes, storesRes] =
-        await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/api/products`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/products/on-sale`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/services`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/stores/featured/list`),
-        ]);
+      const [productsRes, servicesRes, storesRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/products`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/services`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/stores/featured/list`),
+      ]);
 
       if (productsRes.ok) {
         try {
@@ -51,15 +59,6 @@ const Home = () => {
         } catch (error) {
           console.error("Error parsing products JSON:", error);
           setFeaturedProducts([]);
-        }
-      }
-      if (productsOnSaleRes.ok) {
-        try {
-          const productsOnSale = await productsOnSaleRes.json();
-          seProductsOnSale(productsOnSale.slice(0, 12));
-        } catch (error) {
-          console.error("Error parsing products JSON:", error);
-          seProductsOnSale([]);
         }
       }
 
@@ -98,17 +97,25 @@ const Home = () => {
         `${import.meta.env.VITE_API_URL}/api/flash-deals/current`
       );
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setFlashDeal(result.data);
-          setShowFlashDeal(true);
-        }
+      if (!response.ok) {
+        console.error("Failed to fetch flash deal:", response.statusText);
+        setShowFlashDeal(false);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setFlashDeal(result.data);
+        setShowFlashDeal(true);
       } else {
+        // No deal available
+        setFlashDeal(null);
         setShowFlashDeal(false);
       }
     } catch (error) {
       console.error("Error fetching flash deal:", error);
+      setFlashDeal(null);
       setShowFlashDeal(false);
     }
   };
@@ -174,7 +181,7 @@ const Home = () => {
     }
   };
 
-    const flashDealProps = getFlashDealProps();
+  const flashDealProps = getFlashDealProps();
 
   if (loading) {
     return (
@@ -186,74 +193,42 @@ const Home = () => {
 
   return (
     <div>
-      {/* Hero Section */}
-      <LuxuryHeroSection
-        images={[
-          "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Fordinary-life-scene-from-mall-america%20(1).jpg?alt=media&token=fdb88ecc-68c6-49fb-8258-a5a3410393ee",
-          "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Ftwo-happy-girls-sweaters-having-fun-with-shopping-trolley-megaphone-white-wall.jpg?alt=media&token=886c6960-8622-4770-9afd-fc8dbcce99e7",
-          "https://firebasestorage.googleapis.com/v0/b/all-in-one-98568.firebasestorage.app/o/Hero%2Felderly-woman-shopping-customer-day.jpg?alt=media&token=db76d51e-5d2b-44b3-b52a-21ee1b0533c0",
-        ]}
-      />
-
-      {productsOnSale?.length > 0 && (
-        <section className="py-20 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">On Sale</h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                Handpicked premium products from top-rated stores
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {productsOnSale.map((product) => (
-                <ProductCard key={product._id} product={product} />
-              ))}
-            </div>
-
-            <div className="text-center mt-12">
-              <Link
-                to="/products-on-sale"
-                className="inline-flex items-center space-x-2 bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
-              >
-                <span>View All Products</span>
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-            </div>
-          </div>
+      {showFlashDeal && flashDeal && flashDealProps ? (
+        <section className="py-0 bg-white">
+          <FlashDealsBanner
+            // Timer props from backend
+            {...flashDealProps}
+            // Content from backend
+            saleName={flashDeal.saleName}
+            saleSubtitle={flashDeal.saleSubtitle}
+            discountText={flashDeal.discountText}
+            buttonText={flashDeal.buttonText}
+            // Design from backend
+            backgroundColor={flashDeal.backgroundColor}
+            backgroundImage={flashDeal.backgroundImage}
+            textColor={flashDeal.textColor}
+            accentColor={flashDeal.accentColor}
+            // Image from backend
+            heroImage={flashDeal.heroImage}
+            showHeroImage={flashDeal.showHeroImage}
+            // Custom click handler
+            onButtonClick={handleFlashDealClick}
+          />
         </section>
+      ) : (
+        <HeroBanner
+          apiEndpoint={`${import.meta.env.VITE_API_URL}/api/products/trending`}
+          handlePrimaryButtonClick={handlePrimaryButtonClick}
+        />
       )}
-      <section className="py-0 bg-white">
+
+      <section className="py-0 bg-white" ref={shopNowRef}>
         <CategorySection categories={categories} />
       </section>
-      {showFlashDeal && flashDeal && flashDealProps && (
-        <section className="py-0 bg-white">
 
-            <FlashDealsBanner
-              // Timer props from backend
-              {...flashDealProps}
-              // Content from backend
-              saleName={flashDeal.saleName}
-              saleSubtitle={flashDeal.saleSubtitle}
-              discountText={flashDeal.discountText}
-              buttonText={flashDeal.buttonText}
-              // Design from backend
-              backgroundColor={flashDeal.backgroundColor}
-              backgroundImage={flashDeal.backgroundImage}
-              textColor={flashDeal.textColor}
-              accentColor={flashDeal.accentColor}
-              // Image from backend
-              heroImage={flashDeal.heroImage}
-              showHeroImage={flashDeal.showHeroImage}
-              // Custom click handler
-              onButtonClick={handleFlashDealClick}
-            />
-      
-        </section>
-      )}
       {/* Featured Products */}
       <section className="py-5 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Featured Products
@@ -262,7 +237,7 @@ const Home = () => {
 
           {featuredProducts.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-8">
                 {featuredProducts.map((product) => (
                   <ProductCard key={product._id} product={product} />
                 ))}
@@ -288,7 +263,7 @@ const Home = () => {
 
       {/* Featured Services */}
       <section className="py-5 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Featured Services
@@ -297,7 +272,7 @@ const Home = () => {
 
           {featuredServices.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-8">
                 {featuredServices.map((service) => (
                   <ServiceCard key={service._id} service={service} />
                 ))}

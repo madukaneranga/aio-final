@@ -143,8 +143,9 @@ const ServiceDetail = () => {
 
       // Fetch store details separately
       if (data.storeId) {
+        console.log("Fetching store details for:", data);
         const storeResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId._id}`
+          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
         );
         const storeData = await storeResponse.json();
         setStore(storeData.store);
@@ -201,7 +202,7 @@ const ServiceDetail = () => {
       try {
         const bookingsResponse = await fetch(
           `${import.meta.env.VITE_API_URL}/api/bookings/availability/${
-            service.storeId._id
+            service.storeId
           }?date=${dateString}`
         );
 
@@ -604,7 +605,7 @@ const ServiceDetail = () => {
                   </div>
                   <div>
                     <Link
-                      to={`/store/${service.storeId._id}`}
+                      to={`/store/${service.storeId}`}
                       className="font-semibold text-black hover:text-gray-700 transition-colors"
                     >
                       {service.storeId.name}

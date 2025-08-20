@@ -61,6 +61,16 @@ const userSchema = new mongoose.Schema({
       ref: "Store",
     },
   ],
+  searchHistory: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SearchHistory",
+    },
+  ],
+
+  refreshTokenHash: String,
+  refreshTokenId: String,
+
   subscriptionId: String,
   createdAt: {
     type: Date,

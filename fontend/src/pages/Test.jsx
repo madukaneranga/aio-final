@@ -1,562 +1,647 @@
-// ============ PRODUCTS.JSX (WITH ELEGANT PAGINATION) ============
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
-import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
-import ServiceListing from "../components/ServiceListing";
-import ServicesFiltersSidebar from "../components/ServicesFiltersSidebar";
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Archive, Star, Send, Paperclip, MoreVertical, Settings, User, ShoppingBag, Clock, CheckCircle2, Circle, MessageSquare, Phone, Mail } from 'lucide-react';
+import useChat from '../hooks/useChat'; // Your existing hook
 
-// Custom debounce hook
-const useDebounce = (value, delay) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
+// Mock user data - replace with your auth context
+const mockUser = {
+  _id: '1',
+  name: 'John Doe',
+  email: 'john@example.com',
+  role: 'customer', // or 'store_owner'
+  profileImage: null
 };
 
-// Custom intersection observer hook for infinite scroll
-const useIntersectionObserver = (callback, options = {}) => {
-  const targetRef = useRef(null);
+// Extract ChatInterface from your existing ChatPopup
+const ChatInterface = ({ chat, user, onSendMessage, onTyping, messages, typingUsers }) => {
+  const [newMessage, setNewMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    const observer = new IntersectionObserver(callback, {
-      threshold: 0.1,
-      rootMargin: "100px",
-      ...options,
-    });
+    scrollToBottom();
+  }, [messages]);
 
-    const currentTarget = targetRef.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
-    }
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !chat) return;
 
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
-    };
-  }, [callback, options]);
-
-  return targetRef;
-};
-
-const Services = () => {
-  // URL parameter hooks
-  const [searchParams] = useSearchParams();
-  const location = useLocation();
-
-  // Service data state
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
-  const [categories, setCategories] = useState([]);
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalServices, setTotalServices] = useState(0);
-  const [hasMoreServices, setHasMoreServices] = useState(true);
-  const PRODUCTS_PER_PAGE = 20;
-
-  // Unified filters state
-  const [filters, setFilters] = useState({
-    search: "",
-    category: "",
-    subcategory: "",
-    childCategory: "",
-    priceRange: { min: "", max: "" },
-    stock: "",
-    rating: "",
-    shipping: "",
-    condition: "",
-    warrantyMonths: "",
-  });
-
-  // UI state
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Debounced filters for API calls
-  const debouncedFilters = useDebounce(filters, 300);
-
-  // Derived state for backwards compatibility
-  const selectedCategoryObj = categories.find(
-    (cat) => cat.name === filters.category
-  );
-  const subcategories = selectedCategoryObj?.subcategories || [];
-  const childCategories =
-    subcategories.find((sub) => sub.name === filters.subcategory)
-      ?.childCategories || [];
-
-  // Read URL parameters and set initial state
-  useEffect(() => {
-    const searchFromUrl = searchParams.get("search");
-
-    console.log("=== URL PARAMS DEBUG ===");
-    console.log("Current URL:", location.pathname + location.search);
-    console.log("Search from URL:", searchFromUrl);
-    console.log("All URL params:", Object.fromEntries(searchParams.entries()));
-
-    // Set state from URL parameters
-    if (searchFromUrl) {
-      setFilters((prev) => ({
-        ...prev,
-        search: searchFromUrl,
-      }));
-    }
-  }, [searchParams, location]);
-
-  // Fetch services function with pagination
-  const fetchServices = async (
-    searchFilters = {},
-    page = 1,
-    append = false
-  ) => {
     try {
-      if (!append) {
-        setLoading(true);
-        setServices([]);
-      } else {
-        setLoadingMore(true);
-      }
-      setError("");
-
-      console.log(
-        "Fetching services with filters:",
-        searchFilters,
-        "Page:",
-        page
-      );
-
-      // Convert filters to API format
-      const apiFilters = {
-        search: searchFilters.search || "",
-        category: searchFilters.category || "",
-        subcategory: searchFilters.subcategory || "",
-        childCategory: searchFilters.childCategory || "",
-        minPrice: searchFilters.priceRange?.min || "",
-        maxPrice: searchFilters.priceRange?.max || "",
-        stock: searchFilters.stock || "",
-        rating: searchFilters.rating || "",
-        shipping: searchFilters.shipping || "",
-        condition: searchFilters.condition || "",
-        warrantyMonths: searchFilters.warrantyMonths || "",
-        page: page,
-        limit: PRODUCTS_PER_PAGE,
-      };
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/services/listing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(apiFilters),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log(
-          "Services fetched:",
-          data.services.length,
-          "items",
-          "Total:",
-          data.total
-        );
-
-        if (append) {
-          setServices((prev) => [...prev, ...data.services]);
-        } else {
-          setServices(data.services);
-        }
-
-        setTotalServices(data.total);
-        setHasMoreServices(
-          data.services.length === PRODUCTS_PER_PAGE && data.hasMore
-        );
-        setCurrentPage(page);
-      } else {
-        setError("Failed to fetch services");
-        console.error("API Error:", response.status, response.statusText);
-      }
+      await onSendMessage(chat._id, newMessage.trim());
+      setNewMessage('');
+      setIsTyping(false);
     } catch (error) {
-      console.error("Error fetching services:", error);
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      console.error('Failed to send message:', error);
     }
   };
 
-  // Load more services
-  const loadMoreServices = useCallback(() => {
-    if (!loadingMore && hasMoreServices && !loading) {
-      const nextPage = currentPage + 1;
-      fetchServices(debouncedFilters, nextPage, true);
+  const handleTyping = (value) => {
+    setNewMessage(value);
+    
+    if (!isTyping && value.trim()) {
+      setIsTyping(true);
+      onTyping?.(chat._id, true);
     }
-  }, [loadingMore, hasMoreServices, loading, currentPage, debouncedFilters]);
 
-  // Intersection observer for infinite scroll
-  const loadMoreRef = useIntersectionObserver(
-    useCallback(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting) {
-          loadMoreServices();
-        }
-      },
-      [loadMoreServices]
-    )
-  );
-
-  // Auto-fetch services when debounced filters change (reset to page 1)
-  useEffect(() => {
-    setCurrentPage(1);
-    fetchServices(debouncedFilters, 1, false);
-  }, [debouncedFilters]);
-
-  // Load categories
-  const loadCategories = async () => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
-      setCategories(data);
-    } catch (err) {
-      console.error("Error loading categories:", err);
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
     }
+
+    // Set new timeout
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      onTyping?.(chat._id, false);
+    }, 1000);
   };
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // Filter update functions
-  const updateFilter = useCallback((key, value) => {
-    setFilters((prev) => {
-      const newFilters = { ...prev, [key]: value };
-
-      // Auto-clear dependent filters
-      if (key === "category") {
-        newFilters.subcategory = "";
-        newFilters.childCategory = "";
-      } else if (key === "subcategory") {
-        newFilters.childCategory = "";
-      }
-
-      return newFilters;
+  const formatTime = (date) => {
+    return new Date(date).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
-  }, []);
-
-  const updateFilters = useCallback((updates) => {
-    setFilters((prev) => ({ ...prev, ...updates }));
-  }, []);
-
-  const clearAllFilters = useCallback(() => {
-    setFilters({
-      search: "",
-      category: "",
-      subcategory: "",
-      childCategory: "",
-      priceRange: { min: "", max: "" },
-      stock: "",
-      rating: "",
-      shipping: "",
-      condition: "",
-      warrantyMonths: "",
-    });
-  }, []);
-
-  // Manual search handler (for search form)
-  const handleSearch = (e) => {
-    e?.preventDefault?.();
-
-    // Force immediate search without debounce
-    fetchServices(filters, 1, false);
   };
 
-  // Check for active filters
-  const hasActiveFilters = Boolean(
-    filters.search ||
-      filters.category ||
-      filters.subcategory ||
-      filters.childCategory ||
-      filters.priceRange.min ||
-      filters.priceRange.max ||
-      filters.stock ||
-      filters.rating ||
-      filters.shipping ||
-      filters.condition ||
-      filters.warrantyMonths
-  );
+  const currentTypingUsers = typingUsers?.filter(u => u.chatId === chat?._id) || [];
 
-  const activeFiltersCount = [
-    filters.search,
-    filters.category,
-    filters.subcategory,
-    filters.childCategory,
-    filters.priceRange.min,
-    filters.priceRange.max,
-    filters.stock,
-    filters.rating,
-    filters.shipping,
-    filters.condition,
-    filters.warrantyMonths,
-  ].filter(Boolean).length;
-
-  // Calculate display range for results counter
-  const startResult = services.length > 0 ? 1 : 0;
-  const endResult = services.length;
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Services</h1>
-
-          {/* Search Filters */}
-          <div className="space-y-4">
-            {/* Breadcrumb */}
-            {(filters.subcategory || filters.childCategory) && (
-              <nav
-                aria-label="breadcrumb"
-                className="text-sm text-gray-600 mt-2 select-none"
-              >
-                <ol className="list-reset flex space-x-2">
-                  {filters.category && (
-                    <li>
-                      {categories.find(
-                        (c) => c.name.toString() === filters.category
-                      )?.name || "Category"}
-                    </li>
-                  )}
-                  {filters.subcategory && (
-                    <>
-                      <li>→</li>
-                      <li>{filters.subcategory}</li>
-                    </>
-                  )}
-                  {filters.childCategory && (
-                    <>
-                      <li>→</li>
-                      <li>{filters.childCategory}</li>
-                    </>
-                  )}
-                </ol>
-              </nav>
-            )}
-
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => {
-                    updateFilter("search", e.target.value);
-                    console.log("Search query changed to:", e.target.value);
-                  }}
-                  placeholder="Search services..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                Search
-              </button>
-            </form>
-
-            {/* Elegant Results Counter */}
-            {!loading && (
-              <div className="flex items-center justify-between py-4 px-6 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl shadow-sm">
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2 text-gray-700">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium">
-                      Showing {startResult.toLocaleString()}-
-                      {endResult.toLocaleString()} of{" "}
-                      {totalServices.toLocaleString()} results
-                    </span>
-                  </div>
-                  {hasActiveFilters && (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-                      <span className="text-xs text-gray-500 font-medium">
-                        {activeFiltersCount} filter
-                        {activeFiltersCount !== 1 ? "s" : ""} applied
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {hasMoreServices && (
-                  <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <div className="animate-pulse w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span>More available</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Filters Side Drawer */}
-            <ServicesFiltersSidebar
-              showFilters={showFilters}
-              setShowFilters={setShowFilters}
-              categorySet={categories}
-              filters={filters}
-              updateFilter={updateFilter}
-              updateFilters={updateFilters}
-              clearAllFilters={clearAllFilters}
-            />
-          </div>
+  if (!chat) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <MessageSquare className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Chat Selected</h3>
+          <p className="text-gray-500">Choose a conversation to start messaging</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Floating Filter Button */}
-      {!showFilters && (
-        <button
-          onClick={() => setShowFilters(true)}
-          className="
-            fixed 
-            left-0 
-            top-1/2 
-            -translate-y-1/2
-            z-40 
-            bg-gradient-to-b from-black via-gray-800 to-white
-            text-white px-3 py-6 rounded-r-xl shadow-xl 
-            flex flex-col items-center justify-center space-y-2
-            hover:scale-105 hover:shadow-2xl transition-all duration-300 ease-out
-            border border-gray-700
-            writing-mode-vertical
-            min-h-[120px]
-          "
-        >
-          <Filter className="w-5 h-5" />
-
-          <span
-            className="font-medium text-sm transform -rotate-90 whitespace-nowrap"
-            style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-          >
-            Filters
-          </span>
-
-          {hasActiveFilters && (
-            <span className="bg-white text-black text-xs font-semibold px-2 py-1 rounded-full shadow-md min-w-[24px] text-center">
-              {activeFiltersCount}
-            </span>
-          )}
-        </button>
-      )}
-
-      {/* Services Content */}
-      <ServiceListing services={services} loading={loading} error={error} />
-
-      {/* Elegant Load More Section */}
-      {!loading && services.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {hasMoreServices ? (
-            <div
-              ref={loadMoreRef}
-              className="flex flex-col items-center justify-center py-12 space-y-6"
-            >
-              {loadingMore ? (
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="relative">
-                    <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
-                    <div
-                      className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-gray-400 rounded-full animate-spin"
-                      style={{
-                        animationDirection: "reverse",
-                        animationDuration: "1.5s",
-                      }}
-                    ></div>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-gray-600 font-medium">
-                      Loading more services...
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Finding the perfect items for you
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={loadMoreServices}
-                  className="group relative overflow-hidden bg-gradient-to-r from-gray-900 to-black text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 ease-out"
-                >
-                  <span className="relative z-10 flex items-center space-x-2">
-                    <span>Load More Services</span>
-                    <ChevronDown className="w-5 h-5 group-hover:animate-bounce" />
-                  </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-black to-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </button>
+  return (
+    <div className="flex-1 flex flex-col bg-white">
+      {/* Chat Header */}
+      <div className="border-b border-gray-200 p-4 bg-gradient-to-r from-gray-900 to-black text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <img
+                src={chat.otherParticipant?.profileImage || '/api/placeholder/40/40'}
+                alt={chat.otherParticipant?.name}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+              {chat.otherParticipant?.isOnline && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
               )}
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center shadow-lg">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
+            <div>
+              <h3 className="font-semibold">{chat.otherParticipant?.name}</h3>
+              <p className="text-sm text-gray-300">
+                {chat.otherParticipant?.isOnline ? 'Online' : 'Offline'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button className="p-2 hover:bg-gray-700 rounded-lg transition-colors">
+              <Phone className="w-5 h-5" />
+            </button>
+            <button className="p-2 hover:bg-gray-700 rounded-lg transition-colors">
+              <MoreVertical className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        
+        {chat.taggedProduct && (
+          <div className="mt-3 p-2 bg-white/10 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <ShoppingBag className="w-4 h-4" />
+              <span className="text-sm">Product: {chat.taggedProduct.productName}</span>
+            </div>
+          </div>
+        )}
+      </div>
 
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  You've seen it all! ✨
-                </h3>
-                <p className="text-gray-600 max-w-md">
-                  That's every service we have matching your criteria. Try
-                  adjusting your filters to discover more amazing items.
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => {
+          const isMine = message.sender._id === user._id;
+          return (
+            <div key={message._id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                isMine 
+                  ? 'bg-gradient-to-r from-gray-900 to-black text-white' 
+                  : 'bg-gradient-to-r from-white to-gray-50 border border-gray-200'
+              }`}>
+                {message.messageType === 'image' && message.file && (
+                  <img
+                    src={message.file.url}
+                    alt="Uploaded"
+                    className="max-w-full h-auto rounded mb-2"
+                  />
+                )}
+                
+                {message.messageType === 'receipt' && message.receipt && (
+                  <div className="p-3 border rounded-lg mb-2 bg-green-50">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      <span className="font-medium text-green-800">Order Receipt</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <p>Order: {message.receipt.orderId}</p>
+                      <p>Amount: ${message.receipt.amount}</p>
+                      <p>Status: {message.receipt.status}</p>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-sm">{message.content}</p>
+                <p className={`text-xs mt-1 ${isMine ? 'text-gray-300' : 'text-gray-500'}`}>
+                  {formatTime(message.createdAt)}
                 </p>
               </div>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!loading && services.length === 0 && !error && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center space-y-6">
-            <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto shadow-lg">
-              <Search className="w-12 h-12 text-gray-500" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                No services found
-              </h3>
-              <p className="text-gray-600 max-w-md mx-auto mb-6">
-                We couldn't find any services matching your search criteria. Try
-                adjusting your filters or search terms.
-              </p>
-              {hasActiveFilters && (
-                <button
-                  onClick={clearAllFilters}
-                  className="inline-flex items-center space-x-2 bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  <span>Clear All Filters</span>
-                </button>
-              )}
+          );
+        })}
+        
+        {/* Typing Indicator */}
+        {currentTypingUsers.length > 0 && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 px-4 py-2 rounded-lg">
+              <div className="flex items-center space-x-1">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                </div>
+                <span className="text-xs text-gray-500 ml-2">
+                  {currentTypingUsers[0].userName} is typing...
+                </span>
+              </div>
             </div>
           </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Message Input */}
+      <div className="border-t border-gray-200 p-4">
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => handleTyping(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage(e);
+              }
+            }}
+            placeholder="Type your message..."
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!newMessage.trim()}
+            className="p-2 bg-gradient-to-r from-gray-900 to-black text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Chat List Component
+const ChatList = ({ chats, selectedChat, onSelectChat, userRole, onSearch }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredChats = chats.filter(chat =>
+    chat.otherParticipant?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    chat.lastMessage?.content?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const formatLastMessage = (message) => {
+    if (!message) return 'No messages yet';
+    
+    switch (message.messageType) {
+      case 'image':
+        return '📷 Photo';
+      case 'receipt':
+        return '🧾 Receipt';
+      case 'system':
+        return '⚙️ System message';
+      default:
+        return message.content?.length > 50 
+          ? message.content.substring(0, 50) + '...'
+          : message.content;
+    }
+  };
+
+  const formatTime = (date) => {
+    const now = new Date();
+    const messageDate = new Date(date);
+    const diffInHours = (now - messageDate) / (1000 * 60 * 60);
+    
+    if (diffInHours < 24) {
+      return messageDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } else {
+      return messageDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+  };
+
+  return (
+    <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          {userRole === 'customer' ? 'Your Chats' : 'Customer Messages'}
+        </h2>
+        
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+          />
+        </div>
+      </div>
+
+      {/* Chat List */}
+      <div className="flex-1 overflow-y-auto">
+        {filteredChats.map((chat) => (
+          <div
+            key={chat._id}
+            onClick={() => onSelectChat(chat)}
+            className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
+              selectedChat?._id === chat._id ? 'bg-blue-50 border-blue-200' : ''
+            }`}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <img
+                  src={chat.otherParticipant?.profileImage || '/api/placeholder/48/48'}
+                  alt={chat.otherParticipant?.name}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+                {chat.otherParticipant?.isOnline && (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-gray-900 truncate">
+                    {chat.otherParticipant?.name}
+                  </h3>
+                  <span className="text-xs text-gray-500">
+                    {formatTime(chat.lastMessage?.timestamp || chat.updatedAt)}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-sm text-gray-600 truncate">
+                    {formatLastMessage(chat.lastMessage)}
+                  </p>
+                  {chat.unreadCount > 0 && (
+                    <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                      {chat.unreadCount}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Product Tag for Store Owners */}
+                {userRole === 'store_owner' && chat.taggedProduct && (
+                  <div className="flex items-center mt-1 text-xs text-blue-600">
+                    <ShoppingBag className="w-3 h-3 mr-1" />
+                    <span className="truncate">{chat.taggedProduct.productName}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        {filteredChats.length === 0 && (
+          <div className="p-8 text-center text-gray-500">
+            <MessageSquare className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+            <p>No conversations found</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Quick Actions for Store Owners
+const QuickActions = ({ onInsertText }) => {
+  const quickReplies = [
+    { text: "Thanks for your inquiry!", icon: "👋" },
+    { text: "Let me check that for you", icon: "🔍" },
+    { text: "Product is available", icon: "✅" },
+    { text: "Here's the pricing information", icon: "💰" },
+    { text: "Would you like to place an order?", icon: "🛒" },
+    { text: "I'll get back to you shortly", icon: "⏱️" },
+  ];
+
+  return (
+    <div className="w-64 border-l border-gray-200 bg-gray-50 p-4">
+      <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+      
+      <div className="space-y-2">
+        {quickReplies.map((reply, index) => (
+          <button
+            key={index}
+            onClick={() => onInsertText(reply.text)}
+            className="w-full text-left p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">{reply.icon}</span>
+              <span className="text-sm text-gray-700">{reply.text}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
+        <h4 className="font-medium text-gray-900 mb-2">Customer Info</h4>
+        <div className="space-y-2 text-sm text-gray-600">
+          <div className="flex items-center space-x-2">
+            <User className="w-4 h-4" />
+            <span>Previous orders: 5</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <ShoppingBag className="w-4 h-4" />
+            <span>Total spent: $299</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Clock className="w-4 h-4" />
+            <span>Customer since: Jan 2024</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Customer Info Panel for Store Owners
+const CustomerInfo = ({ customer, chat }) => {
+  if (!customer) return null;
+
+  return (
+    <div className="p-4 bg-gradient-to-r from-white to-gray-50 border-b border-gray-200">
+      <div className="flex items-center space-x-4">
+        <img
+          src={customer.profileImage || '/api/placeholder/60/60'}
+          alt={customer.name}
+          className="w-15 h-15 rounded-full object-cover"
+        />
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900">{customer.name}</h3>
+          <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+            <div className="flex items-center space-x-1">
+              <Mail className="w-4 h-4" />
+              <span>{customer.email}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Circle className={`w-2 h-2 rounded-full ${customer.isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <span>{customer.isOnline ? 'Online' : 'Offline'}</span>
+            </div>
+          </div>
+        </div>
+        
+        {chat?.analytics?.customerSatisfaction && (
+          <div className="text-right">
+            <div className="flex items-center space-x-1">
+              <Star className="w-4 h-4 text-yellow-400 fill-current" />
+              <span className="text-sm font-medium">{chat.analytics.customerSatisfaction}</span>
+            </div>
+            <span className="text-xs text-gray-500">Rating</span>
+          </div>
+        )}
+      </div>
+      
+      {chat?.taggedProduct && (
+        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center space-x-2">
+            <ShoppingBag className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
+              Inquiring about: {chat.taggedProduct.productName}
+            </span>
+          </div>
+          {chat.taggedProduct.productId && (
+            <button className="mt-2 text-xs text-blue-600 hover:text-blue-800">
+              View Product Details →
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-export default Services;
+// Main Dashboard Components
+const CustomerChatDashboard = ({ user }) => {
+  const {
+    conversations,
+    activeChat,
+    messages,
+    loadMessages,
+    sendMessage,
+    markAsRead,
+    joinChatRoom,
+    startTyping,
+    stopTyping,
+    typingUsers,
+    isLoading
+  } = useChat(user);
+
+  const [selectedChat, setSelectedChat] = useState(null);
+
+  const handleSelectChat = async (chat) => {
+    try {
+      setSelectedChat(chat);
+      await loadMessages(chat._id);
+      await markAsRead(chat._id);
+      joinChatRoom(chat._id);
+    } catch (error) {
+      console.error('Failed to load chat:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading chats...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex bg-gray-100">
+      <ChatList
+        chats={conversations}
+        selectedChat={selectedChat}
+        onSelectChat={handleSelectChat}
+        userRole="customer"
+      />
+      <ChatInterface
+        chat={activeChat}
+        user={user}
+        onSendMessage={sendMessage}
+        onTyping={startTyping}
+        messages={messages}
+        typingUsers={typingUsers}
+      />
+    </div>
+  );
+};
+
+const StoreOwnerChatDashboard = ({ user, storeId }) => {
+  const {
+    conversations,
+    activeChat,
+    messages,
+    loadMessages,
+    sendMessage,
+    markAsRead,
+    joinChatRoom,
+    startTyping,
+    stopTyping,
+    typingUsers,
+    isLoading
+  } = useChat(user);
+
+  const [selectedChat, setSelectedChat] = useState(null);
+
+  const handleSelectChat = async (chat) => {
+    try {
+      setSelectedChat(chat);
+      await loadMessages(chat._id);
+      await markAsRead(chat._id);
+      joinChatRoom(chat._id);
+    } catch (error) {
+      console.error('Failed to load chat:', error);
+    }
+  };
+
+  const handleInsertQuickReply = (text) => {
+    // This would normally update the message input in ChatInterface
+    // For demo purposes, we'll just send it directly
+    if (activeChat) {
+      sendMessage(activeChat._id, text);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading customer chats...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex bg-gray-100">
+      <ChatList
+        chats={conversations}
+        selectedChat={selectedChat}
+        onSelectChat={handleSelectChat}
+        userRole="store_owner"
+      />
+      
+      <div className="flex-1 flex flex-col">
+        {activeChat && (
+          <CustomerInfo
+            customer={activeChat.otherParticipant}
+            chat={activeChat}
+          />
+        )}
+        
+        <div className="flex-1 flex">
+          <ChatInterface
+            chat={activeChat}
+            user={user}
+            onSendMessage={sendMessage}
+            onTyping={startTyping}
+            messages={messages}
+            typingUsers={typingUsers}
+          />
+          
+          <QuickActions onInsertText={handleInsertQuickReply} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Demo Component - Switch between user roles
+const ChatDashboardDemo = () => {
+  const [userRole, setUserRole] = useState('customer');
+  
+  const user = {
+    ...mockUser,
+    role: userRole
+  };
+
+  return (
+    <div className="h-screen">
+      {/* Role Switcher for Demo */}
+      <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
+        <h1 className="font-bold">Chat Dashboard - {userRole === 'customer' ? 'Customer View' : 'Store Owner View'}</h1>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setUserRole('customer')}
+            className={`px-3 py-1 rounded text-sm ${
+              userRole === 'customer' ? 'bg-blue-600' : 'bg-gray-600'
+            }`}
+          >
+            Customer View
+          </button>
+          <button
+            onClick={() => setUserRole('store_owner')}
+            className={`px-3 py-1 rounded text-sm ${
+              userRole === 'store_owner' ? 'bg-blue-600' : 'bg-gray-600'
+            }`}
+          >
+            Store Owner View
+          </button>
+        </div>
+      </div>
+
+      {/* Dashboard */}
+      {userRole === 'customer' ? (
+        <CustomerChatDashboard user={user} />
+      ) : (
+        <StoreOwnerChatDashboard user={user} storeId="store123" />
+      )}
+    </div>
+  );
+};
+
+export default ChatDashboardDemo;

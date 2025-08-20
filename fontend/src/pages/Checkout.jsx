@@ -169,9 +169,9 @@ const Checkout = () => {
         `${import.meta.env.VITE_API_URL}/api/payments/create-combined-intent`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
             orderItems: orderItems.map((item) => ({

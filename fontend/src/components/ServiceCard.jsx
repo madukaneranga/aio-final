@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Calendar, Clock, Star, Heart, Tag, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatLKR } from "../utils/currency";
@@ -6,10 +6,37 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 
 const ServiceCard = ({ service }) => {
+  const cardRef = useRef(null);
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const { addToBooking } = useCart();
   const { user } = useAuth();
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // Send impression
+            fetch(`${import.meta.env.VITE_API_URL}/api/services/impression`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ serviceId: service._id }),
+            }).catch((err) => console.error("Impression error:", err));
+
+            observer.unobserve(entry.target); // stop observing after first impression
+          }
+        });
+      },
+      { threshold: 0.5 } // 50% of the card visible = impression
+    );
+
+    if (cardRef.current) observer.observe(cardRef.current);
+
+    return () => {
+      if (cardRef.current) observer.unobserve(cardRef.current);
+    };
+  }, [service._id]);
 
   const isNew = () => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -35,7 +62,7 @@ const ServiceCard = ({ service }) => {
       alert("Only customers can add items to cart");
       return;
     }
-    // Ensure we pass the product with proper storeId
+    // Ensure we pass the service with proper storeId
     const serviceWithStoreId = {
       ...service,
       storeId: service.storeId?._id || service.storeId,
@@ -51,7 +78,7 @@ const ServiceCard = ({ service }) => {
   return (
     <>
       <Link to={`/service/${service._id}`} className="block">
-        <div className="relative w-full">
+        <div className="relative w-full" ref={cardRef}>
           {/* Service Card */}
 
           <div className="group relative bg-white rounded-xl sm:rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full max-w-xs mx-auto">

@@ -30,12 +30,14 @@ const CreateProduct = () => {
     description: "",
     price: "",
     oldPrice: "",
+    discount: "",
     stock: "",
     isPreorder: false,
     shipping: "",
     condition: "",
     warrentyMonths: "",
     variants: [], // Combined variants: { name, hex, size, stock }
+    tags: [],
   });
 
   // Load categories once on mount
@@ -50,6 +52,21 @@ const CreateProduct = () => {
     );
     setTotalVariantStock(total);
   }, [formData.variants]);
+
+  // Auto-calculate price when oldPrice or discount changes
+  useEffect(() => {
+    if (formData.oldPrice && formData.discount) {
+      const original = parseFloat(formData.oldPrice);
+      const discountPercent = parseFloat(formData.discount);
+      if (original > 0 && discountPercent >= 0) {
+        const newPrice = original * (1 - discountPercent / 100);
+        setFormData((prev) => ({
+          ...prev,
+          price: newPrice.toFixed(2),
+        }));
+      }
+    }
+  }, [formData.oldPrice, formData.discount]);
 
   const loadCategories = async () => {
     try {
@@ -81,10 +98,20 @@ const CreateProduct = () => {
   // Handle normal inputs
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+
+    // If user manually changes price, clear discount
+    if (name === "price" && formData.discount) {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+        discount: "", // Clear discount
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      }));
+    }
   };
 
   // Variants: Add a new variant row
@@ -115,6 +142,31 @@ const CreateProduct = () => {
       ...prev,
       variants: newVariants,
     }));
+  };
+
+  //tagging
+  const addTag = (tagText) => {
+    if (tagText.trim() && !formData.tags.includes(tagText.trim())) {
+      setFormData((prev) => ({
+        ...prev,
+        tags: [...prev.tags, tagText.trim()],
+      }));
+    }
+  };
+
+  const removeTag = (indexToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      tags: prev.tags.filter((_, index) => index !== indexToRemove),
+    }));
+  };
+
+  const handleTagInput = (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(e.target.value);
+      e.target.value = "";
+    }
   };
 
   // Upload images, compress and get URLs
@@ -188,9 +240,9 @@ const CreateProduct = () => {
         `${import.meta.env.VITE_API_URL}/api/products`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify(payload),
         }
@@ -273,7 +325,7 @@ const CreateProduct = () => {
               </div>
             </div>
 
-            {/* Price, Old Price, Stock, Is Preorder */}
+            {/* Price, Old Price, Discount, Stock, Is Preorder */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -286,14 +338,22 @@ const CreateProduct = () => {
                   onChange={handleChange}
                   required
                   min="0"
-                  step="0.01"
+                  step="1"
                   placeholder="2999.99"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  className={`w-full border rounded-lg px-4 py-2 ${
+                    formData.discount && formData.discount >0  ? "bg-gray-100" : "border-gray-300"
+                  }`}
+                  disabled={!!formData.discount && formData.discount >0 }
                 />
+                {formData.discount && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Auto-calculated from original price and discount
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Old Price (optional)
+                  Original Price (optional)
                 </label>
                 <input
                   type="number"
@@ -301,9 +361,25 @@ const CreateProduct = () => {
                   value={formData.oldPrice}
                   onChange={handleChange}
                   min="0"
-                  step="0.01"
+                  step="1"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"
                   placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Discount (%) (optional)
+                </label>
+                <input
+                  type="number"
+                  name="discount"
+                  value={formData.discount}
+                  onChange={handleChange}
+                  min="0"
+                  max="100"
+                  step="1"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  placeholder="0"
                 />
               </div>
               <div>
@@ -335,7 +411,9 @@ const CreateProduct = () => {
                   </p>
                 )}
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="flex items-center space-x-2 mt-6 md:mt-0">
                 <input
                   type="checkbox"
@@ -498,7 +576,6 @@ const CreateProduct = () => {
                     value={variant.size}
                     onChange={(e) => updateVariant(idx, "size", e.target.value)}
                     className="border border-gray-300 rounded-lg px-3 py-2 w-32 h-10"
-
                   />
                   <input
                     type="number"
@@ -536,6 +613,48 @@ const CreateProduct = () => {
                     {totalVariantStock}
                   </span>
                 </p>
+              )}
+            </div>
+
+
+            {/* Tags Section -  */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Service Tags
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Press Enter or comma to add tags. Great for search and
+                categorization.
+              </p>
+
+              <input
+                type="text"
+                placeholder="Type a tag and press Enter..."
+                onKeyDown={handleTagInput}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3"
+              />
+
+              {/* Display added tags */}
+              <div className="flex flex-wrap gap-2">
+                {formData.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="bg-black text-white  px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(index)}
+                      className="text-white hover:text-red-500 font-bold"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              {formData.tags.length === 0 && (
+                <p className="text-gray-400 text-sm">No tags added yet</p>
               )}
             </div>
 

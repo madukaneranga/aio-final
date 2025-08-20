@@ -83,7 +83,6 @@ const CommentSidebar = ({
     const token = localStorage.getItem("token");
     return {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     };
   };
 
@@ -99,6 +98,7 @@ const CommentSidebar = ({
       const response = await fetch(
         `${API_BASE_URL}/api/posts/${targetPostId}/comments?page=${pageNum}&limit=20`,
         {
+          credentials: "include",
           headers: getAuthHeaders(),
         }
       );
@@ -662,7 +662,6 @@ const SocialFeed = () => {
     const token = localStorage.getItem("token");
     return {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     };
   };
 
@@ -672,6 +671,7 @@ const SocialFeed = () => {
       setError(null);
 
       const response = await fetch(`${API_BASE_URL}/api/posts/feed?page=${page}&limit=10`, {
+        credentials: "include",
         headers: getAuthHeaders(),
       });
 

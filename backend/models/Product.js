@@ -15,6 +15,14 @@ const productSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
+  discount: {
+    type: Number,
+    min: 0,
+  },
+  type: {
+    type: String,
+    default: "product",
+  },
   oldPrice: {
     type: Number,
     min: 0,
@@ -89,13 +97,32 @@ const productSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-
+  stats: {
+    totalOrders: {
+      type: Number,
+      default: 0,
+    },
+    views: {
+      type: Number,
+      default: 98,
+    },
+    impressions: {
+      type: Number,
+      default: 0,
+    },
+  },
   variants: [
     {
       name: { type: String }, // color name
       hex: { type: String }, // color hex code
       size: { type: String },
       stock: { type: Number, min: 0 },
+    },
+  ],
+
+  tags: [
+    {
+      type: String,
     },
   ],
 });

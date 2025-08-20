@@ -6,7 +6,7 @@ import { typeIcons } from "../utils/notificationHelpers";
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
-  const { token, user } = useAuth();
+  const { user } = useAuth(); // Remove token dependency
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
@@ -18,9 +18,7 @@ export const NotificationProvider = ({ children }) => {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/notifications`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: "include", // Already correct
         }
       );
 
@@ -39,16 +37,14 @@ export const NotificationProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (!user || !token) return;
+    if (!user) return; // Remove token dependency
 
     // Fetch on first load
     fetchNotifications();
 
-    // Initialize socket
+    // Initialize socket with cookie-based auth
     socketRef.current = io(import.meta.env.VITE_API_URL, {
-      auth: {
-        token: token,
-      },
+      withCredentials: true, // Use cookies instead of auth token
       transports: ["websocket"],
     });
 
@@ -74,7 +70,7 @@ export const NotificationProvider = ({ children }) => {
     return () => {
       socketRef.current?.disconnect();
     };
-  }, [user, token]);
+  }, [user]); // Remove token dependency
 
   const markAsRead = async (id) => {
     try {
@@ -82,14 +78,14 @@ export const NotificationProvider = ({ children }) => {
         `${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`,
         {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include", // Already correct
         }
       );
       if (res.ok) {
         setNotifications((prev) =>
           prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
         );
-        setUnreadCount((prev) => prev - 1);
+        setUnreadCount((prev) => Math.max(0, prev - 1)); // Prevent negative count
       }
     } catch (e) {
       console.error("Mark read failed", e);
@@ -102,7 +98,7 @@ export const NotificationProvider = ({ children }) => {
         `${import.meta.env.VITE_API_URL}/api/notifications/mark-all-read`,
         {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include", // Already correct
         }
       );
       if (res.ok) {
@@ -120,31 +116,53 @@ export const NotificationProvider = ({ children }) => {
         `${import.meta.env.VITE_API_URL}/api/notifications/${id}/delete`,
         {
           method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include", // Already correct
         }
       );
       if (res.ok) {
         setNotifications((prev) =>
           prev.map((n) => (n._id === id ? { ...n, isDeleted: true } : n))
         );
+        
+        // Decrease unread count if the deleted notification was unread
+        const deletedNotification = notifications.find(n => n._id === id);
+        if (deletedNotification && !deletedNotification.isRead) {
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        }
       }
     } catch (e) {
       console.error("Soft delete failed", e);
     }
   };
 
+  // Helper function to dismiss toast
+  const dismissToast = () => {
+    setToast(null);
+  };
+
+  // Handle toast click with better navigation
+  const handleToastClick = () => {
+    if (toast?.link) {
+      // Use proper navigation instead of window.location.href
+      if (toast.link.startsWith('http')) {
+        window.open(toast.link, '_blank');
+      } else {
+        // For internal routes, you might want to use your router's navigate function
+        window.location.href = toast.link;
+      }
+    }
+    dismissToast();
+  };
+
   return (
     <>
       {toast && (
         <div
-          className="fixed bottom-6 right-4 z-50 bg-white border border-purple-300 rounded-xl shadow-lg p-4 w-80 max-w-full animate-slide-in"
-          onClick={() => {
-            if (toast.link) window.location.href = toast.link;
-            setToast(null);
-          }}
+          className="fixed bottom-6 right-4 z-50 bg-white border border-purple-300 rounded-xl shadow-lg p-4 w-80 max-w-full animate-slide-in cursor-pointer"
+          onClick={handleToastClick}
         >
           <div className="flex items-start gap-3">
-            {/* ✅ FIXED: Icon rendered correctly */}
+            {/* Icon rendered correctly */}
             <div className="text-purple-600">
               {(() => {
                 const ToastIcon = typeIcons[toast.type];
@@ -156,6 +174,17 @@ export const NotificationProvider = ({ children }) => {
               <p className="font-semibold text-sm">{toast.title}</p>
               <p className="text-xs text-gray-600 line-clamp-2">{toast.body}</p>
             </div>
+
+            {/* Close button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissToast();
+              }}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
@@ -170,6 +199,7 @@ export const NotificationProvider = ({ children }) => {
           softDelete,
           setNotifications,
           setUnreadCount,
+          dismissToast,
         }}
       >
         {children}

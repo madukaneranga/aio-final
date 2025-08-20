@@ -61,7 +61,7 @@ const SalesAnalytics = () => {
           import.meta.env.VITE_API_URL
         }/api/analytics/${storeId}?months=${monthRange}`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          credentials: "include",
         }
       );
 

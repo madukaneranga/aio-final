@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
-import ServiceListing from "../components/ServiceListing";
 import ServicesFiltersSidebar from "../components/ServicesFiltersSidebar";
+import CustomListing from "../components/CustomListing";
 
 // Custom debounce hook
 const useDebounce = (value, delay) => {
@@ -99,7 +99,7 @@ const Services = () => {
   // Initialize filters from URL parameters ONCE on mount
   useEffect(() => {
     if (initializationRef.current) return; // Prevent multiple initializations
-    
+
     const searchFromUrl = searchParams.get("search");
     const categoryFromUrl = searchParams.get("category");
 
@@ -121,16 +121,15 @@ const Services = () => {
     };
 
     console.log("Setting initial service filters:", initialFilters);
-    
+
     // Set filters and mark as initialized
     setFilters(initialFilters);
     initializationRef.current = true;
-    
+
     // Immediately fetch with initial filters (no debounce)
     fetchServices(initialFilters, 1, false).then(() => {
       setHasInitialized(true);
     });
-
   }, []); // Empty dependency array - only run once on mount
 
   // Fetch services function with pagination
@@ -239,7 +238,10 @@ const Services = () => {
   useEffect(() => {
     // Only respond to filter changes after initial load
     if (hasInitialized && initializationRef.current) {
-      console.log("Service filter changed after initialization:", debouncedFilters);
+      console.log(
+        "Service filter changed after initialization:",
+        debouncedFilters
+      );
       setCurrentPage(1);
       fetchServices(debouncedFilters, 1, false);
     }
@@ -475,7 +477,14 @@ const Services = () => {
       )}
 
       {/* Services Content */}
-      <ServiceListing services={services} loading={loading} error={error} />
+      {services && (
+        <CustomListing
+          items={services}
+          loading={loading}
+          error={error}
+          type="service"
+        />
+      )}
 
       {/* Elegant Load More Section */}
       {!loading && services.length > 0 && (

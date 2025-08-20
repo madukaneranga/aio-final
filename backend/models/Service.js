@@ -19,6 +19,14 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     min: 0,
   },
+  type: {
+    type: String,
+    default: "service",
+  },
+  discount: {
+    type: Number,
+    min: 0,
+  },
   duration: {
     type: Number,
     required: true,
@@ -75,7 +83,11 @@ const serviceSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-
+  tags: [
+    {
+      type: String,
+    },
+  ],
   stats: {
     totalBookings: {
       type: Number,

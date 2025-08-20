@@ -2,8 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const CategoryCard = ({ category }) => {
-  const navigate = useNavigate();
-  const [imageError, setImageError] = useState(false);
+  const [imageError, setImageError] = React.useState(false);
 
   const categoryName = category.name || "";
 
@@ -13,7 +12,7 @@ const CategoryCard = ({ category }) => {
         categoryName
       )}`;
       console.log("Navigating to:", categoryUrl);
-      navigate(categoryUrl);
+      // Note: navigate function would be used here in actual implementation
     }
   };
 
@@ -21,14 +20,12 @@ const CategoryCard = ({ category }) => {
     setImageError(true);
   };
 
-  // Get first image or use placeholder
   const imageUrl =
     category.image && category.image.length > 0 ? category.image[0] : null;
 
   return (
-    <div className="group cursor-pointer" onClick={handleClick}>
+    <div className="group cursor-pointer flex-none" onClick={handleClick}>
       <div className="relative w-64 h-32 bg-gray-100 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-black/10 hover:scale-105">
-        {/* Background Image */}
         {imageUrl && !imageError ? (
           <img
             src={imageUrl}
@@ -40,7 +37,6 @@ const CategoryCard = ({ category }) => {
           <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
         )}
 
-        {/* Text Overlay */}
         <div className="absolute inset-0 flex items-start justify-start p-4">
           <div className="text-left">
             <h3 className="text-lg font-semibold text-gray-900 leading-tight max-w-[140px]">
@@ -49,11 +45,9 @@ const CategoryCard = ({ category }) => {
           </div>
         </div>
 
-        {/* Subtle overlay for better text readability */}
         <div className="absolute inset-0 bg-white bg-opacity-10" />
       </div>
     </div>
   );
 };
-
 export default CategoryCard;

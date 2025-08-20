@@ -97,19 +97,19 @@ const Admin = () => {
 
     // Fetch subscriptions
     const subscriptionsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/subscriptions/admin/all`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      credentials: "include",
     });
     const subscriptionsData = subscriptionsRes.ok ? await subscriptionsRes.json() : [];
 
     // Fetch commissions
     const commissionsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/commissions/admin/all`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      credentials: "include",
     });
     const commissionsData = commissionsRes.ok ? await commissionsRes.json() : [];
 
     // Fetch commission stats
     const commissionStatsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/commissions/admin/stats`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      credentials: "include",
     });
     const commissionStatsData = commissionStatsRes.ok ? await commissionStatsRes.json() : {};
 
@@ -190,9 +190,9 @@ const Admin = () => {
 
       const response = await fetch(url, {
         method,
+        credentials: "include",
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body
       });

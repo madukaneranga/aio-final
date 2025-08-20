@@ -44,9 +44,7 @@ const PlatformSettings = () => {
     try {
       setLoading(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/platform-settings`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -72,9 +70,9 @@ const PlatformSettings = () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/platform-settings`, {
         method: 'PUT',
+        credentials: "include",
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify(formData)
       });
@@ -100,9 +98,7 @@ const PlatformSettings = () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/platform-settings/reset`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        credentials: "include",
       });
 
       if (response.ok) {

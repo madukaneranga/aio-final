@@ -102,9 +102,9 @@ const PostCreator = () => {
   const createPostAPI = async (postData) => {
     const response = await fetch('/api/posts', {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
       body: JSON.stringify(postData)
     });
@@ -123,9 +123,7 @@ const PostCreator = () => {
     if (query.length > 2) {
       try {
         const response = await fetch(`/api/posts/products/search?q=${encodeURIComponent(query)}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+          credentials: "include",
         });
 
         if (response.ok) {

@@ -73,10 +73,7 @@ const Header = () => {
       `${import.meta.env.VITE_API_URL}/api/auth/switch-role`,
       {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        credentials: "include",
       }
     );
     if (!response.ok) {

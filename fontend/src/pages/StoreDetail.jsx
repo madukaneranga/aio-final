@@ -9,6 +9,8 @@ import "swiper/css/pagination";
 import { Star, ArrowLeft } from "lucide-react";
 import StoreHero from "../components/StoreHero";
 import StoreInfo from "../components/StoreInfo";
+import ChatPopup from '../components/Chat/ChatPopup';
+import { set } from "mongoose";
 
 const StoreDetail = () => {
   const viewUpdateAttempted = useRef(new Set());
@@ -22,6 +24,26 @@ const StoreDetail = () => {
     isFollowing: false,
     isOwnStore: false,
   });
+
+  // Data fetching effect
+  useEffect(() => {
+    const loadAllData = async () => {
+      if (!id) return;
+
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchStoreData(),
+          fetchReviews(),
+          fetchFollowData(),
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAllData();
+  }, [id]);
 
   const handleExploreClick = () => {
     itemsRef.current?.scrollIntoView({
@@ -39,15 +61,6 @@ const StoreDetail = () => {
   };
   const itemsRef = useRef(null);
   const contactRef = useRef(null);
-
-  // Data fetching effect
-  useEffect(() => {
-    if (id) {
-      fetchStoreData();
-      fetchReviews();
-      fetchFollowData();
-    }
-  }, [id]);
 
   // View tracking effect - separate and idempotent
   useEffect(() => {
@@ -86,7 +99,6 @@ const StoreDetail = () => {
 
   const fetchFollowData = async () => {
     try {
-      setLoading(true);
       setError("");
 
       const token = localStorage.getItem("token");
@@ -102,10 +114,7 @@ const StoreDetail = () => {
       }/api/stores/${id}/follow-check`;
 
       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -119,13 +128,10 @@ const StoreDetail = () => {
       setError("Failed to load follow data");
       // Set defaults on error
       setFollowData({ isFollowing: false, isOwnStore: false });
-    } finally {
-      setLoading(false);
     }
   };
   const fetchStoreData = async () => {
     try {
-      setLoading(true);
       setError("");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/stores/${id}`
@@ -140,13 +146,12 @@ const StoreDetail = () => {
     } catch (error) {
       console.error("Error fetching store data:", error);
       setError("Failed to load store data");
-    } finally {
-      setLoading(false);
     }
   };
 
   const fetchReviews = async () => {
     try {
+      setError("");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/reviews/store/${id}`
       );
@@ -490,6 +495,13 @@ const StoreDetail = () => {
           )}
         </div>
       </div>
+      {user && user.role === 'customer' && (
+        <ChatPopup
+          storeId={store._id}
+          position="bottom-left"
+          user={user}
+        />
+      )}
     </div>
   );
 };
