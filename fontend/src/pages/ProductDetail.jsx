@@ -4,6 +4,7 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import ImageGallery from "../components/ImageGallery";
 import { formatLKR } from "../utils/currency";
+import ChatPopup from "../components/Chat/ChatPopup";
 import {
   ShoppingCart,
   Plus,
@@ -756,6 +757,15 @@ const ProductDetail = () => {
           )}
         </div>
       </div>
+
+      {user && user.role === "customer" && (
+        <ChatPopup
+          storeId={product.storeId}
+          productId={product._id}
+          position="bottom-left"
+          user={user}
+        />
+      )}
     </div>
   );
 };

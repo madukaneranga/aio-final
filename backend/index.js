@@ -10,6 +10,8 @@ import app from "./app.js";
 
 // --- Import Models ---
 import User from "./models/User.js";
+import Chat from "./models/Chat.js";
+import ChatAnalytics from "./models/ChatAnalytics.js";
 
 // --- Import Utilities ---
 import { setSocketInstance } from "./utils/socketUtils.js";
@@ -95,12 +97,19 @@ const roomUserMap = new Map(); // Track users in rooms
 io.userSocketMap = userSocketMap;
 setSocketInstance(io);
 
+import {
+  initializeChatHandlers,
+  handleChatDisconnect,
+} from "./utils/chatSocketHandlers.js";
+
 io.on("connection", (socket) => {
   const { userId, user } = socket;
 
   console.log(
     `🔌 Socket connected: ${user.name} (${userId}) - Socket ID: ${socket.id}`
   );
+
+  initializeChatHandlers(io, socket);
 
   // Join user to their personal room
   socket.join(userId);
@@ -168,6 +177,8 @@ io.on("connection", (socket) => {
 
   // Handle disconnect
   socket.on("disconnect", (reason) => {
+    handleChatDisconnect(io, socket);
+
     console.log(
       `🔌 Socket disconnected: ${user.name} (${userId}) - Reason: ${reason}`
     );
@@ -280,7 +291,7 @@ const gracefulShutdown = async (signal) => {
     console.log("⚠️ Shutdown already in progress, forcing exit...");
     process.exit(1);
   }
-  
+
   isShuttingDown = true;
   console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
 
@@ -292,18 +303,18 @@ const gracefulShutdown = async (signal) => {
   try {
     // Disconnect all socket connections
     console.log("🔌 Closing Socket.IO connections...");
-    
+
     // Send disconnect message to all clients
     io.emit("server-shutdown", { message: "Server is shutting down" });
-    
+
     // Close all socket connections
     const sockets = await io.fetchSockets();
     console.log(`🔌 Found ${sockets.length} active connections`);
-    
+
     for (const socket of sockets) {
       socket.disconnect(true);
     }
-    
+
     // Close Socket.IO server
     io.close(() => {
       console.log("🔌 Socket.IO server closed");
@@ -316,7 +327,6 @@ const gracefulShutdown = async (signal) => {
 
     console.log("✅ Graceful shutdown completed");
     process.exit(0);
-    
   } catch (error) {
     console.error("❌ Error during shutdown:", error);
     process.exit(1);

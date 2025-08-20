@@ -51,6 +51,7 @@ import Test from "./pages/Test";
 import NewPost from "./pages/NewPost";
 import SocialFeed from "./pages/SocialFeed";
 import CustomSales from "./pages/CustomSales";
+import ChatDashboard from "./pages/ChatDashboard";
 
 import "./App.css";
 
@@ -173,6 +174,9 @@ function App() {
                               path="/sub-management"
                               element={<SubscriptionManagement />}
                             />
+
+                            <Route path="/chats" element={<ChatDashboard />} />
+
                             <Route path="/sale" element={<CustomSales />} />
                             <Route path="/test" element={<Test />} />
                             <Route path="/new-post" element={<NewPost />} />
