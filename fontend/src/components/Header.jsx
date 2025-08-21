@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { useNotifications } from "../contexts/NotificationContext";
 import RoleSwitching from "./RoleSwitching";
+import MegaMenu from "./Category/MegaMenu";
 import {
   Search,
   ShoppingCart,
@@ -28,6 +29,8 @@ const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSwitching, setIsSwitching] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,6 +49,18 @@ const Header = () => {
     // DON'T call handleSearch here!
   };
 
+  const handleCategoryNavigation = (category, subcategory, childCategory) => {
+    // Handle navigation logic here
+    console.log("Navigate to:", {
+      category: category.name,
+      subcategory: subcategory?.name,
+      childCategory,
+    });
+
+    // Example: You could use react-router here
+    // navigate(`/category/${category._id}${subcategory ? `/${subcategory.name}` : ''}${childCategory ? `/${childCategory}` : ''}`);
+  };
+
   // This should ONLY run on form submit
   const handleSearch = (e) => {
     e.preventDefault();
@@ -56,6 +71,23 @@ const Header = () => {
       navigate(searchUrl);
     }
   };
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/categories`
+        );
+        if (!res.ok) throw new Error("Failed to fetch categories");
+        const data = await res.json();
+        setCategories(data);
+      } catch (err) {
+        console.error("Error loading categories:", err);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Add this inside your component
   useEffect(() => {
@@ -112,6 +144,38 @@ const Header = () => {
     orderItems.reduce((sum, item) => sum + item.quantity, 0) +
     bookingItems.length;
 
+  // Menu Button Component (3-lines icon)
+  const MenuButton = ({ onClick, isOpen }) => (
+    <button
+      onClick={onClick}
+      className="p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      aria-label="Toggle menu"
+    >
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        {isOpen ? (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        ) : (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        )}
+      </svg>
+    </button>
+  );
+
   return (
     <>
       <RoleSwitching currentRole={user?.role} isTransitioning={isSwitching} />
@@ -130,6 +194,11 @@ const Header = () => {
             >
               AIO
             </Link>
+            {/* Menu Button */}
+            <MenuButton
+              onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
+              isOpen={isCategoryMenuOpen}
+            />
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex space-x-8">
@@ -441,6 +510,13 @@ const Header = () => {
           )}
         </div>
       </header>
+      {/* Mega Menu */}
+      <MegaMenu
+        categories={categories}
+        isOpen={isCategoryMenuOpen}
+        onClose={() => setIsCategoryMenuOpen(false)}
+        onCategoryClick={handleCategoryNavigation}
+      />
     </>
   );
 };
