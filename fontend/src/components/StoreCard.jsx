@@ -17,21 +17,36 @@ const StoreCard = ({ store }) => {
   const [productCount, setProductCount] = useState(0);
   const { user } = useAuth();
 
-  useEffect(() => {
+useEffect(() => {
     const fetchCount = async () => {
-      try {
-        const response = await fetch(`/api/stores/${store._id}/item-count`);
-        const data = await response.json();
-        // Fix: Extract the count property from the response object
-        setProductCount(data.count);
-      } catch (err) {
-        console.error("Error fetching product count", err);
-        setProductCount(0); // Set fallback value on error
-      }
+        try {
+            const response = await fetch(`/api/stores/${store._id}/item-count`);
+            
+            // Check if the response is ok
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // Check content type before parsing
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.log('Non-JSON response received:', text.substring(0, 200));
+                throw new Error('Server returned HTML instead of JSON');
+            }
+            
+            const data = await response.json();
+            setProductCount(data.count);
+        } catch (err) {
+            console.error("Error fetching product count", err);
+            setProductCount(0);
+        }
     };
 
-    fetchCount();
-  }, [store._id]);
+    if (store._id) { // Only fetch if store._id exists
+        fetchCount();
+    }
+}, [store._id]);
 
   const isNew = () => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
