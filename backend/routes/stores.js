@@ -301,13 +301,27 @@ router.get("/featured/list", async (req, res) => {
   }
 });
 
-router.get("/:storeId/product-count", async (req, res) => {
+router.get("/:storeId/item-count", async (req, res) => {
   try {
     const storeId = req.params.storeId;
-    const count = await Product.countDocuments({ storeId, isActive: true });
+    const store = await Store.findById(storeId);
+
+    if (!store) {
+      return res.status(404).json({ error: "Store not found" });
+    }
+
+    let count = 0;
+
+    if (store.type === "product") {
+      count = await Product.countDocuments({ storeId, isActive: true });
+    } else if (store.type === "service") {
+      count = await Service.countDocuments({ storeId, isActive: true });
+    }
+
     res.json({ count });
   } catch (error) {
-    res.status(500).json({ error: "Failed to get active product count" });
+    console.error("Error fetching item count:", error);
+    res.status(500).json({ error: "Failed to get active item count" });
   }
 });
 

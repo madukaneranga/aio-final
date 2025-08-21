@@ -39,7 +39,7 @@ const CustomListing = ({ items = [], loading = false, error = null, type = "prod
           description="Try adjusting your search criteria or check back later for new items."
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           {type === "product" &&
             safeItems.map((product) => (
               <ProductCard key={product._id} product={product} />

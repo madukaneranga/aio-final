@@ -20,9 +20,9 @@ const StoreCard = ({ store }) => {
   useEffect(() => {
     const fetchCount = async () => {
       try {
-        const response = await fetch(`/api/stores/${store._id}/product-count`);
+        const response = await fetch(`/api/stores/${store._id}/item-count`);
         const data = await response.json();
-        setProductCount(data.count);
+        setProductCount(data);
       } catch (err) {
         console.error("Error fetching product count", err);
       }
