@@ -22,9 +22,11 @@ const StoreCard = ({ store }) => {
       try {
         const response = await fetch(`/api/stores/${store._id}/item-count`);
         const data = await response.json();
-        setProductCount(data);
+        // Fix: Extract the count property from the response object
+        setProductCount(data.count);
       } catch (err) {
         console.error("Error fetching product count", err);
+        setProductCount(0); // Set fallback value on error
       }
     };
 

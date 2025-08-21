@@ -317,7 +317,6 @@ router.get("/:storeId/item-count", async (req, res) => {
     } else if (store.type === "service") {
       count = await Service.countDocuments({ storeId, isActive: true });
     }
-
     res.json({ count });
   } catch (error) {
     console.error("Error fetching item count:", error);

@@ -9,7 +9,7 @@ import "swiper/css/pagination";
 import { Star, ArrowLeft } from "lucide-react";
 import StoreHero from "../components/StoreHero";
 import StoreInfo from "../components/StoreInfo";
-import ChatPopup from '../components/Chat/ChatPopup';
+import ChatPopup from "../components/Chat/ChatPopup";
 import { set } from "mongoose";
 
 const StoreDetail = () => {
@@ -101,14 +101,6 @@ const StoreDetail = () => {
     try {
       setError("");
 
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        console.log("No token found - user not logged in");
-        setFollowData({ isFollowing: false, isOwnStore: false });
-        return;
-      }
-
       const url = `${
         import.meta.env.VITE_API_URL
       }/api/stores/${id}/follow-check`;
@@ -122,11 +114,11 @@ const StoreDetail = () => {
       }
 
       const data = await response.json();
-      setFollowData(data); // { isFollowing: true/false, isOwnStore: true/false }
+      setFollowData(data);
     } catch (error) {
       console.error("Error fetching follow data:", error);
       setError("Failed to load follow data");
-      // Set defaults on error
+
       setFollowData({ isFollowing: false, isOwnStore: false });
     }
   };
@@ -495,12 +487,8 @@ const StoreDetail = () => {
           )}
         </div>
       </div>
-      {user && user.role === 'customer' && (
-        <ChatPopup
-          storeId={store._id}
-          position="bottom-left"
-          user={user}
-        />
+      {user && user.role === "customer" && (
+        <ChatPopup storeId={store._id} position="bottom-left" user={user} />
       )}
     </div>
   );
