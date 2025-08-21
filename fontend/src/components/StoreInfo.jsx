@@ -74,15 +74,14 @@ const StoreInfo = ({
 
     try {
       setFollowLoading(true);
-      const token = localStorage.getItem("token");
 
-      const response = await fetch(`/api/stores/${storeData._id}/follow`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stores/${storeData._id}/follow`,
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
 
       const data = await response.json();
 
@@ -111,15 +110,14 @@ const StoreInfo = ({
   const confirmUnfollow = async () => {
     try {
       setFollowLoading(true);
-      const token = localStorage.getItem("token");
 
-      const response = await fetch(`/api/stores/${storeData._id}/follow`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stores/${storeData._id}/follow`,
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
 
       const data = await response.json();
 
