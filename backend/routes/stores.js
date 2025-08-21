@@ -82,6 +82,75 @@ router.post("/listing", async (req, res) => {
   }
 });
 
+// Get featured stores
+router.get("/featured/list", async (req, res) => {
+  try {
+    const stores = await Store.find({ isActive: true })
+      .populate("ownerId", "name")
+      .sort({ rating: -1, totalSales: -1 })
+      .limit(6);
+
+    res.json(stores);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create store
+router.post(
+  "/",
+  authenticate,
+  authorize("customer", "store_owner"),
+  async (req, res) => {
+    try {
+      // Check if user already has a store
+      const existingStore = await Store.findOne({ ownerId: req.user._id });
+      if (existingStore) {
+        return res
+          .status(400)
+          .json({ error: "You can only create one store per account" });
+      }
+
+      const {
+        name,
+        type,
+        description,
+        themeColor,
+        contactInfo,
+        heroImages,
+        idImages,
+        addressVerificationImages,
+      } = req.body;
+      const timeSlots = req.body.timeSlots || [];
+
+      const store = new Store({
+        name,
+        type,
+        description,
+        themeColor,
+        heroImages,
+        idImages,
+        addressVerificationImages,
+        ownerId: req.user._id,
+        contactInfo: contactInfo || "{}",
+        timeSlots,
+      });
+
+      await store.save();
+
+      // Update user role to store_owner
+      await User.findByIdAndUpdate(req.user._id, {
+        role: "store_owner",
+        storeId: store._id,
+      });
+
+      res.status(201).json(store);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Get store by ID
 router.get("/:id", async (req, res) => {
   try {
@@ -154,60 +223,7 @@ router.get("/:id/follow-check", authenticate, async (req, res) => {
   }
 });
 
-// Create store
-router.post(
-  "/",
-  authenticate,
-  authorize("customer", "store_owner"),
-  async (req, res) => {
-    try {
-      // Check if user already has a store
-      const existingStore = await Store.findOne({ ownerId: req.user._id });
-      if (existingStore) {
-        return res
-          .status(400)
-          .json({ error: "You can only create one store per account" });
-      }
 
-      const {
-        name,
-        type,
-        description,
-        themeColor,
-        contactInfo,
-        heroImages,
-        idImages,
-        addressVerificationImages,
-      } = req.body;
-      const timeSlots = req.body.timeSlots || [];
-
-      const store = new Store({
-        name,
-        type,
-        description,
-        themeColor,
-        heroImages,
-        idImages,
-        addressVerificationImages,
-        ownerId: req.user._id,
-        contactInfo: contactInfo || "{}",
-        timeSlots,
-      });
-
-      await store.save();
-
-      // Update user role to store_owner
-      await User.findByIdAndUpdate(req.user._id, {
-        role: "store_owner",
-        storeId: store._id,
-      });
-
-      res.status(201).json(store);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
 
 // Update store
 router.put("/:id", authenticate, authorize("store_owner"), async (req, res) => {
@@ -287,19 +303,7 @@ router.put(
     }
   }
 );
-// Get featured stores
-router.get("/featured/list", async (req, res) => {
-  try {
-    const stores = await Store.find({ isActive: true })
-      .populate("ownerId", "name")
-      .sort({ rating: -1, totalSales: -1 })
-      .limit(6);
 
-    res.json(stores);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 router.get("/:storeId/item-count", async (req, res) => {
   try {
