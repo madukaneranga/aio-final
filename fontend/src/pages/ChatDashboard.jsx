@@ -1,6 +1,6 @@
 import useChat from "../hooks/useChat";
 import { useAuth } from "../contexts/AuthContext";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import ChatList from "../components/Chat/dashboards/shared/ChatList";
 import CustomerInfo from "../components/Chat/dashboards/shared/CustomerInfo";
 import ChatInterface from "../components/Chat/dashboards/shared/ChatInterface";
@@ -26,26 +26,7 @@ const ChatDashboard = () => {
 
   // ALWAYS call useChat hook - NEVER conditionally
   const chatHook = useChat(memoizedUser);
-  useEffect(() => {
-    console.log("🔍 Chat Hook State:", {
-      conversations: chatHook.conversations,
-      conversationsLength: chatHook.conversations?.length,
-      isLoading: chatHook.isLoading,
-      error: chatHook.error,
-      isConnected: chatHook.isConnected,
-    });
 
-    // Log each conversation structure
-    chatHook.conversations?.forEach((conv, index) => {
-      console.log(`🗂️ Conversation ${index}:`, {
-        _id: conv._id,
-        id: conv.id,
-        storeId: conv.storeId,
-        customerId: conv.customerId,
-        // ... other properties you want to check
-      });
-    });
-  }, [chatHook.conversations, chatHook.isLoading, chatHook.error]);
   // ALWAYS call useState - NEVER conditionally
   const [selectedChat, setSelectedChat] = useState(null);
 
@@ -62,11 +43,9 @@ const ChatDashboard = () => {
   // Event handlers - define after hooks
   const handleSelectChat = async (chat) => {
     try {
-      console.log("Selected chat:", chat);
       setSelectedChat(chat);
       await chatHook.loadMessages(chat._id);
       await chatHook.markAsRead(chat._id);
-      chatHook.joinChatRoom(chat._id);
     } catch (error) {
       console.error("Failed to load chat:", error);
     }
@@ -77,6 +56,17 @@ const ChatDashboard = () => {
       chatHook.sendMessage(chatHook.activeChat._id, text);
     }
   };
+
+  const handleTyping = useCallback(
+    (chatId, isTyping) => {
+      if (isTyping) {
+        chatHook.startTyping(chatId);
+      } else {
+        chatHook.stopTyping(chatId);
+      }
+    },
+    [chatHook.startTyping, chatHook.stopTyping]
+  );
 
   // NOW we can do conditional rendering - AFTER all hooks are called
   if (authLoading) {
@@ -185,7 +175,7 @@ const ChatDashboard = () => {
                 chat={chatHook.activeChat}
                 user={memoizedUser}
                 onSendMessage={chatHook.sendMessage}
-                onTyping={chatHook.startTyping}
+                onTyping={handleTyping}
                 messages={chatHook.messages}
                 typingUsers={
                   chatHook.getTypingUsers
@@ -224,7 +214,7 @@ const ChatDashboard = () => {
             chat={chatHook.activeChat}
             user={memoizedUser}
             onSendMessage={chatHook.sendMessage}
-            onTyping={chatHook.startTyping}
+            onTyping={handleTyping}
             messages={chatHook.messages}
             typingUsers={
               chatHook.getTypingUsers

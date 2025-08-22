@@ -1,3 +1,4 @@
+import useChat from "../hooks/useChat";
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -5,6 +6,7 @@ import { useCart } from "../contexts/CartContext";
 import { useNotifications } from "../contexts/NotificationContext";
 import RoleSwitching from "./RoleSwitching";
 import MegaMenu from "./Category/MegaMenu";
+
 import {
   Search,
   ShoppingCart,
@@ -18,7 +20,9 @@ import {
   Calendar,
   TrendingUp,
   Wallet,
+  MessageCircle,
 } from "lucide-react";
+import { use } from "react";
 
 const Header = () => {
   const { user, logout, refreshUser } = useAuth();
@@ -33,6 +37,13 @@ const Header = () => {
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const navigate = useNavigate();
 
+    const chatHook = useChat(user);
+  const { 
+    unreadCount: chatUnreadCount = 0, 
+    isConnected: isChatConnected,
+
+  } = chatHook || {};
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -45,7 +56,6 @@ const Header = () => {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchQuery(value);
-    console.log("User typed:", value);
     // DON'T call handleSearch here!
   };
 
@@ -64,10 +74,8 @@ const Header = () => {
   // This should ONLY run on form submit
   const handleSearch = (e) => {
     e.preventDefault();
-    console.log("Form submitted - searching for:", searchQuery);
     if (searchQuery.trim()) {
       const searchUrl = `/products?search=${encodeURIComponent(searchQuery)}`;
-      console.log("Navigating to:", searchUrl);
       navigate(searchUrl);
     }
   };
@@ -89,10 +97,6 @@ const Header = () => {
     loadCategories();
   }, []);
 
-  // Add this inside your component
-  useEffect(() => {
-    console.log("searchQuery state is now:", searchQuery);
-  }, [searchQuery]);
 
   const handleLogout = () => {
     logout();
@@ -288,6 +292,24 @@ const Header = () => {
                 </Link>
               )}
 
+              {user && (
+                <Link
+                  to="/chats"
+                  className="relative p-2 text-gray-700 hover:text-black transition-colors"
+                  aria-label={`You have ${chatUnreadCount} unread messages`}
+                  title={`Chat ${
+                    isChatConnected ? "(Connected)" : "(Disconnected)"
+                  } - ${chatUnreadCount} unread`}
+                >
+                  <MessageCircle className="w-6 h-6" />
+                  {/* Enhanced unread count display */}
+                  {chatUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                      {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {user && (
                 <Link
                   to="/notifications"

@@ -17,16 +17,16 @@ import {
   Download,
   Loader2,
 } from "lucide-react";
-import userProfile from '../../assests/User/user.png'
+import userProfile from "../../assests/User/user.png";
 
 const ChatPopup = ({
   storeId,
   productId = null,
+  serviceId = null,
   position = "bottom-left",
   user,
   onClose,
 }) => {
-
   // State management
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -158,7 +158,7 @@ const ChatPopup = ({
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ storeId, productId }),
+        body: JSON.stringify({ storeId, productId, serviceId }),
       });
 
       const data = await response.json();
@@ -444,7 +444,9 @@ const ChatPopup = ({
     <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-300 rounded-lg p-3 mb-3 shadow-sm">
       <div className="flex items-center">
         <AlertTriangle className="w-4 h-4 text-red-600 mr-2 flex-shrink-0" />
-        <span className="text-red-800 text-sm font-medium">{error.message}</span>
+        <span className="text-red-800 text-sm font-medium">
+          {error.message}
+        </span>
       </div>
       {error.reason && (
         <p className="text-red-700 text-xs mt-1 ml-6">{error.reason}</p>
@@ -468,8 +470,12 @@ const ChatPopup = ({
     }
 
     return (
-      <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-4 group`}>
-        <div className={`max-w-xs lg:max-w-md ${isOwn ? "order-2" : "order-1"}`}>
+      <div
+        className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-4 group`}
+      >
+        <div
+          className={`max-w-xs lg:max-w-md ${isOwn ? "order-2" : "order-1"}`}
+        >
           {!isOwn && (
             <div className="flex items-center mb-2 ml-1">
               <div className="relative">
@@ -478,15 +484,19 @@ const ChatPopup = ({
                   alt={"Store Owner"}
                   className="w-7 h-7 rounded-full mr-3 border-2 border-gray-200 shadow-sm"
                 />
-                <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${onlineStatus ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                <div
+                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                    onlineStatus ? "bg-green-400" : "bg-gray-400"
+                  }`}
+                ></div>
               </div>
             </div>
           )}
 
           <div
             className={`rounded-xl px-4 py-3 shadow-sm transition-all duration-200 group-hover:shadow-md ${
-              isOwn 
-                ? "bg-gradient-to-r from-gray-900 to-black text-white ml-4" 
+              isOwn
+                ? "bg-gradient-to-r from-gray-900 to-black text-white ml-4"
                 : "bg-gradient-to-r from-white to-gray-50 text-gray-900 border border-gray-200 mr-4"
             }`}
           >
@@ -515,13 +525,23 @@ const ChatPopup = ({
                 </div>
                 {message.receipt && (
                   <div className="text-sm space-y-1 bg-gray-50 p-2 rounded border-l-4 border-green-400">
-                    <p><span className="font-medium">Amount:</span> ${message.receipt.amount}</p>
-                    <p><span className="font-medium">Status:</span> <span className="capitalize">{message.receipt.status}</span></p>
+                    <p>
+                      <span className="font-medium">Amount:</span> $
+                      {message.receipt.amount}
+                    </p>
+                    <p>
+                      <span className="font-medium">Status:</span>{" "}
+                      <span className="capitalize">
+                        {message.receipt.status}
+                      </span>
+                    </p>
                   </div>
                 )}
               </div>
             ) : (
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {message.content}
+              </p>
             )}
           </div>
 
@@ -563,7 +583,11 @@ const ChatPopup = ({
                     alt={chat.storeId.name}
                     className="w-10 h-10 rounded-full border-2 border-gray-300 shadow-sm"
                   />
-                  <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${onlineStatus ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                  <div
+                    className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                      onlineStatus ? "bg-green-400" : "bg-gray-400"
+                    }`}
+                  ></div>
                 </div>
               )}
               <div>
@@ -573,7 +597,9 @@ const ChatPopup = ({
                 <div className="flex items-center space-x-2 text-xs text-gray-300">
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      onlineStatus ? "bg-green-400 animate-pulse" : "bg-gray-400"
+                      onlineStatus
+                        ? "bg-green-400 animate-pulse"
+                        : "bg-gray-400"
                     }`}
                   />
                   <span>{onlineStatus ? "Online" : "Offline"}</span>
@@ -622,6 +648,26 @@ const ChatPopup = ({
                   </div>
                 </div>
               )}
+              {/* Tagged Service */}
+              {chat?.taggedService?.serviceId && (
+                <div className="p-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <img
+                      src={chat.taggedService.serviceImage}
+                      alt={chat.taggedService.serviceName}
+                      className="w-12 h-12 rounded-lg object-cover border border-gray-200 shadow-sm"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-900 leading-tight">
+                        {chat.taggedService.serviceName}
+                      </p>
+                      <p className="text-sm text-gray-600 font-medium">
+                        ${chat.taggedService.servicePrice}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Error Message */}
               {error && (
@@ -634,13 +680,21 @@ const ChatPopup = ({
               <div
                 ref={chatContainerRef}
                 className="flex-1 overflow-y-auto p-4 space-y-1 bg-gradient-to-b from-gray-50 to-white"
-                style={{ height: chat?.taggedProduct?.productId ? "calc(100% - 200px)" : "calc(100% - 140px)" }}
+                style={{
+                  height:
+                    chat?.taggedProduct?.productId ||
+                    chat?.taggedService?.serviceId
+                      ? "calc(100% - 200px)"
+                      : "calc(100% - 140px)",
+                }}
               >
                 {isLoading ? (
                   <div className="flex justify-center items-center h-full">
                     <div className="text-center">
                       <Loader2 className="animate-spin h-8 w-8 text-gray-600 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">Loading conversation...</p>
+                      <p className="text-sm text-gray-600">
+                        Loading conversation...
+                      </p>
                     </div>
                   </div>
                 ) : messages.length === 0 ? (
@@ -648,8 +702,12 @@ const ChatPopup = ({
                     <div className="bg-gradient-to-r from-gray-100 to-gray-200 p-4 rounded-full mb-4">
                       <MessageCircle className="w-8 h-8 text-gray-600" />
                     </div>
-                    <p className="text-sm font-medium mb-1">Start a conversation</p>
-                    <p className="text-xs text-center">Send a message to get started with this store</p>
+                    <p className="text-sm font-medium mb-1">
+                      Start a conversation
+                    </p>
+                    <p className="text-xs text-center">
+                      Send a message to get started with this store
+                    </p>
                   </div>
                 ) : (
                   messages.map((message) => (
