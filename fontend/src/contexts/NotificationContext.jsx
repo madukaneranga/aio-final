@@ -49,16 +49,13 @@ export const NotificationProvider = ({ children }) => {
     });
 
     socketRef.current.on("connect", () => {
-      console.log("Connected to socket.io server");
     });
 
     socketRef.current.on("disconnect", () => {
-      console.log("Disconnected from socket.io server");
     });
 
     // Handle new notifications
     socketRef.current.on("new-notification", (notification) => {
-      console.log("New notification via socket:", notification);
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
 

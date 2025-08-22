@@ -27,7 +27,6 @@ const ChatList = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
-  console.log("chats:", chats);
   const filteredChats = chats.filter(
     (chat) =>
       chat.otherParticipant?.name
@@ -146,6 +145,15 @@ const ChatList = ({
                     <ShoppingBag className="w-3 h-3 mr-1" />
                     <span className="truncate">
                       {chat.taggedProduct.productName}
+                    </span>
+                  </div>
+                )}
+                {/* Service Tag for Service Providers */}
+                {userRole === "service_provider" && chat.taggedService && (
+                  <div className="flex items-center mt-1 text-xs text-blue-600">
+                    <ShoppingBag className="w-3 h-3 mr-1" />
+                    <span className="truncate">
+                      {chat.taggedService.serviceName}
                     </span>
                   </div>
                 )}

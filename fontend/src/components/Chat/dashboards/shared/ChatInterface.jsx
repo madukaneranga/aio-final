@@ -42,8 +42,9 @@ const ChatInterface = ({
     if (!isTyping && value.trim()) {
       setIsTyping(true);
       onTyping?.(chat._id, true);
+      
     }
-
+ 
     // Clear previous timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -131,6 +132,14 @@ const ChatInterface = ({
             <div className="flex items-center space-x-2">
               <ShoppingBag className="w-4 h-4" />
               <span className="text-sm">Product: {chat.taggedProduct.productName}</span>
+            </div>
+          </div>
+        )}
+        {chat.taggedService && (
+          <div className="mt-3 p-2 bg-white/10 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm">Service: {chat.taggedService.serviceName}</span>
             </div>
           </div>
         )}

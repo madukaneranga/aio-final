@@ -12,6 +12,7 @@ import ChatAnalytics from "../models/ChatAnalytics.js";
 import User from "../models/User.js";
 import Store from "../models/Store.js";
 import Product from "../models/Product.js";
+import Service from "../models/Service.js";
 import { emitToRoom, isUserOnline } from "../index.js";
 
 const router = express.Router();
@@ -239,7 +240,12 @@ router.get("/customer/chats", authenticate, async (req, res) => {
     customerId: req.user._id,
     status: "active",
   })
-    .populate(["storeOwnerId", "storeId", "taggedProduct.productId"])
+    .populate([
+      "storeOwnerId",
+      "storeId",
+      "taggedProduct.productId",
+      "taggedService.serviceId",
+    ])
     .sort({ "analytics.lastActivity": -1 });
 
   res.json({ success: true, conversations });
@@ -255,7 +261,11 @@ router.get(
       storeId: req.params.storeId,
       status: "active",
     })
-      .populate(["customerId", "taggedProduct.productId"])
+      .populate([
+        "customerId",
+        "taggedProduct.productId",
+        "taggedService.serviceId",
+      ])
       .sort({ "analytics.lastActivity": -1 });
 
     res.json({ success: true, conversations });
@@ -291,6 +301,7 @@ router.get("/conversations", authenticate, async (req, res) => {
         { path: "storeOwnerId", select: "name email profileImage role" },
         { path: "storeId", select: "name profileImage themeColor" },
         { path: "taggedProduct.productId", select: "title images price" },
+        { path: "taggedService.serviceId", select: "title images price" },
       ])
       .sort({ "analytics.lastActivity": -1 })
       .limit(limit * 1)
@@ -341,7 +352,7 @@ router.get("/conversations", authenticate, async (req, res) => {
  */
 router.post("/start", authenticate, async (req, res) => {
   try {
-    const { storeId, productId } = req.body;
+    const { storeId, productId, serviceId } = req.body;
     const customerId = req.user._id;
 
     if (!storeId) {
@@ -377,6 +388,22 @@ router.post("/start", authenticate, async (req, res) => {
         });
       }
     }
+    if (serviceId) {
+      const service = await Service.findById(serviceId);
+      if (!service) {
+        return res.status(404).json({
+          success: false,
+          error: "Service not found",
+        });
+      }
+
+      if (service.storeId.toString() !== storeId) {
+        return res.status(400).json({
+          success: false,
+          error: "Service does not belong to this store",
+        });
+      }
+    }
 
     // Prevent customers from chatting with their own store
     if (
@@ -390,7 +417,12 @@ router.post("/start", authenticate, async (req, res) => {
     }
 
     // Find or create chat
-    const chat = await Chat.findOrCreateChat(customerId, storeId, productId);
+    const chat = await Chat.findOrCreateChat(
+      customerId,
+      storeId,
+      productId,
+      serviceId
+    );
 
     res.json({
       success: true,
@@ -494,6 +526,7 @@ router.get("/search", authenticate, async (req, res) => {
             storeOwner: chat.storeOwnerId,
             store: chat.storeId,
             taggedProduct: chat.taggedProduct,
+            taggedService: chat.taggedService,
           },
         });
       }
@@ -591,6 +624,7 @@ router.get("/:chatId", authenticate, async (req, res) => {
       { path: "storeOwnerId", select: "name email profileImage role" },
       { path: "storeId", select: "name profileImage themeColor contactInfo" },
       { path: "taggedProduct.productId", select: "title images price" },
+      { path: "taggedService.serviceId", select: "title images price" },
     ]);
 
     if (!chat) {
@@ -805,6 +839,13 @@ router.post(
           await dailyAnalytics.updateProductInquiry(
             chat.taggedProduct.productId,
             chat.taggedProduct.productName
+          );
+        }
+        // Update service inquiry if tagged service exists
+        if (chat.taggedService.serviceId) {
+          await dailyAnalytics.updateServiceInquiry(
+            chat.taggedService.serviceId,
+            chat.taggedService.serviceName
           );
         }
       } catch (analyticsError) {
@@ -1400,6 +1441,7 @@ router.get("/:chatId/export", authenticate, async (req, res) => {
       { path: "storeOwnerId", select: "name email" },
       { path: "storeId", select: "name" },
       { path: "taggedProduct.productId", select: "title" },
+      { path: "taggedService.serviceId", select: "title" },
     ]);
 
     if (!chat) {
@@ -1427,6 +1469,7 @@ router.get("/:chatId/export", authenticate, async (req, res) => {
       participants: chat.participants,
       store: chat.storeId,
       taggedProduct: chat.taggedProduct,
+      taggedService: chat.taggedService,
       messages: chat.messages
         .filter((msg) => !msg.isDeleted)
         .map((msg) => ({

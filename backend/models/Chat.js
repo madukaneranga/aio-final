@@ -100,6 +100,7 @@ const chatSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  // Support both products and services
   taggedProduct: {
     productId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -108,6 +109,52 @@ const chatSchema = new mongoose.Schema({
     productName: String,
     productImage: String,
     productPrice: Number,
+    productCategory: String,
+    taggedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  taggedService: {
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Service",
+    },
+    serviceName: String,
+    serviceImage: String,
+    servicePrice: Number,
+    serviceDuration: Number, // in minutes
+    serviceCategory: String,
+    taggedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  // General tagged item (for flexibility)
+  taggedItem: {
+    itemType: {
+      type: String,
+      enum: ["product", "service"],
+    },
+    itemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: 'taggedItem.itemType', // Dynamic reference
+    },
+    itemName: String,
+    itemImage: String,
+    itemPrice: Number,
+    itemDetails: {
+      // For products
+      category: String,
+      brand: String,
+      // For services
+      duration: Number,
+      serviceType: String,
+      availability: [{
+        day: String,
+        slots: [String],
+      }],
+    },
     taggedAt: {
       type: Date,
       default: Date.now,
@@ -219,6 +266,9 @@ chatSchema.index({ customerId: 1 });
 chatSchema.index({ storeOwnerId: 1 });
 chatSchema.index({ "participants.userId": 1 });
 chatSchema.index({ "taggedProduct.productId": 1 });
+chatSchema.index({ "taggedService.serviceId": 1 });
+chatSchema.index({ "taggedItem.itemId": 1 });
+chatSchema.index({ "taggedItem.itemType": 1 });
 chatSchema.index({ status: 1 });
 chatSchema.index({ "analytics.lastActivity": -1 });
 chatSchema.index({ createdAt: -1 });
@@ -237,6 +287,37 @@ chatSchema.virtual("activeParticipants").get(function() {
 // Virtual for chat room ID (for Socket.IO)
 chatSchema.virtual("roomId").get(function() {
   return `chat_${this._id}`;
+});
+
+// Virtual to get the primary tagged item (service takes precedence over product)
+chatSchema.virtual("primaryTaggedItem").get(function() {
+  if (this.taggedItem && this.taggedItem.itemId) {
+    return this.taggedItem;
+  } else if (this.taggedService && this.taggedService.serviceId) {
+    return {
+      itemType: "service",
+      itemId: this.taggedService.serviceId,
+      itemName: this.taggedService.serviceName,
+      itemImage: this.taggedService.serviceImage,
+      itemPrice: this.taggedService.servicePrice,
+      itemDetails: {
+        duration: this.taggedService.serviceDuration,
+        serviceType: this.taggedService.serviceCategory,
+      },
+      taggedAt: this.taggedService.taggedAt,
+    };
+  } else if (this.taggedProduct && this.taggedProduct.productId) {
+    return {
+      itemType: "product",
+      itemId: this.taggedProduct.productId,
+      itemName: this.taggedProduct.productName,
+      itemImage: this.taggedProduct.productImage,
+      itemPrice: this.taggedProduct.productPrice,
+      itemDetails: {},
+      taggedAt: this.taggedProduct.taggedAt,
+    };
+  }
+  return null;
 });
 
 // Pre-save middleware to update analytics
@@ -318,8 +399,50 @@ chatSchema.methods.getUnreadMessages = function(userId) {
   });
 };
 
-// Static method to find or create chat
-chatSchema.statics.findOrCreateChat = async function(customerId, storeId, productId = null) {
+// Method to tag an item (product or service)
+chatSchema.methods.tagItem = async function(itemType, itemId) {
+  if (itemType === "product") {
+    const Product = mongoose.model("Product");
+    const product = await Product.findById(itemId);
+    if (product) {
+      this.taggedItem = {
+        itemType: "product",
+        itemId: product._id,
+        itemName: product.title,
+        itemImage: product.images?.[0],
+        itemPrice: product.price,
+        itemDetails: {
+          category: product.category,
+          brand: product.brand,
+        },
+        taggedAt: new Date(),
+      };
+    }
+  } else if (itemType === "service") {
+    const Service = mongoose.model("Service");
+    const service = await Service.findById(itemId);
+    if (service) {
+      this.taggedItem = {
+        itemType: "service",
+        itemId: service._id,
+        itemName: service.title,
+        itemImage: service.images?.[0],
+        itemPrice: service.price,
+        itemDetails: {
+          duration: service.duration,
+          serviceType: service.category,
+          availability: service.availability,
+        },
+        taggedAt: new Date(),
+      };
+    }
+  }
+  
+  return this.save();
+};
+
+// Static method to find or create chat (updated to support services)
+chatSchema.statics.findOrCreateChat = async function(customerId, storeId, itemType = null, itemId = null) {
   // Find existing chat
   let chat = await this.findOne({
     customerId: customerId,
@@ -329,25 +452,15 @@ chatSchema.statics.findOrCreateChat = async function(customerId, storeId, produc
     { path: "customerId", select: "name email profileImage role" },
     { path: "storeOwnerId", select: "name email profileImage role" },
     { path: "storeId", select: "name profileImage ownerId" },
-    { path: "taggedProduct.productId", select: "title images price" },
+    { path: "taggedProduct.productId", select: "title images price category" },
+    { path: "taggedService.serviceId", select: "title images price duration category" },
+    { path: "taggedItem.itemId", select: "title images price duration category" },
   ]);
   
   if (chat) {
-    // Update tagged product if new product provided
-    if (productId && (!chat.taggedProduct.productId || 
-        chat.taggedProduct.productId.toString() !== productId.toString())) {
-      const Product = mongoose.model("Product");
-      const product = await Product.findById(productId);
-      if (product) {
-        chat.taggedProduct = {
-          productId: product._id,
-          productName: product.title,
-          productImage: product.images[0],
-          productPrice: product.price,
-          taggedAt: new Date(),
-        };
-        await chat.save();
-      }
+    // Update tagged item if new item provided
+    if (itemType && itemId) {
+      await chat.tagItem(itemType, itemId);
     }
     return chat;
   }
@@ -376,21 +489,13 @@ chatSchema.statics.findOrCreateChat = async function(customerId, storeId, produc
     storeOwnerId: store.ownerId,
   };
   
-  // Add tagged product if provided
-  if (productId) {
-    const Product = mongoose.model("Product");
-    const product = await Product.findById(productId);
-    if (product) {
-      newChatData.taggedProduct = {
-        productId: product._id,
-        productName: product.title,
-        productImage: product.images[0],
-        productPrice: product.price,
-      };
-    }
+  chat = new this(newChatData);
+  
+  // Add tagged item if provided
+  if (itemType && itemId) {
+    await chat.tagItem(itemType, itemId);
   }
   
-  chat = new this(newChatData);
   await chat.save();
   
   // Populate and return
@@ -398,7 +503,32 @@ chatSchema.statics.findOrCreateChat = async function(customerId, storeId, produc
     { path: "customerId", select: "name email profileImage role" },
     { path: "storeOwnerId", select: "name email profileImage role" },
     { path: "storeId", select: "name profileImage ownerId" },
-    { path: "taggedProduct.productId", select: "title images price" },
+    { path: "taggedProduct.productId", select: "title images price category" },
+    { path: "taggedService.serviceId", select: "title images price duration category" },
+    { path: "taggedItem.itemId", select: "title images price duration category" },
+  ]);
+};
+
+// Static method to find chats by item
+chatSchema.statics.findChatsByItem = function(itemType, itemId) {
+  const query = { status: { $ne: "archived" } };
+  
+  if (itemType === "product") {
+    query.$or = [
+      { "taggedProduct.productId": itemId },
+      { "taggedItem.itemType": "product", "taggedItem.itemId": itemId }
+    ];
+  } else if (itemType === "service") {
+    query.$or = [
+      { "taggedService.serviceId": itemId },
+      { "taggedItem.itemType": "service", "taggedItem.itemId": itemId }
+    ];
+  }
+  
+  return this.find(query).populate([
+    { path: "customerId", select: "name email profileImage" },
+    { path: "storeOwnerId", select: "name email profileImage" },
+    { path: "storeId", select: "name profileImage" },
   ]);
 };
 
