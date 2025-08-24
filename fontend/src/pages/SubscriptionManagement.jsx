@@ -227,6 +227,11 @@ const SubscriptionManagement = () => {
 
       window.payhere.onCompleted = function (orderId) {
         console.log("✅ Payment completed. Order ID:", orderId);
+        // Refresh subscription data after successful payment
+        setTimeout(() => {
+          fetchSubscription();
+          fetchCurrentPackage();
+        }, 2000);
         resolve(orderId);
       };
 
@@ -270,8 +275,8 @@ const SubscriptionManagement = () => {
         const { paymentParams } = await response.json();
         await loadPayHereSDK();
         await startPayHerePayment(paymentParams);
-        await fetchSubscription();
-        alert(`Your monthly subscription is now active.`);
+        // Remove immediate fetch since onCompleted handler will do it
+        alert(`Payment initiated. Please wait for confirmation.`);
         setView("overview");
       } else {
         const errorData = await response.json();
@@ -327,6 +332,7 @@ const SubscriptionManagement = () => {
         try {
           await loadPayHereSDK();
           await startPayHerePayment(result.paymentParams);
+          alert("Payment initiated. Please wait for confirmation.");
         } catch (paymentError) {
           console.error("❌ Payment failed:", paymentError);
           alert("Payment was not successful. Upgrade was not completed.");
@@ -334,8 +340,8 @@ const SubscriptionManagement = () => {
         }
       }
 
-      setSubscription(result.updatedSubscription || result);
-      alert(`✅ Successfully updated to: ${selectedPackage.toUpperCase()}`);
+      // Remove immediate update since PayHere completion will handle it
+      alert(`Subscription change initiated. Please wait for payment confirmation.`);
       setView("overview");
     } catch (error) {
       console.error("❌ Upgrade Error:", error);
@@ -351,6 +357,10 @@ const SubscriptionManagement = () => {
         {
           method: "POST",
           credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ subscriptionId: subscription?._id }),
         }
       );
 

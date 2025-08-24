@@ -8,9 +8,11 @@ import User from "../models/User.js";
 import Package from "../models/Package.js";
 
 // =================== 🔐 PAYHERE CONFIG ===================
-const PAYHERE_BASE_URL = "https://sandbox.payhere.lk";
-const PAYHERE_MERCHANT_ID = "1231188"; // Replace with live merchant ID when needed
-const PAYHERE_SECRET = "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy"; // Replace with live merchant secret
+const PAYHERE_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? "https://www.payhere.lk" 
+  : "https://sandbox.payhere.lk";
+const PAYHERE_MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || "1231188";
+const PAYHERE_SECRET = process.env.PAYHERE_SECRET || "MTIyNzk3NjY4MTc4NjQ0ODM3NTQxOTczNzI2NjMzOTQwNTgwNjcy";
 
 const PAYHERE_RETURN_URL = "https://aiocart.lk/dashboard";
 const PAYHERE_CANCEL_URL = "https://aiocart.lk/dashboard";
@@ -45,23 +47,38 @@ function generatePayHereHash({
 }
 
 async function getPayHereAccessToken() {
-  const base64Auth = Buffer.from(
-    `${process.env.PAYHERE_APP_ID}:${process.env.PAYHERE_APP_SECRET}`
-  ).toString("base64");
+  const appId = process.env.PAYHERE_APP_ID;
+  const appSecret = process.env.PAYHERE_APP_SECRET;
+  
+  if (!appId || !appSecret) {
+    throw new Error("PayHere APP_ID and APP_SECRET are required in environment variables");
+  }
+  
+  const base64Auth = Buffer.from(`${appId}:${appSecret}`).toString("base64");
 
-  const res = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/oauth/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${base64Auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
+  try {
+    const res = await fetch(`${PAYHERE_BASE_URL}/merchant/v1/oauth/token`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${base64Auth}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials",
+    });
 
-  const data = await res.json();
-  if (!data.access_token)
-    throw new Error("Access token not received from PayHere");
-  return data.access_token;
+    if (!res.ok) {
+      throw new Error(`PayHere OAuth failed: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    if (!data.access_token) {
+      throw new Error("Access token not received from PayHere: " + JSON.stringify(data));
+    }
+    return data.access_token;
+  } catch (error) {
+    console.error("PayHere access token error:", error);
+    throw error;
+  }
 }
 
 // POST /api/subscriptions/create-subscription
@@ -110,7 +127,7 @@ router.post("/create-subscription", authenticate, async (req, res) => {
     });
 
     const paymentParams = {
-      sandbox: true,
+      sandbox: process.env.NODE_ENV !== 'production',
       merchant_id: PAYHERE_MERCHANT_ID,
       return_url: PAYHERE_RETURN_URL,
       cancel_url: PAYHERE_CANCEL_URL,
@@ -184,23 +201,29 @@ router.post("/ipn", async (req, res) => {
     if (status_code === "2") {
       subscription.status = "active";
       subscription.recurrenceId = subscription_id;
-      (subscription.lastChangeAt = new Date()),
-        subscription.paymentHistory.push({
-          paymentId: payment_id,
-          amount: payhere_amount,
-          currency: payhere_currency,
-          paidAt: new Date(),
-        });
+      subscription.lastUpgradeAt = new Date();
+      subscription.paymentHistory.push({
+        localPaymentId: payment_id,
+        amount: payhere_amount,
+        currency: payhere_currency,
+        paidAt: new Date(),
+        status: "completed",
+        paymentMethod: "payhere"
+      });
       await subscription.save();
 
       const user = await User.findById(subscription.userId);
       const store = await Store.findById(subscription.storeId);
 
-      user.subscriptionStatus = "active";
-      await user.save();
+      if (user) {
+        user.subscriptionStatus = "active";
+        await user.save();
+      }
 
-      store.isActive = "true";
-      await user.save();
+      if (store) {
+        store.isActive = true;
+        await store.save();
+      }
     }
 
     res.send("OK");
@@ -214,7 +237,17 @@ router.post("/ipn", async (req, res) => {
 router.post("/cancel", authenticate, async (req, res) => {
   try {
     const { subscriptionId } = req.body;
-    const subscription = await Subscription.findById(subscriptionId);
+    
+    // Find subscription by subscriptionId or by userId if subscriptionId not provided
+    let subscription;
+    if (subscriptionId) {
+      subscription = await Subscription.findById(subscriptionId);
+    } else {
+      subscription = await Subscription.findOne({ 
+        userId: req.user._id, 
+        status: { $in: ['active', 'pending'] }
+      });
+    }
 
     if (!subscription)
       return res.status(404).json({ error: "Subscription not found" });
@@ -224,8 +257,8 @@ router.post("/cancel", authenticate, async (req, res) => {
     }
 
     // Check if 1 month has passed since last upgrade / change
-    if (subscription.lastChangeAt) {
-      const nextAllowedCancelDate = new Date(subscription.lastChangeAt);
+    if (subscription.lastUpgradeAt) {
+      const nextAllowedCancelDate = new Date(subscription.lastUpgradeAt);
       nextAllowedCancelDate.setMonth(nextAllowedCancelDate.getMonth() + 1);
 
       if (new Date() < nextAllowedCancelDate) {
@@ -246,26 +279,37 @@ router.post("/cancel", authenticate, async (req, res) => {
     }
 
     // Cancel subscription on PayHere
-    const accessToken = await getPayHereAccessToken();
+    try {
+      const accessToken = await getPayHereAccessToken();
 
-    const cancelRes = await fetch(
-      `${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
+      const cancelRes = await fetch(
+        `${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
+        }
+      );
+
+      if (!cancelRes.ok) {
+        throw new Error(`PayHere cancel API failed: ${cancelRes.status} ${cancelRes.statusText}`);
       }
-    );
 
-    const cancelData = await cancelRes.json();
+      const cancelData = await cancelRes.json();
 
-    if (cancelData.status !== 1) {
-      return res
-        .status(500)
-        .json({ error: cancelData.msg || "Failed to cancel on PayHere" });
+      if (cancelData.status !== 1) {
+        return res
+          .status(500)
+          .json({ error: cancelData.msg || "Failed to cancel on PayHere" });
+      }
+    } catch (payhereError) {
+      console.error("PayHere cancellation error:", payhereError);
+      return res.status(500).json({ 
+        error: "Failed to cancel subscription with PayHere: " + payhereError.message 
+      });
     }
 
     // Update subscription status locally
@@ -277,11 +321,15 @@ router.post("/cancel", authenticate, async (req, res) => {
     const user = await User.findById(subscription.userId);
     const store = await Store.findById(subscription.storeId);
 
-    user.subscriptionStatus = "inactive";
-    await user.save();
+    if (user) {
+      user.subscriptionStatus = "inactive";
+      await user.save();
+    }
 
-    store.isActive = false; // boolean false for clarity
-    await store.save();
+    if (store) {
+      store.isActive = false;
+      await store.save();
+    }
 
     res.json({ message: "Subscription cancelled successfully" });
   } catch (err) {
@@ -377,8 +425,8 @@ router.put("/upgrade", authenticate, async (req, res) => {
     const isDowngrade = selectedPackage.amount < currentPackage.amount;
 
     // Downgrade cooldown check (2 months)
-    if (isDowngrade && subscription.lastChangeAt) {
-      const nextAllowedDowngrade = new Date(subscription.lastChangeAt);
+    if (isDowngrade && subscription.lastUpgradeAt) {
+      const nextAllowedDowngrade = new Date(subscription.lastUpgradeAt);
       nextAllowedDowngrade.setMonth(nextAllowedDowngrade.getMonth() + 2);
 
       if (new Date() < nextAllowedDowngrade) {
@@ -392,75 +440,75 @@ router.put("/upgrade", authenticate, async (req, res) => {
 
     // Cancel existing PayHere subscription if exists
     if (subscription.recurrenceId) {
-      const token = await getPayHereAccessToken();
-      const cancelRes = await fetch(
-        `${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
-        }
-      );
+      try {
+        const token = await getPayHereAccessToken();
+        const cancelRes = await fetch(
+          `${PAYHERE_BASE_URL}/merchant/v1/subscription/cancel`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ subscription_id: subscription.recurrenceId }),
+          }
+        );
 
-      const cancelData = await cancelRes.json();
-      if (cancelData.status !== 1) {
+        if (!cancelRes.ok) {
+          throw new Error(`PayHere cancel API failed: ${cancelRes.status} ${cancelRes.statusText}`);
+        }
+
+        const cancelData = await cancelRes.json();
+        if (cancelData.status !== 1) {
+          return res.status(500).json({
+            message: cancelData.msg || "Failed to cancel current PayHere subscription",
+          });
+        }
+
+        // Mark old subscription as cancelled
+        subscription.status = "cancelled";
+        subscription.cancelledAt = new Date();
+        await subscription.save();
+      } catch (payhereError) {
+        console.error("PayHere upgrade cancellation error:", payhereError);
         return res.status(500).json({
-          message:
-            cancelData.msg || "Failed to cancel current PayHere subscription",
+          message: "Failed to cancel existing subscription: " + payhereError.message,
         });
       }
-
-      subscription.status = "cancelled";
-      subscription.cancelledAt = new Date();
-      await subscription.save();
     }
 
-    // Create new subscription for the selected package,
-    // copying old payment history
+    // Update existing subscription instead of creating new one
     const now = new Date();
-    const endDate = new Date(now);
-    endDate.setMonth(endDate.getMonth() + 1);
-
     const store = await Store.findById(subscription.storeId);
+    
+    // Update subscription details
+    subscription.amount = selectedPackage.amount;
+    subscription.package = selectedPackage.name;
+    subscription.status = "pending";
+    subscription.lastUpgradeAt = now;
+    subscription.recurrenceId = null; // Reset recurrenceId for new payment
+    
+    await subscription.save();
 
-    const newSubscription = new Subscription({
-      userId,
-      storeId: subscription.storeId,
-      plan: "monthly",
-      amount: selectedPackage.amount,
-      currency: "LKR",
-      status: "pending",
-      startDate: now,
-      endDate,
-      paymentHistory: subscription.paymentHistory || [],
-      package: selectedPackage.name,
-      lastChangeAt: now,
-    });
-
-    await newSubscription.save();
-
-    const orderId = `SUB_${newSubscription._id}`;
+    const orderId = `SUB_${subscription._id}`;
     const hash = generatePayHereHash({
       merchantId: PAYHERE_MERCHANT_ID,
       orderId,
-      amount: newSubscription.amount,
-      currency: newSubscription.currency,
+      amount: subscription.amount,
+      currency: subscription.currency,
       merchantSecret: PAYHERE_SECRET,
     });
 
     const paymentParams = {
-      sandbox: true,
+      sandbox: process.env.NODE_ENV !== 'production',
       merchant_id: PAYHERE_MERCHANT_ID,
       return_url: PAYHERE_RETURN_URL,
       cancel_url: PAYHERE_CANCEL_URL,
       notify_url: PAYHERE_NOTIFY_URL,
       order_id: orderId,
       items: `Subscription (${selectedPackage.name}) for ${store.name}`,
-      currency: newSubscription.currency,
-      amount: parseFloat(newSubscription.amount).toFixed(2),
+      currency: subscription.currency,
+      amount: parseFloat(subscription.amount).toFixed(2),
       first_name: req.user.name?.split(" ")[0] || "Customer",
       last_name: req.user.name?.split(" ")[1] || "Name",
       email: req.user.email || "no-reply@aiocart.lk",
@@ -478,7 +526,7 @@ router.put("/upgrade", authenticate, async (req, res) => {
       message: `Subscription ${
         isDowngrade ? "downgrade" : "upgrade"
       } initiated. Please proceed to payment.`,
-      subscriptionId: newSubscription._id,
+      subscriptionId: subscription._id,
       paymentParams,
       paymentRequired: true,
     });
