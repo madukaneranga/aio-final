@@ -5,7 +5,7 @@ import ProductCard from "../components/ProductCard";
 import ServiceCard from "../components/ServiceCard";
 import StoreCard from "../components/StoreCard";
 import LuxuryHeroSection from "../components/LuxuryHeroSection";
-import CategorySection from "../components/CategorySection";
+import EnhancedCategorySection from "../components/EnhancedCategorySection";
 import FlashDealsBanner from "../components/FlashDealSection";
 import HeroBanner from "../components/HeroBanner";
 import {
@@ -222,22 +222,22 @@ const Home = () => {
         />
       )}
 
-      <section className="py-0 bg-white" ref={shopNowRef}>
-        <CategorySection categories={categories} />
+      <section className="py-0" ref={shopNowRef}>
+        <EnhancedCategorySection categories={categories} />
       </section>
 
       {/* Featured Products */}
       <section className="py-5 bg-gray-50">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight font-sans">
               Featured Products
             </h2>
           </div>
 
           {featuredProducts.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
                 {featuredProducts.map((product) => (
                   <ProductCard key={product._id} product={product} />
                 ))}
@@ -265,14 +265,14 @@ const Home = () => {
       <section className="py-5 bg-white">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight font-sans">
               Featured Services
             </h2>
           </div>
 
           {featuredServices.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
                 {featuredServices.map((service) => (
                   <ServiceCard key={service._id} service={service} />
                 ))}
@@ -299,10 +299,10 @@ const Home = () => {
       {/* Call to Action */}
       <section className="py-10 bg-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold mb-6">
+          <h2 className="text-4xl md:text-5xl font-black mb-6 leading-tight font-sans">
             Start Your Business Journey
           </h2>
-          <p className="text-xl mb-10 opacity-90 max-w-2xl mx-auto">
+          <p className="text-xl mb-10 opacity-90 max-w-2xl mx-auto font-body">
             Join thousands of successful entrepreneurs and start earning today.
             Create your store in minutes.
           </p>
@@ -329,14 +329,14 @@ const Home = () => {
       <section className="py-5 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight font-sans">
               Premium Stores
             </h2>
           </div>
 
           {featuredStores.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {featuredStores.map((store) => (
                   <StoreCard key={store._id} store={store} />
                 ))}

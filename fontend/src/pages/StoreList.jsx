@@ -96,7 +96,7 @@ const StoreList = () => {
             description="Try adjusting your search criteria or check back later for new stores."
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {stores.map((store) => (
               <StoreCard key={store._id} store={store} />
             ))}

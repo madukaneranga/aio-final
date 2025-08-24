@@ -32,11 +32,14 @@ const StoreDetail = () => {
 
       setLoading(true);
       try {
-        await Promise.all([
+        const promises = [
           fetchStoreData(),
           fetchReviews(),
-          fetchFollowData(),
-        ]);
+          fetchFollowData()
+        ];
+        
+        
+        await Promise.all(promises);
       } finally {
         setLoading(false);
       }
@@ -110,15 +113,20 @@ const StoreDetail = () => {
       });
 
       if (!response.ok) {
+        // If user is not authenticated, just set default values
+        if (response.status === 401) {
+          setFollowData({ isFollowing: false, isOwnStore: false });
+          return;
+        }
         throw new Error(`Failed to fetch follow data: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log("Follow data:", data);
       setFollowData(data);
     } catch (error) {
       console.error("Error fetching follow data:", error);
-      setError("Failed to load follow data");
-
+      // Don't show error for follow data, just set defaults
       setFollowData({ isFollowing: false, isOwnStore: false });
     }
   };
@@ -304,7 +312,7 @@ const StoreDetail = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4">
               {listings.map((item) =>
                 store.type === "product" ? (
                   <ProductCard key={item._id} product={item} />

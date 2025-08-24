@@ -6,7 +6,7 @@ import Store from "../models/Store.js";
 import Product from "../models/Product.js";
 import Service from "../models/Service.js";
 import User from "../models/User.js";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -190,7 +190,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.get("/:id/follow-check", authenticate, async (req, res) => {
+router.get("/:id/follow-check", optionalAuth, async (req, res) => {
   try {
     console.log("Fetching store with ID:", req.params.id);
 
@@ -206,10 +206,15 @@ router.get("/:id/follow-check", authenticate, async (req, res) => {
 
     console.log("Store found:", store.name, "Type:", store.type);
 
-    // Since authenticate middleware ensures req.user exists, no need to check
-    const user = await User.findById(req.user._id);
-    const isFollowing = user?.followingStores.includes(req.params.id) || false;
-    const isOwnStore = store.ownerId._id.toString() === req.user._id.toString();
+    // Handle both authenticated and unauthenticated users
+    let isFollowing = false;
+    let isOwnStore = false;
+    
+    if (req.user) {
+      const user = await User.findById(req.user._id);
+      isFollowing = user?.followingStores.some(id => id.toString() === req.params.id) || false;
+      isOwnStore = store.ownerId._id.toString() === req.user._id.toString();
+    }
 
     console.log("Sending follow response:", { isFollowing, isOwnStore });
 
@@ -348,7 +353,7 @@ router.post("/:storeId/follow", authenticate, async (req, res) => {
 
     // Check if already following
     const user = await User.findById(userId);
-    const isFollowing = user.followingStores.includes(storeId);
+    const isFollowing = user.followingStores.some(id => id.toString() === storeId);
 
     if (isFollowing) {
       // UNFOLLOW - Remove from both arrays

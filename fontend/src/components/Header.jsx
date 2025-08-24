@@ -1,9 +1,9 @@
-import useChat from "../hooks/useChat";
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { useNotifications } from "../contexts/NotificationContext";
+import { useGlobalChat } from "../contexts/ChatContext";
 import RoleSwitching from "./RoleSwitching";
 import MegaMenu from "./Category/MegaMenu";
 
@@ -37,12 +37,20 @@ const Header = () => {
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const navigate = useNavigate();
 
-    const chatHook = useChat(user);
-  const { 
-    unreadCount: chatUnreadCount = 0, 
-    isConnected: isChatConnected,
+  const { globalUnreadCount: chatUnreadCount = 0, isConnected: isChatConnected, initializeSocket } = useGlobalChat();
 
-  } = chatHook || {};
+  // Initialize global chat socket when user is available
+  useEffect(() => {
+    if (user?.id) {
+      console.log('📱 Header: Initializing chat socket for user:', user.id);
+      initializeSocket(user);
+    }
+  }, [user?.id, initializeSocket]);
+
+  // Debug: Log unread count changes
+  useEffect(() => {
+    console.log('📱 Header: Chat unread count changed:', chatUnreadCount, 'Connected:', isChatConnected);
+  }, [chatUnreadCount, isChatConnected]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -190,44 +198,68 @@ const Header = () => {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link
-              to="/"
-              className="text-2xl font-bold text-black hover:text-gray-700 transition-colors"
-            >
-              AIO
-            </Link>
-            {/* Menu Button */}
-            <MenuButton
-              onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
-              isOpen={isCategoryMenuOpen}
-            />
+          <div className="flex items-center justify-between h-16">
+            {/* Left Section: Logo + Menu Button */}
+            <div className="flex items-center space-x-4">
+              <Link
+                to="/"
+                className="text-3xl font-black text-black hover:text-gray-700 transition-colors tracking-tight font-sans"
+              >
+                AIO
+              </Link>
+              <MenuButton
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsCategoryMenuOpen(!isCategoryMenuOpen);
+                }}
+                isOpen={isCategoryMenuOpen}
+              />
+            </div>
+
+            {/* Center Section: Search Bar (Desktop) */}
+            <div className="hidden lg:flex flex-1 justify-center max-w-2xl mx-8">
+              <form
+                onSubmit={handleSearch}
+                className="w-full max-w-lg"
+              >
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={handleInputChange}
+                    placeholder="Search products & services..."
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent shadow-sm text-sm"
+                  />
+                </div>
+              </form>
+            </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex space-x-8">
+            <nav className="hidden lg:flex items-center space-x-6">
               <Link
                 to="/products"
-                className="text-gray-700 hover:text-black transition-colors font-medium"
+                className="text-gray-600 hover:text-black transition-colors font-medium text-sm"
               >
                 Products
               </Link>
               <Link
                 to="/services"
-                className="text-gray-700 hover:text-black transition-colors font-medium"
+                className="text-gray-600 hover:text-black transition-colors font-medium text-sm"
               >
                 Services
               </Link>
               <Link
                 to="/stores"
-                className="text-gray-700 hover:text-black transition-colors font-medium"
+                className="text-gray-600 hover:text-black transition-colors font-medium text-sm"
               >
                 Stores
               </Link>
               {user?.role === "store_owner" && (
                 <Link
                   to="/dashboard"
-                  className="text-gray-700 hover:text-black transition-colors font-medium"
+                  className="text-gray-600 hover:text-black transition-colors font-medium text-sm"
                 >
                   Dashboard
                 </Link>
@@ -235,11 +267,11 @@ const Header = () => {
               {/* Switch Role Button */}
               {user && (
                 <button
-                  onClick={handleRoleSwitch} // <-- calls the function we defined
-                  className={`font-medium transition-colors ${
+                  onClick={handleRoleSwitch}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     user?.role === "store_owner"
-                      ? "text-black hover:text-gray-700"
-                      : "bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 bg-clip-text text-transparent hover:opacity-80 animate-pulse"
+                      ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      : "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 shadow-md"
                   }`}
                 >
                   {user?.role === "store_owner"
@@ -249,34 +281,17 @@ const Header = () => {
               )}
             </nav>
 
-            {/* Search Bar */}
-            <form
-              onSubmit={handleSearch}
-              className="hidden lg:flex items-center space-x-2"
-            >
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={handleInputChange}
-                  placeholder="Search products & services..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent w-64"
-                />
-              </div>
-            </form>
-
             {/* Right Side Actions */}
-            <div className="flex items-center space-x-4">
-              {/* Cart - Only for customers */}
+            <div className="flex items-center space-x-2">
+              {/* Action Icons */}
               {user?.role === "customer" && (
                 <Link
                   to="/cart"
-                  className="relative p-2 text-gray-700 hover:text-black transition-colors"
+                  className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
                 >
-                  <ShoppingCart className="w-6 h-6" />
+                  <ShoppingCart className="w-5 h-5" />
                   {totalItems > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="absolute -top-0.5 -right-0.5 bg-black text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
                       {totalItems}
                     </span>
                   )}
@@ -286,39 +301,39 @@ const Header = () => {
               {user?.role === "store_owner" && (
                 <Link
                   to="/wallet-dashboard"
-                  className="relative p-2 text-gray-700 hover:text-black transition-colors"
+                  className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
                 >
-                  <Wallet className="w-6 h-6" />
+                  <Wallet className="w-5 h-5" />
                 </Link>
               )}
 
               {user && (
                 <Link
                   to="/chats"
-                  className="relative p-2 text-gray-700 hover:text-black transition-colors"
+                  className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
                   aria-label={`You have ${chatUnreadCount} unread messages`}
                   title={`Chat ${
                     isChatConnected ? "(Connected)" : "(Disconnected)"
                   } - ${chatUnreadCount} unread`}
                 >
-                  <MessageCircle className="w-6 h-6" />
-                  {/* Enhanced unread count display */}
+                  <MessageCircle className="w-5 h-5" />
                   {chatUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 font-medium">
                       {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                     </span>
                   )}
                 </Link>
               )}
+              
               {user && (
                 <Link
                   to="/notifications"
-                  className="relative p-2 text-gray-700 hover:text-black transition-colors"
+                  className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
                   aria-label={`You have ${unreadCount} unread notifications`}
                 >
-                  <Bell className="w-6 h-6" />
+                  <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
                       {unreadCount}
                     </span>
                   )}
@@ -464,12 +479,13 @@ const Header = () => {
               {/* Mobile Menu Toggle */}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden p-2 text-gray-700 hover:text-black transition-colors"
+                className="lg:hidden p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all ml-2"
+                aria-label="Toggle mobile menu"
               >
                 {isMenuOpen ? (
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 ) : (
-                  <Menu className="w-6 h-6" />
+                  <Menu className="w-5 h-5" />
                 )}
               </button>
             </div>
@@ -477,54 +493,75 @@ const Header = () => {
 
           {/* Mobile Menu */}
           {isMenuOpen && (
-            <div className="md:hidden py-4 border-t border-gray-200">
-              <div className="space-y-4">
+            <div className="lg:hidden border-t border-gray-100 bg-white">
+              <div className="py-4 space-y-4">
+                {/* Mobile Search */}
                 <form
                   onSubmit={handleSearch}
-                  className="flex items-center space-x-2"
+                  className="px-4"
                 >
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       type="text"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                      onChange={handleInputChange}
+                      placeholder="Search products & services..."
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-sm"
                     />
                   </div>
                 </form>
 
-                <nav className="space-y-2">
-                  <Link
-                    to="/stores"
-                    className="block text-gray-700 hover:text-black transition-colors font-medium"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Stores
-                  </Link>
+                {/* Mobile Navigation */}
+                <nav className="px-4 space-y-1">
                   <Link
                     to="/products"
-                    className="block text-gray-700 hover:text-black transition-colors font-medium"
+                    className="flex items-center px-3 py-2.5 text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors font-medium"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Products
                   </Link>
                   <Link
                     to="/services"
-                    className="block text-gray-700 hover:text-black transition-colors font-medium"
+                    className="flex items-center px-3 py-2.5 text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors font-medium"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Services
                   </Link>
+                  <Link
+                    to="/stores"
+                    className="flex items-center px-3 py-2.5 text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors font-medium"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Stores
+                  </Link>
                   {user?.role === "store_owner" && (
                     <Link
                       to="/dashboard"
-                      className="block text-gray-700 hover:text-black transition-colors font-medium"
+                      className="flex items-center px-3 py-2.5 text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors font-medium"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Dashboard
                     </Link>
+                  )}
+                  
+                  {/* Mobile Role Switch */}
+                  {user && (
+                    <button
+                      onClick={() => {
+                        handleRoleSwitch();
+                        setIsMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-all font-medium ${
+                        user?.role === "store_owner"
+                          ? "text-gray-600 hover:text-black hover:bg-gray-50"
+                          : "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
+                      }`}
+                    >
+                      {user?.role === "store_owner"
+                        ? "Switch to Buying"
+                        : "Switch to Selling"}
+                    </button>
                   )}
                 </nav>
               </div>

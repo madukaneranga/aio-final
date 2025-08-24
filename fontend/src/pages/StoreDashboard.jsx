@@ -15,9 +15,11 @@ import {
   Trash2,
   Eye,
   Star,
+  Wallet,
 } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import useUserPackage from "../hooks/useUserPackage";
+import { useWallet } from "../hooks/useWallet";
 
 const StoreDashboard = () => {
   const { user } = useAuth();
@@ -40,6 +42,13 @@ const StoreDashboard = () => {
     headerImagesInfo,
     variantsInfo,
   } = useUserPackage();
+
+  const {
+    wallet,
+    summary: walletSummary,
+    analytics,
+    loading: walletLoading,
+  } = useWallet();
 
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
@@ -411,6 +420,20 @@ const StoreDashboard = () => {
           )}
 
           <Link
+            to="/wallet-dashboard"
+            className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
+          >
+            <Wallet className="w-8 h-8 text-green-600" />
+            <div>
+              <p className="font-semibold text-gray-900">Wallet & Credits</p>
+              <div className="text-sm text-gray-500 space-y-1">
+                <p>Balance: {walletSummary ? formatLKR(walletSummary.availableBalance) : "Loading..."}</p>
+                <p>Credits: {walletSummary?.credits?.balance || 0}</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
             to="/store-management"
             className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
           >
@@ -579,8 +602,13 @@ const StoreDashboard = () => {
               <div>
                 <p className="text-sm text-gray-500">Total Earnings</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {formatLKR(store?.totalSales || 0)}
+                  {walletSummary ? formatLKR(walletSummary.totalEarnings || 0) : formatLKR(0)}
                 </p>
+                {walletSummary?.monthlyGrowth !== undefined && (
+                  <p className={`text-sm ${walletSummary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {walletSummary.monthlyGrowth >= 0 ? '+' : ''}{walletSummary.monthlyGrowth.toFixed(1)}% this month
+                  </p>
+                )}
               </div>
               <DollarSign className="w-8 h-8 text-yellow-500" />
             </div>

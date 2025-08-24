@@ -1,33 +1,30 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { io } from "socket.io-client";
+import { useGlobalChat } from "../contexts/ChatContext";
 
 // Constants
 const MESSAGE_PAGE_SIZE = 50;
 //const DEBUG_MODE = import.meta.env.DEV;
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 const debugLog = (...args) => {
   if (DEBUG_MODE) console.log("[Chat Hook]", ...args);
 };
 
 const useChat = (user) => {
+  // Get global socket from ChatContext
+  const { socket: globalSocket, isConnected: globalIsConnected, globalUnreadCount, updateUnreadCount } = useGlobalChat();
+  
   // Core state
   const [conversations, setConversations] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [typingUsers, setTypingUsers] = useState(new Map());
-  const [connectionStatus, setConnectionStatus] = useState("disconnected");
 
   // Refs
-  const socketRef = useRef(null);
   const typingTimeoutRef = useRef(new Map());
-  const isConnectedRef = useRef(false);
-  const userIdRef = useRef(null);
   const messageIdsRef = useRef(new Set());
-  const reconnectAttemptsRef = useRef(0);
   const joinedRoomsRef = useRef(new Set()); // Track joined rooms
   const markAsReadInProgress = useRef(new Set());
 
@@ -35,7 +32,7 @@ const useChat = (user) => {
 
   // CRITICAL: Auto-join all user's chat rooms
   const joinAllChatRooms = useCallback(async () => {
-    if (!socketRef.current?.connected || !user?.id) {
+    if (!globalSocket?.connected || !user?.id) {
       debugLog("❌ Cannot join rooms: socket disconnected or no user");
       return;
     }
@@ -47,75 +44,23 @@ const useChat = (user) => {
       conversations.forEach((conv) => {
         if (!joinedRoomsRef.current.has(conv._id)) {
           debugLog(`🚪 Joining room for conversation: ${conv._id}`);
-          socketRef.current.emit("join-chat", { chatId: conv._id });
+          globalSocket.emit("join-chat", { chatId: conv._id });
           joinedRoomsRef.current.add(conv._id);
         }
       });
     } catch (error) {
       debugLog("❌ Error joining chat rooms:", error);
     }
-  }, [conversations, user?.id]);
+  }, [conversations, user?.id, globalSocket]);
 
-  // Enhanced socket connection
-  const connectSocket = useCallback(() => {
-    if (!user?.id) {
-      debugLog("❌ No user ID provided");
-      return;
-    }
+  // Setup socket event listeners when global socket is available
+  useEffect(() => {
+    if (!globalSocket || !user?.id) return;
 
-    if (isConnectedRef.current && socketRef.current?.connected) {
-      debugLog("✅ Already connected");
-      return;
-    }
-
-    debugLog("🔄 Connecting socket for user:", user.id);
-    setConnectionStatus("connecting");
-
-    // Clean up existing socket
-    if (socketRef.current) {
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-
-    // Clear joined rooms tracking
-    joinedRoomsRef.current.clear();
-
-    const socket = io(API_URL, {
-      withCredentials: true,
-      transports: ["websocket", "polling"],
-      forceNew: true,
-      timeout: 15000,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      debugLog("✅ Socket connected:", socket.id);
-      setIsConnected(true);
-      setConnectionStatus("connected");
-      isConnectedRef.current = true;
-      reconnectAttemptsRef.current = 0;
-
-      // CRITICAL: Join all chat rooms immediately after connection
-      setTimeout(() => {
-        joinAllChatRooms();
-      }, 100); // Small delay to ensure socket is fully ready
-    });
-
-    socket.on("disconnect", (reason) => {
-      debugLog("❌ Socket disconnected:", reason);
-      setIsConnected(false);
-      setConnectionStatus("disconnected");
-      isConnectedRef.current = false;
-      joinedRoomsRef.current.clear(); // Clear joined rooms on disconnect
-    });
+    debugLog("🔗 Setting up socket event listeners for useChat");
 
     // ENHANCED: New message handler with detailed logging
-    socket.on("new-message", (message) => {
+    const handleNewMessage = (message) => {
       debugLog("📥 NEW MESSAGE RECEIVED:", {
         messageId: message._id,
         chatId: message.chat._id,
@@ -168,14 +113,8 @@ const useChat = (user) => {
         return updated;
       });
 
-      // Update global unread count
-      if (isFromOtherUser) {
-        setUnreadCount((prev) => {
-          const newCount = prev + 1;
-          debugLog(`🌍 Global unread count: ${prev} → ${newCount}`);
-          return newCount;
-        });
-      }
+      // Note: Global unread count is handled by ChatContext
+      // Local unread count here is just for useChat internal state
 
       // Update active chat messages
       setActiveChat((current) => {
@@ -189,26 +128,16 @@ const useChat = (user) => {
         }
         return current;
       });
-    });
+    };
 
     // Chat room join confirmation
-    socket.on("chat-joined", (data) => {
+    const handleChatJoined = (data) => {
       debugLog("✅ Successfully joined chat room:", data.chatId);
       joinedRoomsRef.current.add(data.chatId);
-    });
-
-    // Enhanced error handling
-    socket.on("error", (error) => {
-      debugLog("🚨 Socket error:", error);
-      setError({
-        type: "socket",
-        message: error.message || "Connection error",
-        timestamp: Date.now(),
-      });
-    });
+    };
 
     // Typing indicators
-    socket.on("user-typing", (data) => {
+    const handleUserTyping = (data) => {
       if (data.userId === user.id) return;
 
       setTypingUsers((prev) => {
@@ -242,45 +171,33 @@ const useChat = (user) => {
 
         return newMap;
       });
-    });
+    };
 
-    return socket;
-  }, [user?.id, API_URL, joinAllChatRooms]);
+    // Add event listeners
+    globalSocket.on("new-message", handleNewMessage);
+    globalSocket.on("chat-joined", handleChatJoined);
+    globalSocket.on("user-typing", handleUserTyping);
 
-  // Socket connection effect
-  useEffect(() => {
-    if (!user?.id) return;
-
-    connectSocket();
+    // Join rooms when socket is connected
+    if (globalSocket.connected) {
+      joinAllChatRooms();
+    }
 
     return () => {
-      debugLog("🧹 Cleaning up socket connection");
-      if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-
-      isConnectedRef.current = false;
-      joinedRoomsRef.current.clear();
-
-      if (typingTimeoutRef.current) {
-        typingTimeoutRef.current.forEach((timeout) => clearTimeout(timeout));
-        typingTimeoutRef.current.clear();
-      }
-
-      setTypingUsers(new Map());
-      setConnectionStatus("disconnected");
+      // Cleanup listeners
+      globalSocket.off("new-message", handleNewMessage);
+      globalSocket.off("chat-joined", handleChatJoined);
+      globalSocket.off("user-typing", handleUserTyping);
     };
-  }, [user?.id, connectSocket]);
+  }, [globalSocket, user?.id, joinAllChatRooms]);
 
   // Auto-join rooms when conversations list updates
   useEffect(() => {
-    if (conversations.length > 0 && isConnected) {
+    if (conversations.length > 0 && globalIsConnected) {
       debugLog("📋 Conversations updated, joining rooms...");
       joinAllChatRooms();
     }
-  }, [conversations, isConnected, joinAllChatRooms]);
+  }, [conversations, globalIsConnected, joinAllChatRooms]);
 
   // Data fetching effect
   useEffect(() => {
@@ -341,7 +258,7 @@ const useChat = (user) => {
       receipt = null
     ) => {
       if (!content?.trim() && !file && !receipt) return false;
-      if (!socketRef.current?.connected) {
+      if (!globalSocket?.connected) {
         debugLog("❌ Cannot send message: socket not connected");
         return false;
       }
@@ -364,14 +281,14 @@ const useChat = (user) => {
             .substr(2, 9)}`,
         };
 
-        socketRef.current.emit("send-message", messageData);
+        globalSocket.emit("send-message", messageData);
         return true;
       } catch (error) {
         debugLog("❌ Send message error:", error);
         return false;
       }
     },
-    []
+    [globalSocket]
   );
 
   // Load messages with proper room joining
@@ -397,11 +314,11 @@ const useChat = (user) => {
 
         // CRITICAL: Join this specific chat room
         if (
-          socketRef.current?.connected &&
+          globalSocket?.connected &&
           !joinedRoomsRef.current.has(chatId)
         ) {
           debugLog("🚪 Joining specific chat room:", chatId);
-          socketRef.current.emit("join-chat", { chatId });
+          globalSocket.emit("join-chat", { chatId });
           joinedRoomsRef.current.add(chatId);
         }
 
@@ -424,7 +341,7 @@ const useChat = (user) => {
         setIsLoading(false);
       }
     },
-    [API_URL]
+    [API_URL, globalSocket]
   );
 
   // Mark as read
@@ -433,15 +350,29 @@ const useChat = (user) => {
       try {
         debugLog(`📖 Marking chat ${chatId} as read`);
 
+        // Prevent duplicate API calls
+        if (markAsReadInProgress.current.has(chatId)) {
+          debugLog(`🔄 Mark as read already in progress for chat: ${chatId}`);
+          return;
+        }
+
+        markAsReadInProgress.current.add(chatId);
+
         // Make the API call first
-        await fetch(`${API_URL}/api/chat/${chatId}/read`, {
+        const response = await fetch(`${API_URL}/api/chat/${chatId}/read`, {
           method: "PUT",
           credentials: "include",
         });
 
+        if (!response.ok) {
+          throw new Error('Failed to mark messages as read');
+        }
+
         // Emit socket event
-        if (socketRef.current?.connected) {
-          socketRef.current.emit("mark-messages-read", { chatId });
+        if (globalSocket?.connected) {
+          globalSocket.emit("mark-messages-read", { chatId });
+          // Also emit for global state update
+          globalSocket.emit("messages-marked-read", { chatId, userId: user.id });
         }
 
         // Update conversations and unread count atomically
@@ -470,23 +401,31 @@ const useChat = (user) => {
         });
       } catch (error) {
         debugLog("❌ Failed to mark as read:", error);
+        setError({
+          type: "api",
+          message: error.message || "Failed to mark messages as read",
+          timestamp: Date.now(),
+        });
+      } finally {
+        // Always remove from in-progress set
+        markAsReadInProgress.current.delete(chatId);
       }
     },
-    [API_URL]
+    [API_URL, globalSocket, user?.id]
   );
 
   // Typing functions
   const startTyping = useCallback((chatId) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("typing-start", { chatId });
+    if (globalSocket?.connected) {
+      globalSocket.emit("typing-start", { chatId });
     }
-  }, []);
+  }, [globalSocket]);
 
   const stopTyping = useCallback((chatId) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("typing-stop", { chatId });
+    if (globalSocket?.connected) {
+      globalSocket.emit("typing-stop", { chatId });
     }
-  }, []);
+  }, [globalSocket]);
 
   const getTypingUsers = useCallback(
     (chatId) => {
@@ -502,34 +441,31 @@ const useChat = (user) => {
   const debugChatState = useCallback(() => {
     debugLog("=== CHAT STATE DEBUG ===");
     debugLog("User ID:", user?.id);
-    debugLog("Socket connected:", isConnectedRef.current);
-    debugLog("Socket ID:", socketRef.current?.id);
+    debugLog("Socket connected:", globalSocket?.connected);
+    debugLog("Socket ID:", globalSocket?.id);
     debugLog("Joined rooms:", Array.from(joinedRoomsRef.current));
     debugLog("Conversations:", conversations.length);
     debugLog("Total unread:", unreadCount);
+    debugLog("Global unread:", globalUnreadCount);
     debugLog("Active chat:", activeChat?._id);
-    debugLog("Connection status:", connectionStatus);
 
-    if (socketRef.current?.connected) {
+    if (globalSocket?.connected) {
       // Test connection
-      socketRef.current.emit("ping", { timestamp: Date.now() });
+      globalSocket.emit("ping", { timestamp: Date.now() });
       debugLog("🏓 Sent ping test");
     }
   }, [
     user?.id,
     conversations.length,
     unreadCount,
+    globalUnreadCount,
     activeChat?._id,
-    connectionStatus,
+    globalSocket,
   ]);
 
   const forceReconnect = useCallback(() => {
-    debugLog("🔄 Force reconnecting...");
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-    setTimeout(connectSocket, 1000);
-  }, [connectSocket]);
+    debugLog("🔄 Note: Using global socket, cannot force reconnect from useChat");
+  }, []);
 
   return {
     // Core state
@@ -537,11 +473,10 @@ const useChat = (user) => {
     activeChat,
     messages,
     unreadCount,
-    isConnected,
+    isConnected: globalIsConnected,
     isLoading,
     error,
     typingUsers,
-    connectionStatus,
 
     // Functions
     sendMessage,
@@ -557,12 +492,11 @@ const useChat = (user) => {
 
     // Connection info
     connectionHealth: {
-      isConnected,
-      status: connectionStatus,
+      isConnected: globalIsConnected,
       joinedRooms: Array.from(joinedRoomsRef.current),
     },
 
-    socket: socketRef.current,
+    socket: globalSocket,
   };
 };
 

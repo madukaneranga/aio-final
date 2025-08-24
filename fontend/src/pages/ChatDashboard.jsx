@@ -176,6 +176,7 @@ const ChatDashboard = () => {
                 user={memoizedUser}
                 onSendMessage={chatHook.sendMessage}
                 onTyping={handleTyping}
+                onMarkAsRead={chatHook.markAsRead}
                 messages={chatHook.messages}
                 typingUsers={
                   chatHook.getTypingUsers
@@ -215,6 +216,7 @@ const ChatDashboard = () => {
             user={memoizedUser}
             onSendMessage={chatHook.sendMessage}
             onTyping={handleTyping}
+            onMarkAsRead={chatHook.markAsRead}
             messages={chatHook.messages}
             typingUsers={
               chatHook.getTypingUsers

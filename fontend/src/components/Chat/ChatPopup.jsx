@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import imageCompression from "browser-image-compression";
+import { useGlobalChat } from "../../contexts/ChatContext";
 import {
   MessageCircle,
   Send,
@@ -49,6 +50,7 @@ const ChatPopup = ({
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const { decrementUnreadCount, fetchUnreadCount } = useGlobalChat();
 
   // API URL
   const API_URL = import.meta.env.VITE_API_URL;
@@ -93,6 +95,13 @@ const ChatPopup = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-mark as read when chat is opened and not minimized
+  useEffect(() => {
+    if (isOpen && !isMinimized && chat && unreadCount > 0) {
+      markMessagesAsRead();
+    }
+  }, [isOpen, isMinimized, chat, unreadCount]);
 
   // Socket event handlers
   const handleNewMessage = (message) => {
@@ -324,11 +333,26 @@ const ChatPopup = ({
     if (!chat) return;
 
     try {
-      // Only use socket - backend handles database + broadcast
+      // Make API call to mark as read
+      const response = await fetch(`${API_URL}/api/chat/${chat._id}/read`, {
+        method: "PUT",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to mark messages as read');
+      }
+
+      // Emit socket event
       if (socketRef.current) {
         socketRef.current.emit("mark-messages-read", { chatId: chat._id });
       }
+      
       setUnreadCount(0);
+      // Also update global count
+      decrementUnreadCount(chat._id);
+      // Fetch fresh count to ensure accuracy
+      setTimeout(() => fetchUnreadCount(), 500);
     } catch (error) {
       console.error("Failed to mark messages as read:", error);
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Archive, Star, Send, Paperclip, MoreVertical, Settings, User, ShoppingBag, Clock, CheckCircle2, Circle, MessageSquare, Phone, Mail } from 'lucide-react';
+import { useGlobalChat } from '../../../../contexts/ChatContext';
 import userProfile from '../../../../assests/User/user.png'
 
 const ChatInterface = ({ 
@@ -7,6 +8,7 @@ const ChatInterface = ({
   user, 
   onSendMessage, 
   onTyping, 
+  onMarkAsRead, // Add this prop for marking messages as read
   messages = [], // Default to empty array
   typingUsers = [] // Default to empty array
 }) => {
@@ -14,6 +16,7 @@ const ChatInterface = ({
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const { decrementUnreadCount, fetchUnreadCount } = useGlobalChat();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -22,6 +25,14 @@ const ChatInterface = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Mark messages as read when chat is opened
+  useEffect(() => {
+    if (chat && onMarkAsRead && user) {
+      console.log('🔔 Chat opened, marking as read:', chat._id);
+      onMarkAsRead(chat._id);
+    }
+  }, [chat?._id, onMarkAsRead, user]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();

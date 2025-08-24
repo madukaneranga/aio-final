@@ -227,6 +227,51 @@ export const initializeChatHandlers = (io, socket) => {
       // Emit to all participants in the chat room
       io.to(chat.roomId).emit("new-message", socketMessage);
 
+      // Update global unread count for recipients after a small delay
+      setTimeout(async () => {
+        try {
+          const recipients = chat.participants
+            .filter(p => p.userId.toString() !== userId && p.isActive)
+            .map(p => p.userId.toString());
+
+          for (const recipientId of recipients) {
+            const userSockets = await io.fetchSockets();
+            const recipientSockets = userSockets.filter(s => s.userId === recipientId);
+            
+            console.log(`📊 Looking for sockets for recipient ${recipientId}`);
+            console.log(`📊 Total sockets: ${userSockets.length}, Recipient sockets: ${recipientSockets.length}`);
+            
+            if (recipientSockets.length > 0) {
+              // Get updated unread count for this recipient
+              const recipientChats = await Chat.find({
+                $or: [
+                  { customerId: recipientId },
+                  { storeOwnerId: recipientId }
+                ],
+                status: "active",
+              });
+
+              let totalUnread = 0;
+              for (const recipientChat of recipientChats) {
+                // Use the correct unread count structure
+                const unreadCount = recipientId === recipientChat.customerId.toString() 
+                  ? recipientChat.unreadCount.customer 
+                  : recipientChat.unreadCount.store_owner;
+                totalUnread += unreadCount || 0;
+              }
+
+              console.log(`🔔 Emitting unread count update to ${recipientId}: ${totalUnread}`);
+              // Emit to all recipient's connected sockets
+              for (const recipientSocket of recipientSockets) {
+                recipientSocket.emit("unread-count-updated", { unreadCount: totalUnread });
+              }
+            }
+          }
+        } catch (updateError) {
+          console.error("Failed to update recipient unread counts:", updateError);
+        }
+      }, 100); // Small delay to ensure database is updated
+
       // Update analytics asynchronously
       updateChatAnalytics(chat, messageData, user.role).catch(error => 
         console.error("Analytics update error:", error)
@@ -344,9 +389,59 @@ export const initializeChatHandlers = (io, socket) => {
         message: "Messages marked as read",
       });
 
+      // Emit global unread count update to all user's sockets
+      try {
+        const userSockets = await io.fetchSockets();
+        const userSpecificSockets = userSockets.filter(s => s.userId === userId);
+        
+        if (userSpecificSockets.length > 0) {
+          // Get updated unread count for this user
+          const userChats = await Chat.find({
+            $or: [
+              { customerId: userId },
+              { storeOwnerId: userId }
+            ],
+            status: "active",
+          });
+
+          let totalUnread = 0;
+          for (const userChat of userChats) {
+            // Use the correct unread count structure
+            const unreadCount = userId === userChat.customerId.toString() 
+              ? userChat.unreadCount.customer 
+              : userChat.unreadCount.store_owner;
+            totalUnread += unreadCount || 0;
+          }
+
+          // Emit to all user's connected sockets
+          for (const userSocket of userSpecificSockets) {
+            userSocket.emit("unread-count-updated", { unreadCount: totalUnread });
+          }
+        }
+      } catch (updateError) {
+        console.error("Failed to update global unread count:", updateError);
+      }
+
     } catch (error) {
       console.error("Mark messages read error:", error);
       socket.emit("error", { message: "Failed to mark messages as read" });
+    }
+  });
+
+  // Handle notifications for global unread count updates
+  socket.on("messages-marked-read", async (data) => {
+    try {
+      const { chatId, userId: targetUserId } = data;
+      
+      // Only process if this is for the current user
+      if (targetUserId && targetUserId !== userId) return;
+      
+      // This event is emitted by useChat hook to notify global context
+      // The actual read marking is handled by the above handler
+      socket.emit("global-unread-update-requested", { chatId });
+      
+    } catch (error) {
+      console.error("Global read notification error:", error);
     }
   });
 
