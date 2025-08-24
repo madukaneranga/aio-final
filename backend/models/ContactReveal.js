@@ -8,13 +8,11 @@ const contactRevealSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Store",
       required: true,
-      index: true,
     },
     revealedByUserId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     revealedAt: {
       type: Date,
@@ -30,7 +28,7 @@ const contactRevealSchema = new Schema(
     dedupeKey: {
       type: String,
       required: true,
-      unique: true,
+      index: { unique: true },
     },
     walletTransactionId: {
       type: Schema.Types.ObjectId,
@@ -68,7 +66,6 @@ const contactRevealSchema = new Schema(
 // Indexes for performance optimization
 contactRevealSchema.index({ storeId: 1, revealedAt: -1 });
 contactRevealSchema.index({ revealedByUserId: 1, revealedAt: -1 });
-contactRevealSchema.index({ dedupeKey: 1 }, { unique: true });
 contactRevealSchema.index({ status: 1 });
 
 // Static method: Check if user can reveal (dedupe check)

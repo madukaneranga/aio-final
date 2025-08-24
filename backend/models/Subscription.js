@@ -46,6 +46,10 @@ const subscriptionSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  cancelledAt: {
+    type: Date,
+    default: null,
+  },
   paymentHistory: [
     {
       amount: Number,
@@ -64,6 +68,13 @@ const subscriptionSchema = new mongoose.Schema({
     type: String,
   },
 });
+
+// Indexes for better query performance
+subscriptionSchema.index({ userId: 1, status: 1 });
+subscriptionSchema.index({ storeId: 1, status: 1 });
+subscriptionSchema.index({ recurrenceId: 1 });
+subscriptionSchema.index({ status: 1, endDate: 1 });
+subscriptionSchema.index({ lastUpgradeAt: 1 });
 
 // Auto-set end date to 30 days from start date
 subscriptionSchema.pre("save", function (next) {

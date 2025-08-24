@@ -8,7 +8,6 @@ const walletTransactionSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     transactionId: {
       type: String,
@@ -97,7 +96,6 @@ const walletTransactionSchema = new Schema(
 // Indexes for optimized queries
 walletTransactionSchema.index({ userId: 1, type: 1 });
 walletTransactionSchema.index({ userId: 1, createdAt: -1 });
-walletTransactionSchema.index({ status: 1, type: 1 });
 
 // Virtual: formatted amount
 walletTransactionSchema.virtual("formattedAmount").get(function () {
