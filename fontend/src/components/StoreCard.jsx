@@ -55,7 +55,7 @@ const StoreCard = ({ store }) => {
       <Link to={`/store/${store._id}`} className="block">
         <div className="relative w-full">
           {/* Store Card */}
-          <div className="group relative bg-white rounded-xl sm:rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full max-w-xs mx-auto">
+          <div className="group relative bg-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full">
             {/* Badges */}
             <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 flex flex-col gap-1 sm:gap-2">
               {isNew() && (
@@ -118,7 +118,7 @@ const StoreCard = ({ store }) => {
             </div>
 
             {/* Image Section */}
-            <div className="relative h-44 sm:h-52 lg:h-56 overflow-hidden">
+            <div className="relative h-32 sm:h-36 lg:h-40 overflow-hidden">
               <img
                 src={
                   store.heroImages?.[0] ||
@@ -144,22 +144,22 @@ const StoreCard = ({ store }) => {
             </div>
 
             {/* Content Section */}
-            <div className="p-3 sm:p-4">
+            <div className="p-2 sm:p-3">
               {/* Store Name */}
-              <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-black transition-all duration-300 leading-tight text-sm sm:text-base">
-                {store.name.length > 40
-                  ? `${store.name.slice(0, 40)}...`
+              <h3 className="font-bold text-gray-900 mb-1.5 line-clamp-2 group-hover:text-black transition-all duration-300 leading-tight text-xs sm:text-sm">
+                {store.name.length > 30
+                  ? `${store.name.slice(0, 30)}...`
                   : store.name}
               </h3>
 
               {/* Rating & Sales */}
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1">
                   <div className="flex">
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-3 h-3 sm:w-4 sm:h-4 ${
+                        className={`w-3 h-3 ${
                           i < Math.floor(store.rating)
                             ? "fill-gray-900 text-gray-900"
                             : "fill-gray-300 text-gray-300"
@@ -167,7 +167,7 @@ const StoreCard = ({ store }) => {
                       />
                     ))}
                   </div>
-                  <span className="text-xs sm:text-sm text-gray-600 ml-1 font-medium">
+                  <span className="text-xs text-gray-600 ml-1 font-medium">
                     ({store.rating})
                   </span>
                 </div>
@@ -181,7 +181,7 @@ const StoreCard = ({ store }) => {
               </div>
 
               {/* Owner & Location */}
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1 text-xs text-gray-500">
                   <User className="w-3 h-3" />
                   <span className="font-medium">
@@ -201,7 +201,7 @@ const StoreCard = ({ store }) => {
               {user && store.isActive && (
                 <button
                   onClick={handleQuickView}
-                  className="w-full bg-black text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold transition-all duration-300 hover:bg-gray-900 hover:shadow-2xl transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-300 tracking-wide text-xs sm:text-sm"
+                  className="w-full bg-black text-white py-1.5 sm:py-2 rounded-lg font-bold transition-all duration-300 hover:bg-gray-900 hover:shadow-2xl transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-300 tracking-wide text-xs"
                 >
                   <span className="hidden sm:inline">QUICK VIEW</span>
                   <span className="sm:hidden">VIEW</span>

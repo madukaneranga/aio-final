@@ -18,7 +18,7 @@ const walletTransactionSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ["sale", "withdrawal", "refund", "adjustment"],
+      enum: ["sale", "withdrawal", "refund", "adjustment", "credit_purchase", "credit_usage"],
       required: true,
     },
     amount: {
@@ -70,6 +70,21 @@ const walletTransactionSchema = new Schema(
         type: Number,
         min: 0,
       },
+    },
+    creditDetails: {
+      creditsAmount: {
+        type: Number,
+        min: 0,
+      },
+      creditPrice: {
+        type: Number,
+        min: 0,
+      },
+      relatedRevealId: {
+        type: Schema.Types.ObjectId,
+        ref: "ContactReveal",
+      },
+      packageId: String,
     },
   },
   {

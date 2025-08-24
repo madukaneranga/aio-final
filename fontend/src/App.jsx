@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { ChatProvider } from "./contexts/ChatContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -43,7 +44,7 @@ import Notifications from "./pages/Notifications";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import AdminWithdrawals from "./pages/AdminWithdrawals";
-import WalletDashboard from "./pages/WallerDashboard";
+import WalletDashboard from "./pages/WalletDashboard";
 import SubscriptionManagement from "./pages/SubscriptionManagement";
 import Maintenance from "./pages/Maintenance";
 import NfcCardCustomizer from "./pages/NfcCardCustomizer";
@@ -62,8 +63,9 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <NotificationProvider>
-          <CartProvider>
+        <ChatProvider>
+          <NotificationProvider>
+            <CartProvider>
             <Router>
               {maintenanceMode ? (
                 <Maintenance />
@@ -195,8 +197,9 @@ function App() {
                 </Routes>
               )}
             </Router>
-          </CartProvider>
-        </NotificationProvider>
+            </CartProvider>
+          </NotificationProvider>
+        </ChatProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

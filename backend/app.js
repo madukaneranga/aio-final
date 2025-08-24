@@ -90,6 +90,7 @@ import categoriesRoutes from "./routes/categories.js";
 import postRoutes from "./routes/posts.js";
 import flashDealRoutes from "./routes/flashDeals.js";
 import chatRoutes from "./routes/chats.js";
+import contactRevealRoutes from "./routes/contactReveal.js";
 
 // Route Registration
 if (process.env.NODE_ENV !== "test") {
@@ -119,6 +120,7 @@ app.use("/api/categories", categoriesRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/flash-deals", flashDealRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api", contactRevealRoutes);
 
 // Special routes
 app.use("/sitemap.xml", sitemapRoutes);

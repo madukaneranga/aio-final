@@ -27,6 +27,7 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import ContactReveal from "./ContactReveal";
 import {
   FaFacebook,
   FaInstagram,
@@ -47,7 +48,6 @@ const StoreInfo = ({
   followData,
   setFollowData,
 }) => {
-  const [hoveredContact, setHoveredContact] = useState(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [followersCount, setFollowersCount] = useState(
     store.stats?.followersCount || 0
@@ -266,40 +266,6 @@ const StoreInfo = ({
 
   const levelInfo = getStoreLevel();
 
-  const contactItems = [
-    {
-      icon: Mail,
-      label: storeData.contactInfo?.email,
-      type: "email",
-      action: `mailto:${storeData.contactInfo?.email}`,
-      available: !!storeData.contactInfo?.email,
-    },
-    {
-      icon: Phone,
-      label: storeData.contactInfo?.phone,
-      type: "phone",
-      action: `tel:${storeData.contactInfo?.phone}`,
-      available: !!storeData.contactInfo?.phone,
-    },
-    {
-      icon: MessageCircle,
-      label: "WhatsApp",
-      type: "whatsapp",
-      action: `https://wa.me/${storeData.contactInfo?.whatsapp?.replace(
-        /[^0-9]/g,
-        ""
-      )}`,
-      available: !!storeData.contactInfo?.whatsapp,
-    },
-    {
-      icon: MapPin,
-      label: storeData.contactInfo?.address,
-      type: "address",
-      action: "#",
-      available: !!storeData.contactInfo?.address,
-    },
-  ].filter((item) => item.available);
-
   // Helper function to get platform icon
   const getPlatformData = (platform) => {
     const platformData = {
@@ -405,14 +371,14 @@ const StoreInfo = ({
       : [];
 
   return (
-    <div className="py-8" style={themeStyles}>
+    <div className="py-4 sm:py-8" style={themeStyles}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 lg:gap-8">
           {/* Main Store Content */}
           <div className="lg:col-span-3">
-            <div className="flex items-start space-x-8">
+            <div className="flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-8">
               {/* Enhanced Store Image with Premium Features */}
-              <div className="relative group">
+              <div className="relative group flex-shrink-0 mx-auto sm:mx-0">
                 {/* Premium glow effect */}
                 {storeData.isPremium && (
                   <div
@@ -428,7 +394,7 @@ const StoreInfo = ({
                     <img
                       src={storeData.profileImage}
                       alt={storeData.name}
-                      className={`w-20 h-20 rounded-full object-cover shadow-lg ${
+                      className={`w-24 h-24 sm:w-20 sm:h-20 rounded-full object-cover shadow-lg ${
                         storeData.isPremium
                           ? `border-3`
                           : "border-2 border-gray-200"
@@ -463,19 +429,19 @@ const StoreInfo = ({
                 </div>
               </div>
 
-              <div className="flex-1 space-y-4">
+              <div className="flex-1 space-y-4 text-center sm:text-left">
                 {/* Enhanced Store Header */}
                 <div>
-                  <div className="flex items-center space-x-3 mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 mb-2">
                     <h1
-                      className="text-2xl font-light tracking-wide"
+                      className="text-xl sm:text-2xl font-light tracking-wide"
                       style={{ color: themeStyles.color }}
                     >
                       {storeData.name}
                     </h1>
 
                     {/* Store badges */}
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center justify-center sm:justify-start space-x-2">
                       {storeData.isVerified && (
                         <CheckCircle
                           className="w-5 h-5"
@@ -494,7 +460,7 @@ const StoreInfo = ({
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center space-x-2 ml-auto">
+                    <div className="flex items-center justify-center sm:justify-start space-x-2 sm:ml-auto">
                       {/* Follow Button */}
                       {/* Follow Button - Updated without outside colors */}
                       {/* Follow Button - Using theme colors with black/white text */}
@@ -503,7 +469,7 @@ const StoreInfo = ({
                           <button
                             onClick={handleFollow}
                             disabled={followLoading}
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${
+                            className={`flex items-center space-x-2 px-4 py-3 sm:py-2 rounded-full font-medium text-sm transition-all duration-300 min-h-[44px] ${
                               followData.isFollowing
                                 ? "hover:opacity-80"
                                 : "hover:opacity-90 shadow-md"
@@ -624,7 +590,7 @@ const StoreInfo = ({
                       {storeData.storeLevel} Seller
                     </span>
 
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs sm:text-sm text-gray-500">
                       Member since{" "}
                       {storeData.createdAt
                         ? new Date(storeData.createdAt).getFullYear()
@@ -635,7 +601,7 @@ const StoreInfo = ({
 
                 {/* Description */}
                 <p
-                  className="text-sm leading-relaxed max-w-lg"
+                  className="text-sm sm:text-base leading-relaxed max-w-lg"
                   style={{ color: isLightTheme ? "#555" : "#bbb" }}
                 >
                   {storeData.description}
@@ -687,7 +653,7 @@ const StoreInfo = ({
                 </div>
 
                 {/* Sales Display & Quick Stats */}
-                <div className="grid grid-cols-4 gap-4 pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 pt-2">
                   <div className="text-center">
                     <div className="flex items-center justify-center space-x-1 mb-1">
                       <TrendingUp
@@ -702,7 +668,7 @@ const StoreInfo = ({
                       )}
                     </div>
                     <p
-                      className="text-lg font-light tracking-wider"
+                      className="text-base sm:text-lg font-light tracking-wider"
                       style={{ color: themeStyles.color }}
                     >
                       {formatLKR(storeData.totalSales || 0)}
@@ -747,7 +713,7 @@ const StoreInfo = ({
 
                 {/* Social Links */}
                 {socialLinks.length > 0 && (
-                  <div className="flex justify-center space-x-3 pt-3">
+                  <div className="flex justify-center flex-wrap gap-3 pt-3">
                     {socialLinks.map((social) => {
                       const IconComponent = social.icon;
 
@@ -757,7 +723,7 @@ const StoreInfo = ({
                           href={social.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 group transform hover:scale-110 hover:shadow-lg"
+                          className="w-12 h-12 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 group transform hover:scale-110 hover:shadow-lg min-h-[44px]"
                           style={{
                             background:
                               social.platform === "instagram"
@@ -798,7 +764,7 @@ const StoreInfo = ({
           {/* Compact Info Card */}
           <div className="lg:col-span-2">
             <div
-              className={`rounded-2xl p-5 border shadow-sm ${
+              className={`rounded-2xl p-4 sm:p-5 border shadow-sm ${
                 storeData.isPremium
                   ? "bg-gradient-to-br from-white/90 to-gray-50/80 backdrop-blur-sm"
                   : "bg-gradient-to-br from-gray-50/80 to-white/60 backdrop-blur-sm"
@@ -812,86 +778,24 @@ const StoreInfo = ({
                   : { borderColor: "#e5e7eb50" }
               }
             >
-              {/* Contact Section */}
+              {/* Contact Reveal Section */}
               <div className="mb-4">
                 <h3
                   className="text-sm font-medium mb-3 flex items-center space-x-2"
                   style={{ color: themeStyles.color }}
                 >
-                  <span>Contact</span>
+                  <span>Contact Details</span>
                   <div
                     className="w-6 h-px bg-gradient-to-r to-transparent"
                     style={{ backgroundColor: colors.primary }}
                   ></div>
                 </h3>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {contactItems.map((item, index) => {
-                    const Icon = item.icon;
-                    return (
-                      <div
-                        key={index}
-                        className="group cursor-pointer"
-                        onMouseEnter={() => setHoveredContact(index)}
-                        onMouseLeave={() => setHoveredContact(null)}
-                        onClick={() =>
-                          item.action !== "#" && window.open(item.action)
-                        }
-                      >
-                        <div
-                          className={`flex items-center space-x-2 p-2 rounded-lg transition-all duration-300 ${
-                            hoveredContact === index
-                              ? "transform translate-x-1"
-                              : ""
-                          }`}
-                          style={
-                            hoveredContact === index
-                              ? {
-                                  backgroundColor: colors.light,
-                                }
-                              : {}
-                          }
-                        >
-                          <div
-                            className={`transition-all duration-300 ${
-                              hoveredContact === index ? "scale-110" : ""
-                            }`}
-                            style={{
-                              color:
-                                hoveredContact === index
-                                  ? colors.primary
-                                  : "#9ca3af",
-                            }}
-                          >
-                            <Icon className="w-3 h-3" />
-                          </div>
-                          <span
-                            className={`text-xs transition-colors duration-300 truncate ${
-                              hoveredContact === index
-                                ? "text-gray-900"
-                                : "text-gray-600"
-                            }`}
-                            title={hoveredContact === index ? item.label : ""}
-                          >
-                            {hoveredContact === index
-                              ? item.label
-                              : item.type === "email"
-                              ? "Email"
-                              : item.type === "phone"
-                              ? "Phone"
-                              : item.type === "whatsapp"
-                              ? "WhatsApp"
-                              : "Address"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <ContactReveal store={storeData} />
               </div>
 
               {/* Business Hours & Performance */}
-              <div className="mb-4 grid grid-cols-2 gap-4">
+              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Business Hours */}
                 {storeData.serviceSettings?.workingHours && (
                   <div>

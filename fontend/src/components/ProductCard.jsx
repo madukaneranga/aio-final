@@ -97,7 +97,7 @@ const ProductCard = ({ product }) => {
       <Link to={`/product/${product._id}`} className="block">
         <div className="relative w-full" ref={cardRef}>
           {/* Product Card */}
-          <div className="group relative bg-white rounded-xl sm:rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full max-w-xs mx-auto">
+          <div className="group relative bg-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-200 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full h-full flex flex-col">
             {/* Badges */}
             <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 flex flex-col gap-1 sm:gap-2">
               {isNew() && (
@@ -106,12 +106,12 @@ const ProductCard = ({ product }) => {
                 </span>
               )}
               {isOnSale() && (
-                <span className="bg-gray-900 text-white text-xs font-bold px-2 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg backdrop-blur-sm tracking-wider">
+                <span className="bg-black text-white text-xs font-bold px-2 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg backdrop-blur-sm tracking-wider">
                   SALE
                 </span>
               )}
               {isLowStock() && (
-                <span className="bg-gray-600 text-white text-xs font-bold px-2 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg backdrop-blur-sm flex items-center gap-1 tracking-wider">
+                <span className="bg-black text-white text-xs font-bold px-2 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg backdrop-blur-sm flex items-center gap-1 tracking-wider">
                   <AlertCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   <span className="hidden sm:inline">LOW STOCK</span>
                   <span className="sm:hidden">LOW</span>
@@ -148,7 +148,7 @@ const ProductCard = ({ product }) => {
             </div>
 
             {/* Image Section */}
-            <div className="relative h-44 sm:h-52 lg:h-56 overflow-hidden">
+            <div className="relative h-32 sm:h-36 lg:h-40 overflow-hidden">
               <img
                 src={
                   product.images?.[0] ||
@@ -174,25 +174,23 @@ const ProductCard = ({ product }) => {
             </div>
 
             {/* Content Section */}
-            <div className="p-3 sm:p-4">
-              {/* Category */}
-              <div className="flex items-center gap-1 sm:gap-2 mb-2 sm:mb-3">
-                <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-400" />
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+            <div className="p-2 flex-1 flex flex-col">
+              {/* Category - Fixed Height */}
+              <div className="flex items-center gap-1 mb-1 h-4">
+                <Tag className="w-2.5 h-2.5 text-gray-600" />
+                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide truncate">
                   {product.category}
                 </span>
               </div>
 
-              {/* Title */}
-              <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-black transition-all duration-300 leading-tight text-sm sm:text-base">
-                {product.title.length > 35
-                  ? `${product.title.slice(0, 35)}...`
-                  : product.title}
+              {/* Title - Fixed Height */}
+              <h3 className="font-bold text-black mb-2 line-clamp-2 group-hover:text-gray-800 transition-all duration-300 leading-tight text-xs h-8 overflow-hidden font-body">
+                {product.title}
               </h3>
 
               {/* Price Section */}
-              <div className="flex items-baseline gap-2 mb-2 sm:mb-3">
-                <span className="text-base sm:text-lg font-black text-black">
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-sm sm:text-base font-black text-black">
                   {formatLKR(product.price)}
                 </span>
                 {isOnSale() && (
@@ -211,28 +209,47 @@ const ProductCard = ({ product }) => {
                 )}
               </div>
 
-              {/* Rating & Stock */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-5 h-5 ${
-                          i < Math.floor(product.rating)
-                            ? "fill-gray-900 text-gray-900"
-                            : "fill-gray-300 text-gray-300"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-xs sm:text-sm text-gray-600 ml-1 sm:ml-2 font-medium">
-                    ({product.rating || 0})
-                  </span>
+              {/* Product Details Grid */}
+              {(product.rating > 0 || product.totalOrders > 0) && (
+                <div className={`grid gap-2 mb-1 ${
+                  product.rating > 0 && product.totalOrders > 0 ? 'grid-cols-2' : 'grid-cols-1'
+                }`}>
+                  {/* Rating */}
+                  {product.rating > 0 && (
+                    <div className="flex items-center gap-1">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-2.5 h-2.5 ${
+                              i < Math.floor(product.rating)
+                                ? "fill-black text-black"
+                                : "fill-gray-300 text-gray-300"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-black font-medium">
+                        {product.rating}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Orders */}
+                  {product.totalOrders > 0 && (
+                    <div className={`${product.rating > 0 ? 'text-right' : 'text-left'}`}>
+                      <span className="text-xs text-black font-medium">
+                        {product.totalOrders} sold
+                      </span>
+                    </div>
+                  )}
                 </div>
+              )}
 
+              {/* Stock Status */}
+              <div className="flex justify-center mb-1">
                 <span
-                  className={`text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full ${
+                  className={`text-xs font-bold px-2 py-1 rounded-full w-full text-center ${
                     product.stock > 5
                       ? "text-black bg-gray-100"
                       : product.stock > 0
@@ -240,27 +257,24 @@ const ProductCard = ({ product }) => {
                       : "text-white bg-black"
                   }`}
                 >
-                  <span className="hidden sm:inline">
-                    {product.stock > 0
-                      ? `${product.stock} LEFT`
-                      : "OUT OF STOCK"}
-                  </span>
-                  <span className="sm:hidden">
-                    {product.stock > 0 ? `${product.stock}` : "OUT"}
-                  </span>
+                  {product.stock > 0
+                    ? `${product.stock} in stock`
+                    : "Out of stock"}
                 </span>
               </div>
 
               {/* Quick View Button */}
-              {product.stock > 0 && (
-                <button
-                  onClick={handleQuickView}
-                  className="w-full bg-black text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold transition-all duration-300 hover:bg-gray-900 hover:shadow-2xl transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-gray-300 tracking-wide text-xs sm:text-sm"
-                >
+              <div className="mt-auto pt-1">
+                {product.stock > 0 && (
+                  <button
+                    onClick={handleQuickView}
+                    className="w-full bg-black text-white py-1.5 rounded-lg font-bold transition-all duration-300 hover:bg-gray-800 hover:shadow-xl transform hover:scale-[1.02] text-xs"
+                  >
                   <span className="hidden sm:inline">QUICK VIEW</span>
                   <span className="sm:hidden">VIEW</span>
-                </button>
-              )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -311,15 +325,15 @@ const ProductCard = ({ product }) => {
                   </span>
                 </div>
 
-                <h2 className="text-xl sm:text-2xl font-bold text-black mb-3 sm:mb-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-black mb-3 sm:mb-4 font-display">
                   {product.title}
                 </h2>
-                <p className="text-gray-600 mb-4 sm:mb-5 leading-relaxed text-sm sm:text-base">
+                <p className="text-gray-600 mb-4 sm:mb-5 leading-relaxed text-sm sm:text-base font-body">
                   {product.description}
                 </p>
 
                 {/* Price */}
-                <div className="flex items-baseline gap-2 sm:gap-3 mb-4 sm:mb-6">
+                <div className="flex items-baseline gap-2 sm:gap-3 mb-4">
                   <span className="text-2xl sm:text-3xl font-black text-black">
                     {formatLKR(product.price)}
                   </span>
@@ -330,8 +344,50 @@ const ProductCard = ({ product }) => {
                   )}
                 </div>
 
-                {/* Quantity Selector */}
+                {/* Product Info Grid */}
+                <div className={`grid gap-4 mb-6 p-3 bg-gray-100 rounded-lg grid-cols-${
+                  [product.rating > 0, true, product.totalOrders > 0].filter(Boolean).length
+                }`}>
+                  {product.rating > 0 && (
+                    <div className="text-center">
+                      <span className="block text-lg font-bold text-black">{product.rating}</span>
+                      <span className="text-xs text-gray-700 uppercase tracking-wide">Rating</span>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <span className="block text-lg font-bold text-black">{product.stock || 0}</span>
+                    <span className="text-xs text-gray-700 uppercase tracking-wide">Stock</span>
+                  </div>
+                  {product.totalOrders > 0 && (
+                    <div className="text-center">
+                      <span className="block text-lg font-bold text-black">{product.totalOrders}</span>
+                      <span className="text-xs text-gray-700 uppercase tracking-wide">Sold</span>
+                    </div>
+                  )}
+                </div>
 
+                {/* Rating Stars */}
+                {product.rating > 0 && (
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-5 h-5 ${
+                            i < Math.floor(product.rating)
+                              ? "fill-black text-black"
+                              : "fill-gray-300 text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-base font-medium text-black">
+                      ({product.rating}/5)
+                    </span>
+                  </div>
+                )}
+
+                {/* Quantity Selector */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
                   <span className="text-sm font-bold text-gray-900">
                     QUANTITY:
@@ -361,25 +417,6 @@ const ProductCard = ({ product }) => {
                       +
                     </button>
                   </div>
-                </div>
-
-                {/* Rating */}
-                <div className="flex items-center gap-2 mb-6 sm:mb-8">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-5 h-5 ${
-                          i < Math.floor(product.rating)
-                            ? "fill-gray-900 text-gray-900"
-                            : "fill-gray-300 text-gray-300"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-base font-medium text-gray-600">
-                    {product.rating || 0}
-                  </span>
                 </div>
                 {/* Add to Cart Button */}
                 <button
