@@ -506,6 +506,91 @@ export const batchUploadFiles = async (files, folder = 'ChatFolder', options = {
 };
 
 /**
+ * Upload ID verification document to Firebase Storage
+ * @param {File} file - ID document file to upload
+ * @param {Object} options - Upload options
+ * @returns {Object} Upload result with URL and metadata
+ */
+export const uploadIdDocument = async (file, options = {}) => {
+  try {
+    // Validate file
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    // Validate file size (max 5MB for ID documents)
+    const maxSize = options.maxSizeMB || 5;
+    if (file.size > maxSize * 1024 * 1024) {
+      throw new Error(`File size must be less than ${maxSize}MB`);
+    }
+
+    // Validate file type (only images for ID documents)
+    const allowedTypes = options.allowedTypes || ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('File type not allowed. Only image files are supported.');
+    }
+
+    // Compress image for optimal storage
+    let processedFile = file;
+    if (file.type.startsWith('image/')) {
+      processedFile = await compressImage(file, {
+        maxSizeMB: 2, // Compress to max 2MB for ID documents
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        initialQuality: 0.9, // Higher quality for ID documents
+      });
+    }
+
+    // Generate unique filename with ID prefix
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const extension = file.name.split('.').pop();
+    const sanitizedName = file.name.replace(/\.[^/.]+$/, "")
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .substring(0, 15);
+    
+    const filename = `id_${timestamp}_${randomId}_${sanitizedName}.${extension}`;
+    
+    // Create storage reference in id-documents folder
+    const storageRef = ref(storage, `id-documents/${filename}`);
+    
+    // Set metadata for ID documents
+    const metadata = {
+      contentType: processedFile.type,
+      customMetadata: {
+        originalName: file.name,
+        uploadedAt: new Date().toISOString(),
+        fileSize: processedFile.size.toString(),
+        documentType: 'id_verification',
+        uploadType: 'customer_verification',
+      }
+    };
+
+    // Upload file
+    const snapshot = await uploadBytes(storageRef, processedFile, metadata);
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return {
+      success: true,
+      url: downloadURL,
+      filename: filename,
+      originalName: file.name,
+      size: processedFile.size,
+      mimeType: processedFile.type,
+      path: `id-documents/${filename}`,
+      metadata: snapshot.metadata,
+      documentType: 'id_verification',
+    };
+
+  } catch (error) {
+    console.error('ID document upload error:', error);
+    throw new Error(`Upload failed: ${error.message}`);
+  }
+};
+
+/**
  * Default export with all utilities
  */
 export default {
@@ -526,4 +611,5 @@ export default {
   uploadProgressTracker,
   uploadFileWithProgress,
   batchUploadFiles,
+  uploadIdDocument,
 };

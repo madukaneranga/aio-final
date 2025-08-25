@@ -3,6 +3,7 @@ const router = express.Router();
 import WalletTransaction from "../models/WalletTransaction.js";
 import Wallet from "../models/Wallet.js";
 import BankDetails from "../models/BankDetails.js";
+import BankChangeRequest from "../models/BankChangeRequest.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { v4 as uuidv4 } from "uuid";
 import { emitNotification } from "../utils/socketUtils.js";
@@ -339,6 +340,14 @@ router.get(
     try {
       const userId = req.user._id;
       const bankDetails = await BankDetails.findOne({ userId, isActive: true });
+      
+      console.log('📄 Fetching bank details for user:', {
+        userId: userId.toString(),
+        found: !!bankDetails,
+        isLocked: bankDetails?.isLocked,
+        lockReason: bankDetails?.lockReason,
+        lockedAt: bankDetails?.lockedAt
+      });
 
       res.json({
         success: true,
@@ -354,7 +363,7 @@ router.get(
   }
 );
 
-// Update bank details
+// Update bank details (only if not locked)
 router.put(
   "/bank-details",
   authenticate,
@@ -370,6 +379,27 @@ router.put(
       }
 
       const userId = req.user._id;
+      
+      // Check if existing details are locked
+      const existingDetails = await BankDetails.findOne({ userId, isActive: true });
+      
+      console.log('🔍 Checking existing bank details:', {
+        exists: !!existingDetails,
+        isLocked: existingDetails?.isLocked,
+        lockReason: existingDetails?.lockReason,
+        userId: userId.toString()
+      });
+      
+      if (existingDetails && existingDetails.isLocked) {
+        console.log('🔒 Bank details are locked, blocking update');
+        return res.status(403).json({
+          success: false,
+          message: "Bank details are locked for security. Please submit a change request to modify them.",
+          lockInfo: existingDetails.getLockInfo(),
+          requiresChangeRequest: true
+        });
+      }
+      
       const bankData = {
         accountHolderName: req.body.accountHolderName?.trim(),
         bankName: req.body.bankName?.trim(),
@@ -379,23 +409,218 @@ router.put(
         branchCode: req.body.branchCode?.trim() || "",
         accountType: req.body.accountType || "savings",
       };
-
-      const bankDetails = await BankDetails.findOneAndUpdate(
-        { userId },
-        { ...bankData, userId, isVerified: false },
-        { new: true, upsert: true }
-      );
+      
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.get('User-Agent');
+      
+      let bankDetails;
+      
+      if (existingDetails) {
+        console.log('🔄 Updating existing bank details');
+        
+        // If existing details are not locked, lock them now (legacy data)
+        if (!existingDetails.isLocked) {
+          console.log('⚠️ Found unlocked existing bank details, locking now');
+          existingDetails.isLocked = true;
+          existingDetails.lockReason = 'auto_lock_legacy_data';
+          existingDetails.lockedAt = new Date();
+          await existingDetails.save();
+          
+          return res.status(403).json({
+            success: false,
+            message: "Your bank details have been locked for security. Please submit a change request to modify them.",
+            lockInfo: existingDetails.getLockInfo(),
+            requiresChangeRequest: true,
+            wasJustLocked: true
+          });
+        }
+        
+        // This should never be reached if locking works correctly
+        console.log('⚠️ WARNING: Existing bank details found but not locked!');
+        
+        // Track modification for existing details
+        existingDetails.trackModification(
+          userId, 
+          bankData, 
+          'Direct bank details update', 
+          ipAddress
+        );
+        
+        // Update existing details
+        Object.assign(existingDetails, bankData);
+        existingDetails.isVerified = false;
+        existingDetails.verifiedAt = null;
+        
+        bankDetails = await existingDetails.save();
+      } else {
+        // Create new bank details (will be auto-locked after save)
+        console.log('💾 Creating new bank details (will be auto-locked)');
+        bankDetails = new BankDetails({
+          ...bankData,
+          userId,
+          lastModifiedBy: userId,
+          modificationHistory: [{
+            modifiedBy: userId,
+            changes: bankData,
+            reason: 'Initial bank details creation',
+            ipAddress
+          }]
+        });
+        
+        bankDetails = await bankDetails.save();
+        console.log('✅ New bank details created and locked:', {
+          id: bankDetails._id,
+          isLocked: bankDetails.isLocked,
+          lockReason: bankDetails.lockReason
+        });
+      }
 
       res.json({
         success: true,
-        message: "Bank details updated successfully",
         data: bankDetails,
+        lockInfo: bankDetails.getLockInfo(),
+        message: bankDetails.isLocked ? 
+          "Bank details saved and locked for security. Future changes will require admin approval." :
+          "Bank details updated successfully."
       });
     } catch (error) {
       console.error("Update bank details error:", error);
       res.status(500).json({
         success: false,
         message: "Failed to update bank details",
+      });
+    }
+  }
+);
+
+// Submit bank details change request
+router.post(
+  "/bank-details/change-request",
+  authenticate,
+  authorize("store_owner"),
+  async (req, res) => {
+    try {
+      const { requestedDetails, reason } = req.body;
+      
+      // Validate requested details
+      const validationErrors = validateBankDetails(requestedDetails);
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: validationErrors,
+        });
+      }
+      
+      if (!reason || reason.trim().length < 10) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide a detailed reason for the change (minimum 10 characters)"
+        });
+      }
+      
+      const userId = req.user._id;
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.get('User-Agent');
+      
+      // Create change request
+      const changeRequest = await BankChangeRequest.createChangeRequest({
+        userId,
+        requestedDetails: {
+          accountHolderName: requestedDetails.accountHolderName?.trim(),
+          bankName: requestedDetails.bankName?.trim(),
+          accountNumber: requestedDetails.accountNumber?.trim(),
+          routingNumber: requestedDetails.routingNumber?.trim(),
+          branchName: requestedDetails.branchName?.trim(),
+          branchCode: requestedDetails.branchCode?.trim() || "",
+          accountType: requestedDetails.accountType || "savings",
+        },
+        reason: reason.trim(),
+        ipAddress,
+        userAgent
+      });
+      
+      res.json({
+        success: true,
+        message: "Change request submitted successfully. It will be reviewed by an administrator.",
+        data: {
+          requestId: changeRequest._id,
+          status: changeRequest.status,
+          requestedAt: changeRequest.requestedAt,
+          requestAge: changeRequest.requestAge
+        }
+      });
+      
+    } catch (error) {
+      console.error("Submit change request error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to submit change request",
+      });
+    }
+  }
+);
+
+// Get user's change requests
+router.get(
+  "/bank-details/change-requests",
+  authenticate,
+  authorize("store_owner"),
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      
+      const requests = await BankChangeRequest.getUserRequests(userId);
+      
+      res.json({
+        success: true,
+        data: requests,
+      });
+      
+    } catch (error) {
+      console.error("Get change requests error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch change requests",
+      });
+    }
+  }
+);
+
+// Cancel a pending change request
+router.delete(
+  "/bank-details/change-request/:requestId",
+  authenticate,
+  authorize("store_owner"),
+  async (req, res) => {
+    try {
+      const { requestId } = req.params;
+      const userId = req.user._id;
+      
+      const changeRequest = await BankChangeRequest.findOne({
+        _id: requestId,
+        userId
+      });
+      
+      if (!changeRequest) {
+        return res.status(404).json({
+          success: false,
+          message: "Change request not found"
+        });
+      }
+      
+      await changeRequest.cancel();
+      
+      res.json({
+        success: true,
+        message: "Change request cancelled successfully"
+      });
+      
+    } catch (error) {
+      console.error("Cancel change request error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to cancel change request",
       });
     }
   }

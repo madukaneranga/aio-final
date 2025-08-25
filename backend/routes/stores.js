@@ -334,6 +334,55 @@ router.get("/:storeId/item-count", async (req, res) => {
   }
 });
 
+// Upload verification documents
+router.put(
+  "/:id/verification-docs",
+  authenticate,
+  authorize("store_owner"),
+  async (req, res) => {
+    try {
+      const store = await Store.findById(req.params.id);
+
+      if (!store) {
+        return res.status(404).json({ error: "Store not found" });
+      }
+
+      if (store.ownerId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { idImages, addressVerificationImages } = req.body;
+      const updates = {};
+
+      if (idImages && Array.isArray(idImages)) {
+        updates.idImages = idImages;
+        updates.canReuploadDocs = false; // Lock re-upload after first submission
+      }
+
+      if (addressVerificationImages && Array.isArray(addressVerificationImages)) {
+        updates.addressVerificationImages = addressVerificationImages;
+        updates.canReuploadDocs = false; // Lock re-upload after first submission
+      }
+
+      // Reset verification status to pending when new documents are uploaded
+      if (idImages || addressVerificationImages) {
+        updates.isVerified = false;
+      }
+
+      const updatedStore = await Store.findByIdAndUpdate(
+        req.params.id,
+        updates,
+        { new: true }
+      );
+
+      res.json(updatedStore);
+    } catch (error) {
+      console.error('Verification upload error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Toggle follow/unfollow a store
 router.post("/:storeId/follow", authenticate, async (req, res) => {
   try {

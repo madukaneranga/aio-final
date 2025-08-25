@@ -10,6 +10,12 @@ import {
   MapPin,
   Timer,
   AlertCircle,
+  Download,
+  CreditCard,
+  Building2,
+  Banknote,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import EmptyState from "../components/EmptyState";
@@ -27,6 +33,10 @@ const Orders = () => {
   const [selectedOrderForReview, setSelectedOrderForReview] = useState(null);
   const [reviewData, setReviewData] = useState({ rating: 5, comment: "" });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(null);
+  const [markingDelivered, setMarkingDelivered] = useState(null);
+  const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(null);
+  const [expandedOrders, setExpandedOrders] = useState(new Set());
 
   useEffect(() => {
     if (user) {
@@ -245,6 +255,117 @@ const Orders = () => {
     );
   };
 
+  // Download receipt function
+  const downloadReceipt = async (orderId, type) => {
+    try {
+      setDownloadingReceipt(orderId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/payments/download-receipt/${orderId}?type=${type}`,
+        {
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `receipt_${orderId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const errorData = await response.json();
+        alert(`Error downloading receipt: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error downloading receipt:", error);
+      alert("Error downloading receipt. Please try again.");
+    } finally {
+      setDownloadingReceipt(null);
+    }
+  };
+
+  // Mark order as delivered (COD)
+  const markOrderAsDelivered = async (orderId) => {
+    if (!confirm("Are you sure you want to mark this order as delivered?")) {
+      return;
+    }
+
+    try {
+      setMarkingDelivered(orderId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/mark-delivered`,
+        {
+          method: "PUT",
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        alert("Order marked as delivered successfully!");
+        fetchOrders(); // Refresh orders
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error marking order as delivered:", error);
+      alert("Error marking order as delivered. Please try again.");
+    } finally {
+      setMarkingDelivered(null);
+    }
+  };
+
+  // Store owner updates payment status to paid
+  const updatePaymentStatus = async (orderId, paymentStatus) => {
+    if (!confirm(`Are you sure you want to mark this payment as ${paymentStatus}?`)) {
+      return;
+    }
+
+    try {
+      setUpdatingPaymentStatus(orderId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/update-payment-status`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ paymentStatus }),
+        }
+      );
+
+      if (response.ok) {
+        alert("Payment status updated successfully!");
+        fetchOrders(); // Refresh orders
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error updating payment status:", error);
+      alert("Error updating payment status. Please try again.");
+    } finally {
+      setUpdatingPaymentStatus(null);
+    }
+  };
+
+  // Toggle expand/collapse for orders
+  const toggleOrderExpansion = (orderId) => {
+    const newExpandedOrders = new Set(expandedOrders);
+    if (newExpandedOrders.has(orderId)) {
+      newExpandedOrders.delete(orderId);
+    } else {
+      newExpandedOrders.add(orderId);
+    }
+    setExpandedOrders(newExpandedOrders);
+  };
+
   const filteredOrders = orders.filter(
     (order) => filter === "all" || order.status === filter
   );
@@ -318,264 +439,585 @@ const Orders = () => {
             description="You haven't placed any orders yet or no orders match your current filter."
           />
         ) : (
-          <div className="space-y-6">
-            {filteredOrders.map((order) => (
-              <div
-                key={order._id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(order.status)}
-                      <span className="font-semibold text-gray-900">
-                        Order #{order._id.slice(-8)}
-                      </span>
-                    </div>
-                    <StatusBadge status={order.status} />
-                    {/*{user.role === "customer" && (
-                      <CountdownTimer order={order} />
-                    )} */}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-500">Order Date</p>
-                    <p className="font-medium text-gray-900">
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
+          <div className="space-y-2">
+            {filteredOrders.map((order) => {
+              const isExpanded = expandedOrders.has(order._id);
+              const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+              
+              return (
+                <div
+                  key={order._id}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200"
+                >
+                  {/* Compact Collapsed View - Mobile First */}
+                  <div className="p-4">
+                    {/* Main Row: Always visible */}
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => toggleOrderExpansion(order._id)}
+                    >
+                      {/* Left: Order ID & Status */}
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2">
+                          {getStatusIcon(order.status)}
+                          <span className="font-semibold text-gray-900 text-sm sm:text-base">
+                            #{order._id.slice(-8)}
+                          </span>
+                        </div>
+                        <StatusBadge status={order.status} />
+                      </div>
 
-                {/* Order Items */}
-                <div className="mb-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Items:</h4>
-                  <div className="space-y-2">
-                    {order.items.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center space-x-3 bg-gray-50 p-3 rounded-lg"
-                      >
-                        <img
-                          src={
-                            item.productId?.images?.[0]
-                              ? item.productId.images[0].startsWith("http")
-                                ? item.productId.images[0]
-                                : `${import.meta.env.VITE_API_URL}${
-                                    item.productId.images[0]
-                                  }`
-                              : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
-                          }
-                          alt={item.productId?.title || "Product"}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">
-                            {item.productId?.title || "Product"}
+                      {/* Right: Amount & Expand */}
+                      <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900 text-sm sm:text-base">
+                            LKR {order.totalAmount}
                           </p>
-                          <p className="text-sm text-gray-500">
-                            Quantity: {item.quantity}
+                          <p className="text-xs text-gray-500">
+                            {order.paymentDetails?.paymentStatus === "paid" ? "Paid" : "Pending"}
                           </p>
                         </div>
-                        <p className="font-medium text-gray-900">
-                          LKR {(item.price * item.quantity).toFixed(2)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Review Section for Delivered Orders */}
-                {order.status === "delivered" && user.role === "customer" && (
-                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h4 className="font-medium text-green-900 mb-2">
-                      Order Completed
-                    </h4>
-                    {order.reviewed ? (
-                      <p className="text-sm text-green-700">
-                        ✅ Thank you! You have already reviewed this order.
-                      </p>
-                    ) : (
-                      <>
-                        <p className="text-sm text-green-700 mb-3">
-                          How was your experience with this order?
-                        </p>
-                        <button
-                          onClick={() => openReviewModal(order)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                        >
-                          Write a Review
+                        
+                        <button className="text-gray-400 hover:text-gray-600 transition-colors p-1">
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5" />
+                          )}
                         </button>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Order Details */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-gray-500">
-                      {user.role === "store_owner" ? "Customer" : "Store"}
-                    </p>
-                    <p className="font-medium text-gray-900">
-                      {user.role === "store_owner"
-                        ? order.customerId?.name || "Unknown Customer"
-                        : order.storeId?.name || "Unknown Store"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Total Amount</p>
-                    <p className="font-medium text-gray-900">
-                      LKR {order.totalAmount}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Payment Status</p>
-                    <p
-                      className={`font-medium ${
-                        order.paymentDetails?.paymentStatus?.toLowerCase() ===
-                        "paid"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {order.paymentDetails?.paymentStatus?.toLowerCase() ===
-                      "paid"
-                        ? "Paid"
-                        : "Payment Pending"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Shipping Address */}
-                {order.shippingAddress && (
-                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-start space-x-2">
-                      <MapPin className="w-4 h-4 text-gray-400 mt-1" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          Shipping Address:
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {order.shippingAddress.street},{" "}
-                          {order.shippingAddress.city},
-                          {order.shippingAddress.state}{" "}
-                          {order.shippingAddress.zipCode}
-                        </p>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Tracking Number */}
-                {order.trackingNumber && (
-                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Truck className="w-4 h-4 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-medium text-blue-900">
-                          Tracking Number:
-                        </p>
-                        <p className="text-sm text-blue-700 font-mono">
-                          {order.trackingNumber}
-                        </p>
+                    {/* Mobile Info Row: Visible on mobile only */}
+                    <div className="mt-3 sm:hidden">
+                      <div className="flex items-center justify-between text-sm text-gray-600">
+                        <div className="flex items-center space-x-3">
+                          <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
+                          <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div>
+                          {user.role === "store_owner" && (
+                            <span>{order.customerId?.name || "Unknown"}</span>
+                          )}
+                          {user.role === "customer" && (
+                            <span className="truncate max-w-24">{order.storeId?.name || "Unknown Store"}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                  <div className="flex items-center space-x-4">
-                    <button
-                      onClick={() => setSelectedOrder(order)}
-                      className="flex items-center space-x-2 text-black hover:text-gray-700 transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                      <span>View Details</span>
-                    </button>
-                  </div>
+                    {/* Desktop Info Row: Hidden on mobile */}
+                    <div className="hidden sm:flex items-center justify-between mt-2">
+                      <div className="flex items-center space-x-6 text-sm text-gray-600">
+                        <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
+                        <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                        {user.role === "store_owner" && (
+                          <span>Customer: {order.customerId?.name || "Unknown"}</span>
+                        )}
+                        {user.role === "customer" && (
+                          <span>Store: {order.storeId?.name || "Unknown Store"}</span>
+                        )}
+                      </div>
 
-                  <div className="flex items-center space-x-2">
-                    {/* Customer Actions 
-                    {user.role === 'customer' && canCancelOrder(order) && (
-                      <button
-                        onClick={() => cancelOrder(order._id)}
-                        disabled={cancelling === order._id}
-                        className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm disabled:opacity-50"
-                      >
-                        {cancelling === order._id ? 'Cancelling...' : 'Cancel Order'}
-                      </button>
-                    )}
-*/}
-                    {/* Store Owner Actions */}
-                    {user.role === "store_owner" && (
-                      <>
-                        {order.status === "pending" && (
+                      {/* Desktop Quick Actions */}
+                      <div className="flex items-center space-x-2">
+                        {/* Payment Status Update for Store Owners */}
+                        {user.role === "store_owner" && order.status !== "cancelled" && (
+                          <>
+                            {order.paymentDetails?.paymentMethod === "bank_transfer" && 
+                             order.paymentDetails?.paymentStatus === "pending_bank_transfer" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updatePaymentStatus(order._id, "paid");
+                                }}
+                                disabled={updatingPaymentStatus === order._id}
+                                className="bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 min-h-[36px]"
+                              >
+                                {updatingPaymentStatus === order._id ? "..." : "Mark Paid"}
+                              </button>
+                            )}
+                            
+                            {order.paymentDetails?.paymentMethod === "cod" && 
+                             order.paymentDetails?.paymentStatus === "cod_pending" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updatePaymentStatus(order._id, "paid");
+                                }}
+                                disabled={updatingPaymentStatus === order._id}
+                                className="bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 min-h-[36px]"
+                              >
+                                {updatingPaymentStatus === order._id ? "..." : "Mark Paid"}
+                              </button>
+                            )}
+                          </>
+                        )}
+
+                        {/* COD Mark as Delivered for Customers */}
+                        {user.role === "customer" && 
+                         order.status !== "cancelled" &&
+                         order.paymentDetails?.paymentMethod === "cod" && 
+                         order.paymentDetails?.paymentStatus === "cod_pending" && 
+                         order.canCustomerUpdateStatus && (
                           <button
-                            onClick={() =>
-                              updateOrderStatus(order._id, "accepted")
-                            }
-                            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markOrderAsDelivered(order._id);
+                            }}
+                            disabled={markingDelivered === order._id}
+                            className="bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 min-h-[36px]"
                           >
-                            Accept Order
+                            {markingDelivered === order._id ? "..." : "Mark Delivered"}
                           </button>
                         )}
-                        {order.status === "accepted" && (
-                          <button
-                            onClick={() =>
-                              updateOrderStatus(order._id, "processing")
-                            }
-                            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                          >
-                            Start Processing
-                          </button>
-                        )}
-                        {order.status === "processing" && (
-                          <button
-                            onClick={() =>
-                              updateOrderStatus(order._id, "ready")
-                            }
-                            className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors text-sm"
-                          >
-                            Mark Ready
-                          </button>
-                        )}
-                        {order.status === "ready" && (
-                          <button
-                            onClick={() =>
-                              updateOrderStatus(order._id, "shipped")
-                            }
-                            className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors text-sm"
-                          >
-                            Ship Order
-                          </button>
-                        )}
-                        {order.status === "shipped" && (
-                          <button
-                            onClick={() =>
-                              updateOrderStatus(order._id, "delivered")
-                            }
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                          >
-                            Mark Delivered
-                          </button>
-                        )}
-                        {order.status !== "cancelled" &&
-                          order.status !== "delivered" && (
+                      </div>
+                    </div>
+
+                    {/* Mobile Quick Actions: Full width buttons below main content */}
+                    <div className="sm:hidden">
+                      {/* Payment Status Update for Store Owners */}
+                      {user.role === "store_owner" && order.status !== "cancelled" && (
+                        <div className="mt-3 space-y-2">
+                          {order.paymentDetails?.paymentMethod === "bank_transfer" && 
+                           order.paymentDetails?.paymentStatus === "pending_bank_transfer" && (
                             <button
-                              onClick={() =>
-                                updateOrderStatus(order._id, "cancelled")
-                              }
-                              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updatePaymentStatus(order._id, "paid");
+                              }}
+                              disabled={updatingPaymentStatus === order._id}
+                              className="w-full bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
                             >
-                              Cancel Order
+                              {updatingPaymentStatus === order._id ? "Updating Payment..." : "Mark Payment as Paid"}
                             </button>
                           )}
-                      </>
-                    )}
+                          
+                          {order.paymentDetails?.paymentMethod === "cod" && 
+                           order.paymentDetails?.paymentStatus === "cod_pending" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updatePaymentStatus(order._id, "paid");
+                              }}
+                              disabled={updatingPaymentStatus === order._id}
+                              className="w-full bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              {updatingPaymentStatus === order._id ? "Updating Payment..." : "Mark COD Payment as Paid"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* COD Mark as Delivered for Customers */}
+                      {user.role === "customer" && 
+                       order.status !== "cancelled" &&
+                       order.paymentDetails?.paymentMethod === "cod" && 
+                       order.paymentDetails?.paymentStatus === "cod_pending" && 
+                       order.canCustomerUpdateStatus && (
+                        <div className="mt-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markOrderAsDelivered(order._id);
+                            }}
+                            disabled={markingDelivered === order._id}
+                            className="w-full bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
+                          >
+                            {markingDelivered === order._id ? "Marking as Delivered..." : "Mark Order as Delivered"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 animate-in slide-in-from-top duration-200">
+                      <div className="p-4 space-y-6">
+                        {/* Summary Card - Mobile Priority */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-500 mb-1">
+                                {user.role === "store_owner" ? "Customer" : "Store"}
+                              </p>
+                              <p className="font-medium text-gray-900 text-sm">
+                                {user.role === "store_owner"
+                                  ? order.customerId?.name || "Unknown Customer"
+                                  : order.storeId?.name || "Unknown Store"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500 mb-1">Order Date</p>
+                              <p className="font-medium text-gray-900 text-sm">
+                                {new Date(order.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500 mb-1">Payment Status</p>
+                              <p
+                                className={`font-medium text-sm ${
+                                  order.paymentDetails?.paymentStatus?.toLowerCase() === "paid"
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {order.paymentDetails?.paymentStatus?.toLowerCase() === "paid"
+                                  ? "Paid"
+                                  : "Payment Pending"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Order Items */}
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <h4 className="font-medium text-gray-900 mb-3 text-sm sm:text-base">
+                            Order Items ({itemCount} item{itemCount !== 1 ? 's' : ''})
+                          </h4>
+                          <div className="space-y-3">
+                            {order.items.map((item, index) => (
+                              <div
+                                key={index}
+                                className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg"
+                              >
+                                <img
+                                  src={
+                                    item.productId?.images?.[0]
+                                      ? item.productId.images[0].startsWith("http")
+                                        ? item.productId.images[0]
+                                        : `${import.meta.env.VITE_API_URL}${
+                                            item.productId.images[0]
+                                          }`
+                                      : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
+                                  }
+                                  alt={item.productId?.title || "Product"}
+                                  className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded flex-shrink-0"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                                    {item.productId?.title || "Product"}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-1">
+                                    <p className="text-sm text-gray-500">
+                                      Qty: {item.quantity}
+                                    </p>
+                                    <p className="font-medium text-gray-900 text-sm">
+                                      LKR {(item.price * item.quantity).toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Shipping Address */}
+                        {order.shippingAddress && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-start space-x-3">
+                              <MapPin className="w-5 h-5 text-gray-400 mt-1 flex-shrink-0" />
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">
+                                  Shipping Address
+                                </h4>
+                                <div className="text-sm text-gray-600 space-y-1">
+                                  <p>{order.shippingAddress.street}</p>
+                                  <p>{order.shippingAddress.city}, {order.shippingAddress.state}</p>
+                                  <p>{order.shippingAddress.zipCode}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tracking Number */}
+                        {order.trackingNumber && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-start space-x-3">
+                              <Truck className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                              <div>
+                                <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                  Tracking Information
+                                </h4>
+                                <p className="text-sm text-gray-700 font-mono bg-gray-50 p-2 rounded">
+                                  {order.trackingNumber}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Review Section for Delivered Orders */}
+                        {order.status === "delivered" && user.role === "customer" && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 className="font-medium text-gray-900 mb-3 text-sm sm:text-base">
+                              Order Completed ✅
+                            </h4>
+                            {order.reviewed ? (
+                              <p className="text-sm text-gray-600">
+                                Thank you! You have already reviewed this order.
+                              </p>
+                            ) : (
+                              <>
+                                <p className="text-sm text-gray-600 mb-4">
+                                  How was your experience with this order?
+                                </p>
+                                <button
+                                  onClick={() => openReviewModal(order)}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                >
+                                  Write a Review
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Payment Method Details */}
+                        {order.paymentDetails && (
+                          <div className="space-y-4">
+                            {/* Bank Transfer - Customer View */}
+                            {order.paymentDetails.paymentMethod === "bank_transfer" && 
+                             user.role === "customer" && 
+                             order.paymentDetails.paymentStatus === "pending_bank_transfer" && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Building2 className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Bank Transfer Instructions
+                                    </h4>
+                                    <p className="text-sm text-gray-700 mb-4">
+                                      Please transfer LKR {order.totalAmount} to the bank account below and contact the store with your receipt.
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                {/* Bank Details for Customer - Mobile Optimized */}
+                                {order.bankDetails && (
+                                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h4 className="font-medium text-gray-900 text-sm">Bank Transfer Details</h4>
+                                      <div className="flex items-center space-x-2">
+                                        {order.bankDetails.isVerified && (
+                                          <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                                            ✓ Verified
+                                          </span>
+                                        )}
+                                        {order.bankDetails.isLocked && (
+                                          <span className="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-full">
+                                            🔒 Secured
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                          <p className="font-medium text-gray-700 text-xs mb-1">Bank Name</p>
+                                          <p className="text-black text-sm">{order.bankDetails.bankName}</p>
+                                        </div>
+                                        <div>
+                                          <p className="font-medium text-gray-700 text-xs mb-1">Account Holder</p>
+                                          <p className="text-black text-sm">{order.bankDetails.accountHolderName}</p>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-gray-700 text-xs mb-1">Account Number</p>
+                                        <p className="text-black font-mono text-sm bg-white p-2 rounded border select-all">
+                                          {order.bankDetails.accountNumber}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-gray-700 text-xs mb-1">Branch</p>
+                                        <p className="text-black text-sm">{order.bankDetails.branchName}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                                  <p className="font-medium">Reference: Order #{order.combinedId || order._id.slice(-8)}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Bank Transfer - Store Owner View */}
+                            {order.paymentDetails.paymentMethod === "bank_transfer" && 
+                             user.role === "store_owner" && 
+                             order.paymentDetails.paymentStatus === "pending_bank_transfer" && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Building2 className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Bank Transfer Payment
+                                    </h4>
+                                    <p className="text-sm text-gray-700">
+                                      Waiting for customer to transfer LKR {order.totalAmount}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => updatePaymentStatus(order._id, "paid")}
+                                  disabled={updatingPaymentStatus === order._id}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                                >
+                                  {updatingPaymentStatus === order._id ? "Updating Payment Status..." : "Mark Payment as Paid"}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* COD - Customer View */}
+                            {order.paymentDetails.paymentMethod === "cod" && 
+                             order.paymentDetails.paymentStatus === "cod_pending" && 
+                             user.role === "customer" && 
+                             order.canCustomerUpdateStatus && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Banknote className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Cash on Delivery
+                                    </h4>
+                                    <p className="text-sm text-gray-700">
+                                      Mark as delivered once you receive your order
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => markOrderAsDelivered(order._id)}
+                                  disabled={markingDelivered === order._id}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                                >
+                                  {markingDelivered === order._id ? "Marking as Delivered..." : "Mark Order as Delivered"}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* COD - Store Owner View */}
+                            {order.paymentDetails.paymentMethod === "cod" && 
+                             order.paymentDetails.paymentStatus === "cod_pending" && 
+                             user.role === "store_owner" && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Banknote className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Cash on Delivery
+                                    </h4>
+                                    <p className="text-sm text-gray-700">
+                                      Mark as paid when you receive payment: LKR {order.totalAmount}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => updatePaymentStatus(order._id, "paid")}
+                                  disabled={updatingPaymentStatus === order._id}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                                >
+                                  {updatingPaymentStatus === order._id ? "Updating Payment Status..." : "Mark Payment as Paid"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Receipt Download */}
+                        {order.receiptGenerated && order.receiptUrl && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-start space-x-3 mb-3">
+                              <Download className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                              <div>
+                                <h4 className="font-medium text-black mb-1 text-sm sm:text-base">Receipt Available</h4>
+                                <p className="text-sm text-gray-600">Download your order receipt as PDF</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadReceipt(order._id, 'order')}
+                              disabled={downloadingReceipt === order._id}
+                              className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                            >
+                              {downloadingReceipt === order._id ? "Downloading PDF..." : "Download Receipt"}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <div className="space-y-4">
+                            {/* View Details Button */}
+                            <button
+                              onClick={() => setSelectedOrder(order)}
+                              className="w-full flex items-center justify-center space-x-2 text-black border border-gray-300 py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                            >
+                              <Eye className="w-4 h-4" />
+                              <span>View Full Details</span>
+                            </button>
+
+                            {/* Store Owner Actions */}
+                            {user.role === "store_owner" && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {order.status === "pending" && (
+                                  <button
+                                    onClick={() => updateOrderStatus(order._id, "accepted")}
+                                    className="bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                  >
+                                    Accept Order
+                                  </button>
+                                )}
+                                {order.status === "accepted" && (
+                                  <button
+                                    onClick={() => updateOrderStatus(order._id, "processing")}
+                                    className="bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                  >
+                                    Start Processing
+                                  </button>
+                                )}
+                                {order.status === "processing" && (
+                                  <button
+                                    onClick={() => updateOrderStatus(order._id, "ready")}
+                                    className="bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                  >
+                                    Mark Ready
+                                  </button>
+                                )}
+                                {order.status === "ready" && (
+                                  <button
+                                    onClick={() => updateOrderStatus(order._id, "shipped")}
+                                    className="bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                  >
+                                    Ship Order
+                                  </button>
+                                )}
+                                {order.status === "shipped" && (
+                                  <button
+                                    onClick={() => updateOrderStatus(order._id, "delivered")}
+                                    className="bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                  >
+                                    Mark Delivered
+                                  </button>
+                                )}
+                                {order.status !== "cancelled" && order.status !== "delivered" && (
+                                  <button
+                                    onClick={() => updateOrderStatus(order._id, "cancelled")}
+                                    className="bg-gray-600 text-white py-2.5 rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                                  >
+                                    Cancel Order
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

@@ -72,9 +72,29 @@ const orderSchema = new mongoose.Schema({
     paidAt: Date,
     paymentMethod: String,
     authorizationToken: String,
+    bankTransferReference: String,
   },
   trackingNumber: String,
   notes: String,
+  
+  // Receipt fields
+  receiptUrl: {
+    type: String,
+    default: "",
+  },
+  receiptGenerated: {
+    type: Boolean,
+    default: false,
+  },
+  receiptGeneratedAt: {
+    type: Date,
+  },
+  
+  // Customer delivery confirmation for COD
+  canCustomerUpdateStatus: {
+    type: Boolean,
+    default: false,
+  },
   statusHistory: [
     {
       status: String,

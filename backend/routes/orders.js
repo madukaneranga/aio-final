@@ -3,6 +3,8 @@ import Order from "../models/Order.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import Notification from "../models/Notification.js";
 import { emitNotification } from "../utils/socketUtils.js";
+import WalletTransaction from "../models/WalletTransaction.js";
+import Store from "../models/Store.js";
 
 const router = express.Router();
 
@@ -67,7 +69,17 @@ router.get(
         .populate("items.productId", "title images")
         .sort({ createdAt: -1 });
 
-      res.json(orders);
+      // Store owners don't need to see any bank details - they already know their own bank info
+      const filteredOrders = orders.map(order => {
+        const orderObj = order.toObject();
+        delete orderObj.bankTransferInstructions;
+        delete orderObj.bankDetails;
+        delete orderObj.instructions;
+        delete orderObj.transferInstructions;
+        return orderObj;
+      });
+
+      res.json(filteredOrders);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -87,14 +99,23 @@ router.get("/:id", authenticate, async (req, res) => {
     }
 
     // Check if user owns this order or owns the store
-    if (
-      order.customerId._id.toString() !== req.user._id.toString() &&
-      order.storeId._id.toString() !== req.user.storeId?.toString()
-    ) {
+    const isCustomer = order.customerId._id.toString() === req.user._id.toString();
+    const isStoreOwner = order.storeId._id.toString() === req.user.storeId?.toString();
+    
+    if (!isCustomer && !isStoreOwner) {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    res.json(order);
+    // Store owners don't need to see any bank details - they already know their own bank info
+    let responseOrder = order.toObject();
+    if (isStoreOwner && !isCustomer) {
+      delete responseOrder.bankTransferInstructions;
+      delete responseOrder.bankDetails;
+      delete responseOrder.instructions;
+      delete responseOrder.transferInstructions;
+    }
+
+    res.json(responseOrder);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -162,45 +183,248 @@ router.put(
 );
 
 // Allow customers to cancel orders within 5 minutes
-/*
-router.put('/:id/cancel', authenticate, async (req, res) => {
+// Customer marks COD order as delivered
+router.put("/:id/mark-delivered", authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: "Order not found" });
     }
 
     // Check if user owns this order
     if (order.customerId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: "Access denied" });
     }
 
-    // Check if order can be cancelled (within 5 minutes and status is pending)
-    if (order.status !== 'pending') {
-      return res.status(400).json({ error: 'Order cannot be cancelled' });
+    // Check if this is a COD order that can be marked as delivered
+    if (order.paymentDetails?.paymentMethod !== "cod") {
+      return res.status(400).json({ 
+        error: "Only Cash on Delivery orders can be marked as delivered by customers" 
+      });
     }
 
-    const orderTime = new Date(order.createdAt);
-    const now = new Date();
-    const timeDiff = (now - orderTime) / (1000 * 60); // difference in minutes
-
-    if (timeDiff > 5) {
-      return res.status(400).json({ error: 'Cancellation window has expired' });
+    if (order.paymentDetails?.paymentStatus !== "cod_pending") {
+      return res.status(400).json({ 
+        error: "This order is not eligible for delivery confirmation" 
+      });
     }
 
+    if (!order.canCustomerUpdateStatus) {
+      return res.status(400).json({ 
+        error: "Customer delivery confirmation is not enabled for this order" 
+      });
+    }
+
+    // Update order status
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id,
-      { 
-        status: 'cancelled',
-        notes: 'Cancelled by customer'
+      {
+        status: "delivered",
+        "paymentDetails.paymentStatus": "paid",
+        "paymentDetails.paidAt": new Date(),
+        notes: "Marked as delivered by customer",
+        canCustomerUpdateStatus: false,
       },
       { new: true }
     );
 
-    res.json(updatedOrder);
+    // Complete the wallet transaction
+    await WalletTransaction.updateMany(
+      { 
+        transactionId: order.combinedId || order._id.toString(),
+        status: "pending" 
+      },
+      { 
+        status: "completed",
+        description: "COD payment completed - marked as delivered by customer"
+      }
+    );
+
+    // Update store total sales
+    await Store.findByIdAndUpdate(order.storeId, {
+      $inc: { totalSales: order.storeAmount },
+    });
+
+    // Notify store owner
+    const storeNotification = await Notification.create({
+      userId: (await Store.findById(order.storeId)).ownerId,
+      title: "🎉 COD Order Delivered",
+      userType: "store_owner",
+      body: `Order #${order._id.toString().slice(-8)} has been marked as delivered by the customer.`,
+      type: "order_update",
+      link: "/orders",
+    });
+
+    // Emit notification to store owner
+    try {
+      const store = await Store.findById(order.storeId);
+      emitNotification(store.ownerId.toString(), storeNotification);
+    } catch (emitError) {
+      console.error("Failed to emit notification:", emitError);
+    }
+
+    res.json({
+      success: true,
+      message: "Order marked as delivered successfully",
+      order: updatedOrder,
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error marking order as delivered:", error);
+    res.status(500).json({ error: "Failed to mark order as delivered" });
   }
 });
-*/
+
+// Store owner updates payment status for bank transfer and COD orders
+router.put("/:id/update-payment-status", 
+  authenticate, 
+  authorize("store_owner"), 
+  async (req, res) => {
+    try {
+      const { paymentStatus, notes } = req.body;
+      
+      console.log("Payment status update request:", {
+        orderId: req.params.id,
+        paymentStatus,
+        userId: req.user._id,
+        userStoreId: req.user.storeId,
+        userRole: req.user.role
+      });
+      
+      if (!paymentStatus) {
+        return res.status(400).json({ error: "Payment status is required" });
+      }
+
+      if (!req.user.storeId) {
+        return res.status(403).json({ error: "Store not found for user" });
+      }
+
+      const order = await Order.findById(req.params.id).populate("storeId");
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      console.log("Order found:", {
+        orderId: order._id,
+        orderStoreId: order.storeId._id,
+        userStoreId: req.user.storeId,
+        paymentMethod: order.paymentDetails?.paymentMethod,
+        paymentStatus: order.paymentDetails?.paymentStatus
+      });
+
+      // Check if user owns this store
+      if (order.storeId._id.toString() !== req.user.storeId.toString()) {
+        return res.status(403).json({ 
+          error: "Access denied - store mismatch",
+          orderStore: order.storeId._id.toString(),
+          userStore: req.user.storeId.toString()
+        });
+      }
+
+      const currentPaymentMethod = order.paymentDetails?.paymentMethod;
+      const currentPaymentStatus = order.paymentDetails?.paymentStatus;
+
+      // Validate payment method
+      if (!["bank_transfer", "cod"].includes(currentPaymentMethod)) {
+        return res.status(400).json({ 
+          error: "Payment status can only be updated for bank transfer and COD orders",
+          currentMethod: currentPaymentMethod
+        });
+      }
+
+      // Check if payment is already processed
+      if (currentPaymentStatus === "paid") {
+        return res.status(400).json({ 
+          error: "Payment is already marked as paid" 
+        });
+      }
+
+      // Validate payment status update
+      if (!["paid", "failed"].includes(paymentStatus)) {
+        return res.status(400).json({ 
+          error: "Payment status must be 'paid' or 'failed'",
+          received: paymentStatus
+        });
+      }
+
+      console.log("Validation passed, updating payment status...");
+
+      // Update order payment status
+      const updateData = {
+        "paymentDetails.paymentStatus": paymentStatus,
+        "paymentDetails.updatedAt": new Date(),
+        "paymentDetails.updatedBy": "store_owner",
+      };
+
+      if (notes) {
+        updateData.notes = notes;
+      }
+
+      if (paymentStatus === "paid") {
+        updateData["paymentDetails.paidAt"] = new Date();
+        // If it's a COD order, also update the order status
+        if (currentPaymentMethod === "cod") {
+          updateData.status = "processing"; // Move from pending to processing
+        }
+      }
+
+      const updatedOrder = await Order.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true }
+      ).populate("customerId", "name email");
+
+      // If payment confirmed, complete wallet transaction
+      if (paymentStatus === "paid") {
+        await WalletTransaction.updateMany(
+          { 
+            transactionId: order.combinedId || order._id.toString(),
+            status: "pending" 
+          },
+          { 
+            status: "completed",
+            description: `${currentPaymentMethod.toUpperCase()} payment confirmed by store owner`
+          }
+        );
+
+        // Update store total sales
+        await Store.findByIdAndUpdate(order.storeId, {
+          $inc: { totalSales: order.storeAmount },
+        });
+      }
+
+      // Notify customer
+      const notification = await Notification.create({
+        userId: order.customerId,
+        title: paymentStatus === "paid" ? "💰 Payment Confirmed" : "❌ Payment Issue",
+        userType: "customer",
+        body: paymentStatus === "paid" 
+          ? `Your ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment for order #${order._id.toString().slice(-8)} has been confirmed.`
+          : `There was an issue with your ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment for order #${order._id.toString().slice(-8)}.`,
+        type: "order_update",
+        link: "/orders",
+      });
+
+      // Emit notification to customer
+      try {
+        emitNotification(order.customerId.toString(), notification);
+      } catch (emitError) {
+        console.error("Failed to emit notification:", emitError);
+      }
+
+      console.log(`Order payment status successfully updated to ${paymentStatus} for order ${req.params.id}`);
+      
+      res.json({
+        success: true,
+        message: `Payment status updated to ${paymentStatus}`,
+        order: updatedOrder,
+      });
+
+    } catch (error) {
+      console.error("Error updating payment status:", error);
+      res.status(500).json({ error: "Failed to update payment status" });
+    }
+  }
+);
+
 export default router;

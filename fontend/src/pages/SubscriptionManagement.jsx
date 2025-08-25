@@ -290,11 +290,39 @@ const SubscriptionManagement = () => {
     }
   };
 
-  // Handle package upgrade/downgrade
+  // Handle package upgrade/downgrade with safe upgrade flow
   const handlePackageUpgrade = async () => {
     if (!selectedPackage || selectedPackage === subscription?.package) {
       alert("Please select a different package.");
       return;
+    }
+
+    // Check if upgrade already in progress
+    if (subscription?.status === "pending_upgrade") {
+      const confirmRollback = confirm(
+        "You have an upgrade in progress. Do you want to cancel it and start a new upgrade?"
+      );
+      if (confirmRollback) {
+        try {
+          await fetch(
+            `${import.meta.env.VITE_API_URL}/api/subscriptions/rollback-upgrade`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ upgradeAttemptId: subscription.upgradeAttemptId }),
+            }
+          );
+          await fetchSubscription(); // Refresh data
+        } catch (error) {
+          alert("Failed to cancel previous upgrade. Please try again.");
+          return;
+        }
+      } else {
+        return;
+      }
     }
 
     try {
@@ -312,6 +340,12 @@ const SubscriptionManagement = () => {
 
       const result = await response.json();
 
+      // Handle upgrade already in progress
+      if (response.status === 409) {
+        alert(result.message);
+        return;
+      }
+
       if (response.status === 403 && result.nextAvailableDowngradeDate) {
         const formattedDate = new Date(
           result.nextAvailableDowngradeDate
@@ -328,24 +362,82 @@ const SubscriptionManagement = () => {
         throw new Error(result.message || "Failed to upgrade package");
       }
 
+      // Store upgrade attempt ID for potential rollback
+      const upgradeAttemptId = result.upgradeAttemptId;
+
       if (result.paymentRequired && result.paymentParams) {
         try {
           await loadPayHereSDK();
+          
+          // Enhanced PayHere handlers for safe upgrade
+          window.payhere.onCompleted = function (orderId) {
+            console.log("✅ Safe upgrade payment completed:", orderId);
+            setTimeout(() => {
+              fetchSubscription();
+              fetchCurrentPackage();
+              alert("✅ Upgrade completed successfully! Your new subscription is now active.");
+            }, 2000);
+          };
+          
+          window.payhere.onDismissed = function () {
+            console.log("❌ Payment dismissed, offering rollback...");
+            const rollbackConfirm = confirm(
+              "Payment was cancelled. Do you want to cancel the upgrade and keep your current subscription?"
+            );
+            if (rollbackConfirm) {
+              handleUpgradeRollback(upgradeAttemptId);
+            }
+          };
+          
+          window.payhere.onError = function (error) {
+            console.error("❌ Payment error:", error);
+            alert("Payment failed. Your current subscription remains active.");
+            handleUpgradeRollback(upgradeAttemptId);
+          };
+          
           await startPayHerePayment(result.paymentParams);
-          alert("Payment initiated. Please wait for confirmation.");
+          
+          alert(
+            "Safe upgrade initiated! Your current subscription remains active until payment is confirmed. If you cancel the payment, your original subscription will be restored."
+          );
         } catch (paymentError) {
-          console.error("❌ Payment failed:", paymentError);
-          alert("Payment was not successful. Upgrade was not completed.");
+          console.error("❌ Payment setup failed:", paymentError);
+          alert("Payment setup failed. Your original subscription is safe.");
+          handleUpgradeRollback(upgradeAttemptId);
           return;
         }
       }
 
-      // Remove immediate update since PayHere completion will handle it
-      alert(`Subscription change initiated. Please wait for payment confirmation.`);
       setView("overview");
     } catch (error) {
-      console.error("❌ Upgrade Error:", error);
-      alert(error.message || "Something went wrong during the upgrade.");
+      console.error("❌ Safe Upgrade Error:", error);
+      alert(error.message || "Something went wrong during the upgrade. Your original subscription is safe.");
+    }
+  };
+  
+  // Helper function to rollback upgrade
+  const handleUpgradeRollback = async (upgradeAttemptId) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/subscriptions/rollback-upgrade`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ upgradeAttemptId }),
+        }
+      );
+      
+      if (response.ok) {
+        await fetchSubscription(); // Refresh data
+        alert("✅ Upgrade cancelled. Your original subscription has been restored.");
+      } else {
+        console.error("Rollback failed:", await response.text());
+      }
+    } catch (error) {
+      console.error("Rollback error:", error);
     }
   };
 
@@ -446,7 +538,17 @@ const SubscriptionManagement = () => {
                       <div className="space-y-2 text-sm text-gray-600">
                         <p>
                           <span className="font-medium">Status:</span>{" "}
-                          {subscription.status}
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            subscription.status === "active" 
+                              ? "bg-green-100 text-green-800"
+                              : subscription.status === "pending_upgrade"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : subscription.status === "pending"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}>
+                            {subscription.status === "pending_upgrade" ? "Upgrade in Progress" : subscription.status}
+                          </span>
                         </p>
                         <p>
                           <span className="font-medium">Started:</span>{" "}
@@ -461,21 +563,45 @@ const SubscriptionManagement = () => {
                       </div>
                     </div>
                     <div className="flex flex-col space-y-3">
-                      <button
-                        onClick={() => setView("packages")}
-                        className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
-                      >
-                        Upgrade / Change Plan
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowCancelModal(true);
-                          handleCancelSubscription();
-                        }}
-                        className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-                      >
-                        Cancel Subscription
-                      </button>
+                      {subscription.status === "pending_upgrade" ? (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <div className="flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-3"></div>
+                            <div>
+                              <p className="text-sm font-medium text-yellow-800">
+                                Upgrade in Progress
+                              </p>
+                              <p className="text-xs text-yellow-600">
+                                Waiting for payment confirmation...
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleUpgradeRollback(subscription.upgradeAttemptId)}
+                            className="mt-3 text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-3 py-1 rounded transition-colors"
+                          >
+                            Cancel Upgrade
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setView("packages")}
+                            className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                          >
+                            Upgrade / Change Plan
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowCancelModal(true);
+                              handleCancelSubscription();
+                            }}
+                            className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                          >
+                            Cancel Subscription
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -512,11 +638,21 @@ const SubscriptionManagement = () => {
                 onClick={
                   subscription ? handlePackageUpgrade : createSubscription
                 }
-                disabled={!selectedPackage}
+                disabled={!selectedPackage || subscription?.status === "pending_upgrade"}
                 className="bg-black text-white px-12 py-4 rounded-lg font-medium text-lg hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {subscription ? "Update Subscription" : "Start Subscription"}
+                {subscription?.status === "pending_upgrade" 
+                  ? "Upgrade in Progress..."
+                  : subscription 
+                  ? "Update Subscription" 
+                  : "Start Subscription"
+                }
               </button>
+              {subscription?.status === "pending_upgrade" && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Please complete your current upgrade or wait for timeout before starting a new one.
+                </p>
+              )}
             </div>
           </div>
         )}

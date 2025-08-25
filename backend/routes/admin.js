@@ -2,6 +2,7 @@ import { Router } from "express";
 const router = Router();
 import WalletTransaction from "../models/WalletTransaction.js";
 import BankDetails from "../models/BankDetails.js";
+import BankChangeRequest from "../models/BankChangeRequest.js";
 import Store from "../models/Store.js";
 import { authenticate, authorize } from "../middleware/auth.js"
 
@@ -355,6 +356,188 @@ router.get("/analytics", authenticate,
     res.status(500).json({
       success: false,
       message: "Failed to fetch wallet analytics",
+    });
+  }
+});
+
+// =================== BANK CHANGE REQUEST MANAGEMENT ===================
+
+// Get all pending bank change requests
+router.get('/bank-change-requests', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const status = req.query.status || 'pending';
+    
+    let query = {};
+    if (status !== 'all') {
+      query.status = status;
+    }
+    
+    const skip = (page - 1) * limit;
+    
+    const requests = await BankChangeRequest.find(query)
+      .populate('userId', 'name email')
+      .populate('reviewedBy', 'name email')
+      .populate('currentBankDetailsId')
+      .sort({ requestedAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    
+    const total = await BankChangeRequest.countDocuments(query);
+    
+    res.json({
+      success: true,
+      data: requests,
+      pagination: {
+        current: page,
+        pages: Math.ceil(total / limit),
+        total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get bank change requests error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch bank change requests' 
+    });
+  }
+});
+
+// Approve bank change request
+router.put('/bank-change-requests/:requestId/approve', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { adminNotes } = req.body;
+    const adminId = req.user._id;
+    
+    const changeRequest = await BankChangeRequest.findById(requestId);
+    
+    if (!changeRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Change request not found'
+      });
+    }
+    
+    if (changeRequest.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending requests can be approved'
+      });
+    }
+    
+    await changeRequest.approve(adminId, adminNotes);
+    
+    res.json({
+      success: true,
+      message: 'Change request approved successfully',
+      data: changeRequest
+    });
+    
+  } catch (error) {
+    console.error('Approve bank change request error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to approve change request' 
+    });
+  }
+});
+
+// Reject bank change request
+router.put('/bank-change-requests/:requestId/reject', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { adminNotes } = req.body;
+    const adminId = req.user._id;
+    
+    if (!adminNotes || adminNotes.trim().length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a reason for rejection (minimum 5 characters)'
+      });
+    }
+    
+    const changeRequest = await BankChangeRequest.findById(requestId);
+    
+    if (!changeRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Change request not found'
+      });
+    }
+    
+    if (changeRequest.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending requests can be rejected'
+      });
+    }
+    
+    await changeRequest.reject(adminId, adminNotes.trim());
+    
+    res.json({
+      success: true,
+      message: 'Change request rejected',
+      data: changeRequest
+    });
+    
+  } catch (error) {
+    console.error('Reject bank change request error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to reject change request' 
+    });
+  }
+});
+
+// Emergency function to lock all existing unlocked bank details
+router.post('/lock-all-bank-details', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const adminId = req.user._id;
+    
+    // Find all unlocked bank details
+    const unlockedDetails = await BankDetails.find({ 
+      isLocked: { $ne: true },
+      isActive: true 
+    });
+    
+    let lockedCount = 0;
+    
+    for (const bankDetails of unlockedDetails) {
+      bankDetails.isLocked = true;
+      bankDetails.lockReason = 'admin_mass_lock';
+      bankDetails.lockedAt = new Date();
+      bankDetails.lockedBy = adminId;
+      
+      // Add to modification history
+      bankDetails.modificationHistory.push({
+        modifiedAt: new Date(),
+        modifiedBy: adminId,
+        changes: { action: 'mass_lock' },
+        reason: 'Admin mass lock of all unlocked bank details for security',
+        ipAddress: req.ip || req.connection.remoteAddress
+      });
+      
+      await bankDetails.save();
+      lockedCount++;
+    }
+    
+    res.json({
+      success: true,
+      message: `Successfully locked ${lockedCount} bank details records`,
+      lockedCount,
+      totalFound: unlockedDetails.length
+    });
+    
+  } catch (error) {
+    console.error('Mass lock bank details error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to lock bank details' 
     });
   }
 });

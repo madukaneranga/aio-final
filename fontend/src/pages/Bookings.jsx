@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { Calendar, Eye, Clock } from "lucide-react";
+import { 
+  Calendar, 
+  Eye, 
+  Clock, 
+  Download, 
+  Building2, 
+  Banknote,
+  ChevronDown,
+  ChevronUp 
+} from "lucide-react";
 import { Star } from "lucide-react";
 
 const Bookings = () => {
@@ -13,6 +22,10 @@ const Bookings = () => {
     useState(null);
   const [reviewData, setReviewData] = useState({ rating: 5, comment: "" });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(null);
+  const [markingDelivered, setMarkingDelivered] = useState(null);
+  const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(null);
+  const [expandedBookings, setExpandedBookings] = useState(new Set());
 
   useEffect(() => {
     if (user) {
@@ -115,6 +128,117 @@ const Bookings = () => {
     }
   };
 
+  // Download receipt function
+  const downloadReceipt = async (bookingId, type) => {
+    try {
+      setDownloadingReceipt(bookingId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/payments/download-receipt/${bookingId}?type=${type}`,
+        {
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `receipt_${bookingId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const errorData = await response.json();
+        alert(`Error downloading receipt: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error downloading receipt:", error);
+      alert("Error downloading receipt. Please try again.");
+    } finally {
+      setDownloadingReceipt(null);
+    }
+  };
+
+  // Mark booking as completed (COD)
+  const markBookingAsCompleted = async (bookingId) => {
+    if (!confirm("Are you sure you want to mark this booking as completed?")) {
+      return;
+    }
+
+    try {
+      setMarkingDelivered(bookingId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/bookings/${bookingId}/mark-delivered`,
+        {
+          method: "PUT",
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        alert("Booking marked as completed successfully!");
+        fetchBookings(); // Refresh bookings
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error marking booking as completed:", error);
+      alert("Error marking booking as completed. Please try again.");
+    } finally {
+      setMarkingDelivered(null);
+    }
+  };
+
+  // Store owner updates payment status to paid
+  const updatePaymentStatus = async (bookingId, paymentStatus) => {
+    if (!confirm(`Are you sure you want to mark this payment as ${paymentStatus}?`)) {
+      return;
+    }
+
+    try {
+      setUpdatingPaymentStatus(bookingId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/bookings/${bookingId}/update-payment-status`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ paymentStatus }),
+        }
+      );
+
+      if (response.ok) {
+        alert("Payment status updated successfully!");
+        fetchBookings(); // Refresh bookings
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error updating payment status:", error);
+      alert("Error updating payment status. Please try again.");
+    } finally {
+      setUpdatingPaymentStatus(null);
+    }
+  };
+
+  // Toggle expand/collapse for bookings
+  const toggleBookingExpansion = (bookingId) => {
+    const newExpandedBookings = new Set(expandedBookings);
+    if (newExpandedBookings.has(bookingId)) {
+      newExpandedBookings.delete(bookingId);
+    } else {
+      newExpandedBookings.add(bookingId);
+    }
+    setExpandedBookings(newExpandedBookings);
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "pending":
@@ -175,178 +299,534 @@ const Bookings = () => {
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {bookings.map((booking) => (
-              <div
-                key={booking._id}
-                className="bg-white rounded-lg shadow-sm p-6"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {booking.serviceId?.title || "Service"}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      Booking #{booking._id.slice(-6)}
-                    </p>
-                    {user.role === "store_owner" && (
-                      <p className="text-sm text-gray-600">
-                        Customer: {booking.customerId?.name || "Unknown"}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-gray-900">
-                      ${booking.totalAmount}
-                    </p>
-                    <span
-                      className={`inline-block px-3 py-1 text-sm rounded-full ${getStatusColor(
-                        booking.status
-                      )}`}
+          <div className="space-y-2">
+            {bookings.map((booking) => {
+              const isExpanded = expandedBookings.has(booking._id);
+              
+              return (
+                <div
+                  key={booking._id}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200"
+                >
+                  {/* Compact Collapsed View - Mobile First */}
+                  <div className="p-4">
+                    {/* Main Row: Always visible */}
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => toggleBookingExpansion(booking._id)}
                     >
-                      {booking.status}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Service Image */}
-                <div className="flex items-center space-x-4 mb-4">
-                  <img
-                    src={
-                      booking.serviceId?.images?.[0]
-                        ? booking.serviceId.images[0].startsWith("http")
-                          ? booking.serviceId.images[0]
-                          : `${import.meta.env.VITE_API_URL}${
-                              booking.serviceId.images[0]
-                            }`
-                        : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
-                    }
-                    alt={booking.serviceId?.title || "Service"}
-                    className="w-16 h-16 object-cover rounded-lg"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {booking.serviceId?.title || "Service"}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {booking.serviceId?.category || "Service"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Booking Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">
-                      {new Date(booking.bookingDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">
-                      {booking.startTime} - {booking.endTime}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {booking.notes && (
-                  <div className="mb-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Notes:</h4>
-                    <p className="text-sm text-gray-600">{booking.notes}</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => setSelectedBooking(booking)}
-                    className="flex items-center space-x-2 text-black hover:text-gray-700 transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    <span>View Details</span>
-                  </button>
-
-                  {user.role === "store_owner" &&
-                    booking.status !== "completed" &&
-                    booking.status !== "cancelled" && (
-                      <div className="flex space-x-2">
-                        {booking.status === "pending" && (
-                          <button
-                            onClick={() =>
-                              updateBookingStatus(booking._id, "confirmed")
-                            }
-                            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                          >
-                            Confirm
-                          </button>
-                        )}
-                        {booking.status === "confirmed" && (
-                          <button
-                            onClick={() =>
-                              updateBookingStatus(booking._id, "completed")
-                            }
-                            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-sm"
-                          >
-                            Mark Completed
-                          </button>
-                        )}
-                        <button
-                          onClick={() =>
-                            updateBookingStatus(booking._id, "cancelled")
-                          }
-                          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                      {/* Left: Booking ID & Status */}
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-black" />
+                          <span className="font-semibold text-gray-900 text-sm sm:text-base">
+                            #{booking._id.slice(-6)}
+                          </span>
+                        </div>
+                        <span
+                          className={`inline-block px-3 py-1 text-xs rounded-full ${getStatusColor(
+                            booking.status
+                          )}`}
                         >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-
-                  {user.role === "store_owner" &&
-                    booking.status === "pending" && (
-                      <div className="flex items-center space-x-2 mt-2">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs text-orange-600 font-medium">
-                          New Booking - Action Required
+                          {booking.status}
                         </span>
                       </div>
-                    )}
-                </div>
 
-                <div className="pt-2">
-                  <p className="text-xs text-gray-400">
-                    Created: {new Date(booking.createdAt).toLocaleString()}
-                  </p>
-                </div>
-
-                {/* Review Section for Completed Bookings */}
-                {booking.status === "completed" && user.role === "customer" && (
-                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h4 className="font-medium text-green-900 mb-2">
-                      Service Completed
-                    </h4>
-                    {booking.reviewed ? (
-                      <p className="text-sm text-green-700">
-                        ✅ Thank you! You have already reviewed this service.
-                      </p>
-                    ) : (
-                      <>
-                        <p className="text-sm text-green-700 mb-3">
-                          How was your experience with this service?
-                        </p>
-                        <button
-                          onClick={() => openReviewModal(booking)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-                        >
-                          Write a Review
+                      {/* Right: Amount & Expand */}
+                      <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900 text-sm sm:text-base">
+                            LKR {booking.totalAmount}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {booking.paymentDetails?.paymentStatus === "paid" ? "Paid" : "Pending"}
+                          </p>
+                        </div>
+                        
+                        <button className="text-gray-400 hover:text-gray-600 transition-colors p-1">
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5" />
+                          )}
                         </button>
-                      </>
-                    )}
+                      </div>
+                    </div>
+
+                    {/* Mobile Info Row: Visible on mobile only */}
+                    <div className="mt-3 sm:hidden">
+                      <div className="flex items-center justify-between text-sm text-gray-600">
+                        <div className="flex items-center space-x-3">
+                          <span className="truncate max-w-20">{booking.serviceId?.title || "Service"}</span>
+                          <span>{new Date(booking.bookingDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="text-xs">
+                          <span>{booking.startTime}-{booking.endTime}</span>
+                        </div>
+                      </div>
+                      {user.role === "store_owner" && (
+                        <div className="mt-1 text-sm text-gray-600">
+                          <span>Customer: {booking.customerId?.name || "Unknown"}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Desktop Info Row: Hidden on mobile */}
+                    <div className="hidden sm:flex items-center justify-between mt-2">
+                      <div className="flex items-center space-x-6 text-sm text-gray-600">
+                        <span>{booking.serviceId?.title || "Service"}</span>
+                        <span>{new Date(booking.bookingDate).toLocaleDateString()}</span>
+                        <span>{booking.startTime} - {booking.endTime}</span>
+                        {user.role === "store_owner" && (
+                          <span>Customer: {booking.customerId?.name || "Unknown"}</span>
+                        )}
+                      </div>
+
+                      {/* Desktop Quick Actions */}
+                      <div className="flex items-center space-x-2">
+                        {/* Payment Status Update for Store Owners */}
+                        {user.role === "store_owner" && booking.status !== "cancelled" && (
+                          <>
+                            {booking.paymentDetails?.paymentMethod === "bank_transfer" && 
+                             booking.paymentDetails?.paymentStatus === "pending_bank_transfer" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updatePaymentStatus(booking._id, "paid");
+                                }}
+                                disabled={updatingPaymentStatus === booking._id}
+                                className="bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 min-h-[36px]"
+                              >
+                                {updatingPaymentStatus === booking._id ? "..." : "Mark Paid"}
+                              </button>
+                            )}
+                            
+                            {booking.paymentDetails?.paymentMethod === "cod" && 
+                             booking.paymentDetails?.paymentStatus === "cod_pending" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updatePaymentStatus(booking._id, "paid");
+                                }}
+                                disabled={updatingPaymentStatus === booking._id}
+                                className="bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 min-h-[36px]"
+                              >
+                                {updatingPaymentStatus === booking._id ? "..." : "Mark Paid"}
+                              </button>
+                            )}
+                          </>
+                        )}
+
+                        {/* COD Mark as Completed for Customers */}
+                        {user.role === "customer" && 
+                         booking.status !== "cancelled" &&
+                         booking.paymentDetails?.paymentMethod === "cod" && 
+                         booking.paymentDetails?.paymentStatus === "cod_pending" && 
+                         booking.canCustomerUpdateStatus && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markBookingAsCompleted(booking._id);
+                            }}
+                            disabled={markingDelivered === booking._id}
+                            className="bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 min-h-[36px]"
+                          >
+                            {markingDelivered === booking._id ? "..." : "Mark Complete"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Mobile Quick Actions: Full width buttons below main content */}
+                    <div className="sm:hidden">
+                      {/* Payment Status Update for Store Owners */}
+                      {user.role === "store_owner" && booking.status !== "cancelled" && (
+                        <div className="mt-3 space-y-2">
+                          {booking.paymentDetails?.paymentMethod === "bank_transfer" && 
+                           booking.paymentDetails?.paymentStatus === "pending_bank_transfer" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updatePaymentStatus(booking._id, "paid");
+                              }}
+                              disabled={updatingPaymentStatus === booking._id}
+                              className="w-full bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              {updatingPaymentStatus === booking._id ? "Updating Payment..." : "Mark Payment as Paid"}
+                            </button>
+                          )}
+                          
+                          {booking.paymentDetails?.paymentMethod === "cod" && 
+                           booking.paymentDetails?.paymentStatus === "cod_pending" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updatePaymentStatus(booking._id, "paid");
+                              }}
+                              disabled={updatingPaymentStatus === booking._id}
+                              className="w-full bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              {updatingPaymentStatus === booking._id ? "Updating Payment..." : "Mark COD Payment as Paid"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* COD Mark as Completed for Customers */}
+                      {user.role === "customer" && 
+                       booking.status !== "cancelled" &&
+                       booking.paymentDetails?.paymentMethod === "cod" && 
+                       booking.paymentDetails?.paymentStatus === "cod_pending" && 
+                       booking.canCustomerUpdateStatus && (
+                        <div className="mt-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markBookingAsCompleted(booking._id);
+                            }}
+                            disabled={markingDelivered === booking._id}
+                            className="w-full bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
+                          >
+                            {markingDelivered === booking._id ? "Marking as Completed..." : "Mark Service as Completed"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 animate-in slide-in-from-top duration-200">
+                      <div className="p-4 space-y-6">
+                        {/* Summary Card - Mobile Priority */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-500 mb-1">
+                                {user.role === "store_owner" ? "Customer" : "Service"}
+                              </p>
+                              <p className="font-medium text-gray-900 text-sm">
+                                {user.role === "store_owner"
+                                  ? booking.customerId?.name || "Unknown Customer"
+                                  : booking.serviceId?.title || "Unknown Service"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500 mb-1">Booking Date</p>
+                              <p className="font-medium text-gray-900 text-sm">
+                                {new Date(booking.bookingDate).toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {booking.startTime} - {booking.endTime}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500 mb-1">Payment Status</p>
+                              <p
+                                className={`font-medium text-sm ${
+                                  booking.paymentDetails?.paymentStatus?.toLowerCase() === "paid"
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {booking.paymentDetails?.paymentStatus?.toLowerCase() === "paid"
+                                  ? "Paid"
+                                  : "Payment Pending"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Service Details */}
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <h4 className="font-medium text-gray-900 mb-3 text-sm sm:text-base">
+                            Service Information
+                          </h4>
+                          <div className="flex items-start space-x-4">
+                            <img
+                              src={
+                                booking.serviceId?.images?.[0]
+                                  ? booking.serviceId.images[0].startsWith("http")
+                                    ? booking.serviceId.images[0]
+                                    : `${import.meta.env.VITE_API_URL}${
+                                        booking.serviceId.images[0]
+                                      }`
+                                  : "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop"
+                              }
+                              alt={booking.serviceId?.title || "Service"}
+                              className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 text-sm sm:text-base">
+                                {booking.serviceId?.title || "Service"}
+                              </p>
+                              <p className="text-sm text-gray-500 mt-1">
+                                {booking.serviceId?.category || "Service"}
+                              </p>
+                              <p className="font-medium text-gray-900 text-sm mt-2">
+                                LKR {booking.totalAmount}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        {booking.notes && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 className="font-medium text-gray-900 mb-3 text-sm sm:text-base">
+                              Special Notes
+                            </h4>
+                            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                              {booking.notes}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Payment Method Details */}
+                        {booking.paymentDetails && (
+                          <div className="space-y-4">
+                            {/* Bank Transfer - Customer View */}
+                            {booking.paymentDetails.paymentMethod === "bank_transfer" && 
+                             user.role === "customer" && 
+                             booking.paymentDetails.paymentStatus === "pending_bank_transfer" && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Building2 className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Bank Transfer Instructions
+                                    </h4>
+                                    <p className="text-sm text-gray-700 mb-4">
+                                      Please transfer LKR {booking.totalAmount} to the bank account below and contact the store with your receipt.
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                {/* Bank Details for Customer - Mobile Optimized */}
+                                {booking.bankDetails && (
+                                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h4 className="font-medium text-gray-900 text-sm">Bank Transfer Details</h4>
+                                      <div className="flex items-center space-x-2">
+                                        {booking.bankDetails.isVerified && (
+                                          <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                                            ✓ Verified
+                                          </span>
+                                        )}
+                                        {booking.bankDetails.isLocked && (
+                                          <span className="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-full">
+                                            🔒 Secured
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                          <p className="font-medium text-gray-700 text-xs mb-1">Bank Name</p>
+                                          <p className="text-black text-sm">{booking.bankDetails.bankName}</p>
+                                        </div>
+                                        <div>
+                                          <p className="font-medium text-gray-700 text-xs mb-1">Account Holder</p>
+                                          <p className="text-black text-sm">{booking.bankDetails.accountHolderName}</p>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-gray-700 text-xs mb-1">Account Number</p>
+                                        <p className="text-black font-mono text-sm bg-white p-2 rounded border select-all">
+                                          {booking.bankDetails.accountNumber}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-gray-700 text-xs mb-1">Branch</p>
+                                        <p className="text-black text-sm">{booking.bankDetails.branchName}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                                  <p className="font-medium">Reference: Booking #{booking.combinedId || booking._id.slice(-8)}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Bank Transfer - Store Owner View */}
+                            {booking.paymentDetails.paymentMethod === "bank_transfer" && 
+                             user.role === "store_owner" && 
+                             booking.paymentDetails.paymentStatus === "pending_bank_transfer" && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Building2 className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Bank Transfer Payment
+                                    </h4>
+                                    <p className="text-sm text-gray-700">
+                                      Waiting for customer to transfer LKR {booking.totalAmount}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => updatePaymentStatus(booking._id, "paid")}
+                                  disabled={updatingPaymentStatus === booking._id}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                                >
+                                  {updatingPaymentStatus === booking._id ? "Updating Payment Status..." : "Mark Payment as Paid"}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* COD - Customer View */}
+                            {booking.paymentDetails.paymentMethod === "cod" && 
+                             booking.paymentDetails.paymentStatus === "cod_pending" && 
+                             user.role === "customer" && 
+                             booking.canCustomerUpdateStatus && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Banknote className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Cash on Service
+                                    </h4>
+                                    <p className="text-sm text-gray-700">
+                                      Mark as completed once service is finished
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => markBookingAsCompleted(booking._id)}
+                                  disabled={markingDelivered === booking._id}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                                >
+                                  {markingDelivered === booking._id ? "Marking as Completed..." : "Mark Service as Completed"}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* COD - Store Owner View */}
+                            {booking.paymentDetails.paymentMethod === "cod" && 
+                             booking.paymentDetails.paymentStatus === "cod_pending" && 
+                             user.role === "store_owner" && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3 mb-4">
+                                  <Banknote className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                                  <div>
+                                    <h4 className="font-medium text-black mb-2 text-sm sm:text-base">
+                                      Cash on Service
+                                    </h4>
+                                    <p className="text-sm text-gray-700">
+                                      Mark as paid when you receive payment: LKR {booking.totalAmount}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => updatePaymentStatus(booking._id, "paid")}
+                                  disabled={updatingPaymentStatus === booking._id}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                                >
+                                  {updatingPaymentStatus === booking._id ? "Updating Payment Status..." : "Mark Payment as Paid"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Receipt Download */}
+                        {booking.receiptGenerated && booking.receiptUrl && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-start space-x-3 mb-3">
+                              <Download className="w-5 h-5 text-black mt-1 flex-shrink-0" />
+                              <div>
+                                <h4 className="font-medium text-black mb-1 text-sm sm:text-base">Receipt Available</h4>
+                                <p className="text-sm text-gray-600">Download your booking receipt as PDF</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadReceipt(booking._id, 'booking')}
+                              disabled={downloadingReceipt === booking._id}
+                              className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 font-medium"
+                            >
+                              {downloadingReceipt === booking._id ? "Downloading PDF..." : "Download Receipt"}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Review Section for Completed Bookings */}
+                        {booking.status === "completed" && user.role === "customer" && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 className="font-medium text-gray-900 mb-3 text-sm sm:text-base">
+                              Service Completed ✅
+                            </h4>
+                            {booking.reviewed ? (
+                              <p className="text-sm text-gray-600">
+                                Thank you! You have already reviewed this service.
+                              </p>
+                            ) : (
+                              <>
+                                <p className="text-sm text-gray-600 mb-4">
+                                  How was your experience with this service?
+                                </p>
+                                <button
+                                  onClick={() => openReviewModal(booking)}
+                                  className="w-full sm:w-auto bg-black text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                >
+                                  Write a Review
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <div className="space-y-4">
+                            {/* View Details Button */}
+                            <button
+                              onClick={() => setSelectedBooking(booking)}
+                              className="w-full flex items-center justify-center space-x-2 text-black border border-gray-300 py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                            >
+                              <Eye className="w-4 h-4" />
+                              <span>View Full Details</span>
+                            </button>
+
+                            {/* Store Owner Actions */}
+                            {user.role === "store_owner" && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {booking.status === "pending" && (
+                                  <button
+                                    onClick={() => updateBookingStatus(booking._id, "confirmed")}
+                                    className="bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                  >
+                                    Confirm Booking
+                                  </button>
+                                )}
+                                {booking.status === "confirmed" && (
+                                  <button
+                                    onClick={() => updateBookingStatus(booking._id, "completed")}
+                                    className="bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                                  >
+                                    Mark Completed
+                                  </button>
+                                )}
+                                {booking.status !== "completed" && booking.status !== "cancelled" && (
+                                  <button
+                                    onClick={() => updateBookingStatus(booking._id, "cancelled")}
+                                    className="bg-gray-600 text-white py-2.5 rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                                  >
+                                    Cancel Booking
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

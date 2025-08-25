@@ -384,7 +384,8 @@ const StoreManagement = () => {
         setError(errorData.error || "Failed to upload verification documents");
       }
     } catch (error) {
-      setError("Network error. Please try again." + error);
+      console.error('Upload error:', error);
+      setError("Network error. Please try again: " + error.message);
     } finally {
       setSaving(false);
     }
@@ -687,9 +688,6 @@ const StoreManagement = () => {
                         <span className="ml-1 bg-black text-white text-xs px-2 py-1 rounded-full">
                           {reviews.length}
                         </span>
-                      )}
-                      {tab.id === "verification" && store.isVerified && (
-                        <CheckCircle className="w-4 h-4 ml-1 text-green-600" />
                       )}
                     </span>
                   </button>
@@ -1478,6 +1476,15 @@ const StoreManagement = () => {
                   <p className="text-sm text-gray-600 mt-1">
                     Upload verification documents to build customer trust
                   </p>
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="text-xs text-gray-500 mt-2 space-y-1">
+                      <p>Debug Info:</p>
+                      <p>canReuploadDocs: {canReuploadDocs ? 'true' : 'false'}</p>
+                      <p>hasIdImages: {store.idImages && store.idImages.length > 0 ? 'true' : 'false'}</p>
+                      <p>hasAddressImages: {store.addressVerificationImages && store.addressVerificationImages.length > 0 ? 'true' : 'false'}</p>
+                      <p>isVerified: {store.isVerified ? 'true' : 'false'}</p>
+                    </div>
+                  )}
                 </div>
                 {store.isVerified && (
                   <div className="flex items-center space-x-2 bg-green-50 px-4 py-2 rounded-full">
@@ -1552,20 +1559,29 @@ const StoreManagement = () => {
                         maxImages={3}
                         multiple={true}
                         accept="image/*"
+                        idPrefix="id-verification"
                       />
                       {idImages.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleVerificationDocsUpload("id")}
-                          disabled={saving}
-                          className="w-full bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-                        >
-                          {saving && <LoadingSpinner size="sm" />}
-                          <Upload className="w-4 h-4" />
-                          <span>
-                            {saving ? "Uploading..." : "Upload ID Documents"}
-                          </span>
-                        </button>
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              console.log('Attempting to upload ID documents:', idImages);
+                              handleVerificationDocsUpload("id");
+                            }}
+                            disabled={saving}
+                            className="w-full bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                          >
+                            {saving && <LoadingSpinner size="sm" />}
+                            <Upload className="w-4 h-4" />
+                            <span>
+                              {saving ? "Uploading..." : "Upload ID Documents"}
+                            </span>
+                          </button>
+                          <p className="text-xs text-gray-500">
+                            {idImages.length} file(s) selected for upload
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1573,10 +1589,20 @@ const StoreManagement = () => {
                   {!canReuploadDocs &&
                     store.idImages &&
                     store.idImages.length > 0 && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <p className="text-sm text-yellow-800">
-                          Your ID documents are under review. You can only
-                          reupload if admin requests changes.
+                      <div className={`border rounded-lg p-3 ${
+                        store.isVerified 
+                          ? "bg-green-50 border-green-200" 
+                          : "bg-yellow-50 border-yellow-200"
+                      }`}>
+                        <p className={`text-sm ${
+                          store.isVerified 
+                            ? "text-green-800" 
+                            : "text-yellow-800"
+                        }`}>
+                          {store.isVerified 
+                            ? "✓ Your ID documents have been verified and approved."
+                            : "Your ID documents are under review. You can only reupload if admin requests changes."
+                          }
                         </p>
                       </div>
                     )}
@@ -1646,24 +1672,31 @@ const StoreManagement = () => {
                         maxImages={3}
                         multiple={true}
                         accept="image/*"
+                        idPrefix="address-verification"
                       />
                       {addressImages.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleVerificationDocsUpload("address")
-                          }
-                          disabled={saving}
-                          className="w-full bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-                        >
-                          {saving && <LoadingSpinner size="sm" />}
-                          <Upload className="w-4 h-4" />
-                          <span>
-                            {saving
-                              ? "Uploading..."
-                              : "Upload Address Documents"}
-                          </span>
-                        </button>
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              console.log('Attempting to upload address documents:', addressImages);
+                              handleVerificationDocsUpload("address");
+                            }}
+                            disabled={saving}
+                            className="w-full bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                          >
+                            {saving && <LoadingSpinner size="sm" />}
+                            <Upload className="w-4 h-4" />
+                            <span>
+                              {saving
+                                ? "Uploading..."
+                                : "Upload Address Documents"}
+                            </span>
+                          </button>
+                          <p className="text-xs text-gray-500">
+                            {addressImages.length} file(s) selected for upload
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1671,10 +1704,20 @@ const StoreManagement = () => {
                   {!canReuploadDocs &&
                     store.addressVerificationImages &&
                     store.addressVerificationImages.length > 0 && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <p className="text-sm text-yellow-800">
-                          Your address documents are under review. You can only
-                          reupload if admin requests changes.
+                      <div className={`border rounded-lg p-3 ${
+                        store.isVerified 
+                          ? "bg-green-50 border-green-200" 
+                          : "bg-yellow-50 border-yellow-200"
+                      }`}>
+                        <p className={`text-sm ${
+                          store.isVerified 
+                            ? "text-green-800" 
+                            : "text-yellow-800"
+                        }`}>
+                          {store.isVerified 
+                            ? "✓ Your address documents have been verified and approved."
+                            : "Your address documents are under review. You can only reupload if admin requests changes."
+                          }
                         </p>
                       </div>
                     )}

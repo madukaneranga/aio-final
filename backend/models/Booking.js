@@ -87,12 +87,32 @@ const bookingSchema = new mongoose.Schema({
     paidAt: Date,
     paymentMethod: String,
     authorizationToken: String,
+    bankTransferReference: String,
   },
   refundDetails: {
     amount: Number,
     reason: String,
     refundedAt: Date,
     transactionId: String,
+  },
+  
+  // Receipt fields
+  receiptUrl: {
+    type: String,
+    default: "",
+  },
+  receiptGenerated: {
+    type: Boolean,
+    default: false,
+  },
+  receiptGeneratedAt: {
+    type: Date,
+  },
+  
+  // Customer delivery confirmation for COD
+  canCustomerUpdateStatus: {
+    type: Boolean,
+    default: false,
   },
   createdAt: {
     type: Date,

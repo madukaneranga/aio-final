@@ -68,6 +68,20 @@ const userSchema = new mongoose.Schema({
     },
   ],
 
+  // COD Verification fields
+  verificationStatus: {
+    type: String,
+    enum: ["unverified", "pending", "verified", "rejected"],
+    default: "unverified",
+  },
+  idDocument: {
+    type: String,
+    default: "",
+  },
+  verificationSubmittedAt: {
+    type: Date,
+  },
+
   refreshTokenHash: String,
   refreshTokenId: String,
 

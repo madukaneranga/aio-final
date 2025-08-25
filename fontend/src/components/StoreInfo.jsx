@@ -410,7 +410,7 @@ const StoreInfo = ({
                   {/* Verification and Premium badges */}
                   <div className="absolute -bottom-1 -right-1 flex space-x-1">
                     {storeData.isVerified && (
-                      <div
+                      <div title="Verified"
                         className="w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center"
                         style={{ backgroundColor: colors.primary }}
                       >
