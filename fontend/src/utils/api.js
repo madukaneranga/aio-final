@@ -95,6 +95,33 @@ export const walletAPI = {
     });
     return handleResponse(response);
   },
+  
+  submitBankChangeRequest: async (changeRequestData) => {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/bank-details/change-request`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(changeRequestData),
+    });
+    return handleResponse(response);
+  },
+  
+  getBankChangeRequests: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/bank-details/change-requests`, {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+  
+  cancelBankChangeRequest: async (requestId) => {
+    const response = await fetch(`${API_BASE_URL}/api/wallet/bank-details/change-request/${requestId}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
 
   // Credit management
   getCreditPackages: async () => {

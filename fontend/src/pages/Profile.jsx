@@ -5,8 +5,7 @@ import { User, Mail, Phone, MapPin, Camera } from "lucide-react";
 import imageCompression from 'browser-image-compression';
 
 //  ADDED: Firebase storage imports
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../utils/firebase"; //  CHANGED: use firebase storage instead of multer
+import { uploadIdDocument } from "../utils/firebaseUpload";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -16,6 +15,9 @@ const Profile = () => {
   const [profileImage, setProfileImage] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [verificationDocument, setVerificationDocument] = useState(null);
+  const [verificationStatus, setVerificationStatus] = useState(null);
+  const [verificationLoading, setVerificationLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -32,6 +34,7 @@ const Profile = () => {
   useEffect(() => {
     if (user) {
       fetchProfile();
+      fetchVerificationStatus();
     }
   }, [user]);
 
@@ -64,6 +67,90 @@ const Profile = () => {
       console.error("Error fetching profile:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchVerificationStatus = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/verification-status`,
+        {
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setVerificationStatus(data);
+      }
+    } catch (error) {
+      console.error("Error fetching verification status:", error);
+    }
+  };
+
+  const handleVerificationUpload = async () => {
+    if (!verificationDocument) {
+      setError("Please select an ID or Passport image to upload");
+      return;
+    }
+
+    setVerificationLoading(true);
+    setError("");
+
+    try {
+      // Upload to Firebase Storage first using specialized ID document function
+      const uploadResult = await uploadIdDocument(verificationDocument);
+
+      if (!uploadResult.success) {
+        setError("Failed to upload document to storage");
+        return;
+      }
+
+      // Send Firebase URL to backend
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/upload-verification`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            idDocumentUrl: uploadResult.url,
+            originalName: uploadResult.originalName,
+            size: uploadResult.size,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setSuccess("Verification document uploaded successfully! Your request is under review.");
+        setVerificationDocument(null);
+        await fetchVerificationStatus(); // Refresh status
+        await fetchProfile(); // Refresh profile
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to upload verification document");
+      }
+    } catch (error) {
+      console.error("Error uploading verification:", error);
+      setError("Upload failed. Please try again.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
+  const getVerificationStatusBadge = (status) => {
+    switch (status) {
+      case "verified":
+        return <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">✓ Verified</span>;
+      case "pending":
+        return <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">⏳ Under Review</span>;
+      case "rejected":
+        return <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">✗ Rejected</span>;
+      default:
+        return <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">Not Verified</span>;
     }
   };
 
@@ -456,6 +543,125 @@ const Profile = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Verification Section */}
+          <div className="mt-8 bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-gray-50 px-6 py-4 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Document Verification
+                </h2>
+                {verificationStatus && getVerificationStatusBadge(verificationStatus.verificationStatus)}
+              </div>
+              <p className="text-gray-600 mt-2">
+                Upload your ID or Passport to enable Cash on Delivery payment option
+              </p>
+            </div>
+
+            <div className="p-6">
+              {verificationStatus?.verificationStatus === "verified" ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="text-green-600 mr-3">✓</div>
+                    <div>
+                      <p className="font-medium text-green-800">
+                        Your account is verified!
+                      </p>
+                      <p className="text-green-700 text-sm">
+                        You can now use Cash on Delivery for your orders.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : verificationStatus?.verificationStatus === "pending" ? (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="text-yellow-600 mr-3">⏳</div>
+                    <div>
+                      <p className="font-medium text-yellow-800">
+                        Verification in progress
+                      </p>
+                      <p className="text-yellow-700 text-sm">
+                        Your document is under review. This usually takes 24-48 hours.
+                      </p>
+                      {verificationStatus.submittedAt && (
+                        <p className="text-yellow-700 text-xs mt-1">
+                          Submitted: {new Date(verificationStatus.submittedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : verificationStatus?.verificationStatus === "rejected" ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center">
+                    <div className="text-red-600 mr-3">✗</div>
+                    <div>
+                      <p className="font-medium text-red-800">
+                        Verification rejected
+                      </p>
+                      <p className="text-red-700 text-sm">
+                        Please upload a clear photo of your valid ID or Passport.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {(!verificationStatus?.verificationStatus || 
+                verificationStatus?.verificationStatus === "unverified" || 
+                verificationStatus?.verificationStatus === "rejected") && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload ID or Passport Image
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setVerificationDocument(e.target.files[0])}
+                        className="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-lg file:border-0
+                          file:text-sm file:font-medium
+                          file:bg-black file:text-white
+                          hover:file:bg-gray-800"
+                      />
+                      <button
+                        onClick={handleVerificationUpload}
+                        disabled={!verificationDocument || verificationLoading}
+                        className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {verificationLoading ? "Uploading..." : "Upload"}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Accepted formats: JPG, PNG, GIF. Maximum size: 5MB
+                    </p>
+                  </div>
+
+                  {verificationDocument && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
+                      <img
+                        src={URL.createObjectURL(verificationDocument)}
+                        alt="Document preview"
+                        className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                      />
+                    </div>
+                  )}
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-blue-800 text-sm">
+                      <strong>Important:</strong> Please ensure your document is clear and all details are visible. 
+                      Once uploaded, your document will be locked until verification is complete.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

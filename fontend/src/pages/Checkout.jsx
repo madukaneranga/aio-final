@@ -46,6 +46,8 @@ const Checkout = () => {
     country: "Sri Lanka",
   });
   const [payhereReady, setPayhereReady] = useState(false);
+  const [bankTransferData, setBankTransferData] = useState(null);
+  const [showBankTransfer, setShowBankTransfer] = useState(false);
 
   const totalItems =
     orderItems.reduce((sum, item) => sum + item.quantity, 0) +
@@ -75,7 +77,7 @@ const Checkout = () => {
     } else {
       setPayhereReady(true);
     }
-  }, [orderItems, bookingItems]);
+  }, [orderItems, bookingItems, user]);
 
   const fetchPaymentMethods = async () => {
     try {
@@ -84,12 +86,45 @@ const Checkout = () => {
       );
       if (response.ok) {
         const methods = await response.json();
-        // Always filter to payhere only if orderItems exist, otherwise show all
-        const filtered =
-          orderItems.length > 0
-            ? methods.filter((method) => method.id === "payhere")
-            : methods;
-        setPaymentMethods(filtered.length > 0 ? filtered : methods);
+        
+        // Check user verification status for COD
+        if (user) {
+          try {
+            const verificationResponse = await fetch(
+              `${import.meta.env.VITE_API_URL}/api/users/verification-status`,
+              { credentials: "include" }
+            );
+            
+            if (verificationResponse.ok) {
+              const verificationData = await verificationResponse.json();
+              const isVerified = verificationData.verificationStatus === "verified";
+              
+              // Update COD availability based on verification status
+              const updatedMethods = methods.map(method => {
+                if (method.id === "cod") {
+                  return { ...method, available: isVerified };
+                }
+                return method;
+              });
+              
+              setPaymentMethods(updatedMethods);
+            } else {
+              setPaymentMethods(methods);
+            }
+          } catch (verificationError) {
+            console.error("Error checking verification status:", verificationError);
+            setPaymentMethods(methods);
+          }
+        } else {
+          // If no user, disable COD
+          const updatedMethods = methods.map(method => {
+            if (method.id === "cod") {
+              return { ...method, available: false };
+            }
+            return method;
+          });
+          setPaymentMethods(updatedMethods);
+        }
       } else {
         console.error("Failed to fetch payment methods:", response.status);
       }
@@ -157,7 +192,8 @@ const Checkout = () => {
       return;
     }
 
-    if (!payhereReady) {
+    // Check for PayHere readiness only if PayHere is selected
+    if (selectedPaymentMethod === "payhere" && !payhereReady) {
       alert("Payment gateway is still loading, please wait a moment.");
       return;
     }
@@ -165,8 +201,25 @@ const Checkout = () => {
     setLoading(true);
 
     try {
+      let endpoint = "";
+      switch (selectedPaymentMethod) {
+        case "payhere":
+          endpoint = "/api/payments/payhere-intent";
+          break;
+        case "bank_transfer":
+          endpoint = "/api/payments/bank-transfer-intent";
+          break;
+        case "cod":
+          endpoint = "/api/payments/cod-intent";
+          break;
+        default:
+          alert("Please select a payment method");
+          setLoading(false);
+          return;
+      }
+
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/payments/create-combined-intent`,
+        `${import.meta.env.VITE_API_URL}${endpoint}`,
         {
           method: "POST",
           credentials: "include",
@@ -174,6 +227,7 @@ const Checkout = () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            paymentMethod: selectedPaymentMethod,
             orderItems: orderItems.map((item) => ({
               productId: item.id,
               quantity: item.quantity,
@@ -195,38 +249,54 @@ const Checkout = () => {
               notes: item.bookingDetails.notes || item.notes, 
             })),
             shippingAddress,
-            paymentMethod: selectedPaymentMethod,
           }),
         }
       );
 
       if (!response.ok) {
         const data = await response.json();
+        if (data.requiresVerification) {
+          alert("Document verification required for Cash on Delivery. Please upload your ID/Passport in your profile settings.");
+          navigate("/profile");
+          setLoading(false);
+          return;
+        }
         alert(
-          `Payment intent creation failed: ${data.error || "Unknown error"}`
+          `Payment creation failed: ${data.error || "Unknown error"}`
         );
         setLoading(false);
         return;
       }
 
-      const { paymentParams } = await response.json();
+      const responseData = await response.json();
 
-      if (!paymentParams) {
-        alert("Payment parameters missing in response.");
-        setLoading(false);
-        return;
+      if (selectedPaymentMethod === "payhere") {
+        const { paymentParams } = responseData;
+        if (!paymentParams) {
+          alert("Payment parameters missing in response.");
+          setLoading(false);
+          return;
+        }
+
+        // Start PayHere payment
+        await startPayHerePayment(paymentParams);
+        clearOrder();
+        clearBookings();
+        alert("Payment successful!");
+      } else if (selectedPaymentMethod === "bank_transfer") {
+        // Store bank transfer data for display
+        setBankTransferData(responseData);
+        clearOrder();
+        clearBookings();
+        setShowBankTransfer(true);
+        return; // Don't navigate yet, show bank details first
+      } else if (selectedPaymentMethod === "cod") {
+        clearOrder();
+        clearBookings();
+        alert("COD order created successfully! You can mark it as delivered once you receive your order/service.");
       }
 
-      // Log payment params to console for debugging
-      console.log("Received paymentParams:", paymentParams);
-
-      // Start PayHere payment
-      await startPayHerePayment(paymentParams);
-
-      clearOrder();
-      clearBookings();
-      alert("Payment successful!");
-
+      // Navigate to appropriate page
       if (orderItems.length > 0 && bookingItems.length > 0) {
         navigate("/orders");
       } else if (orderItems.length > 0) {
@@ -384,10 +454,12 @@ const Checkout = () => {
                 {paymentMethods.map((method) => (
                   <label
                     key={method.id}
-                    className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedPaymentMethod === method.id
-                        ? "border-black bg-black text-white"
-                        : "border-gray-200 hover:border-gray-300"
+                    className={`flex items-center p-4 rounded-lg border-2 transition-all ${
+                      !method.available
+                        ? "border-gray-100 bg-gray-50 cursor-not-allowed opacity-60"
+                        : selectedPaymentMethod === method.id
+                        ? "border-black bg-black text-white cursor-pointer"
+                        : "border-gray-200 hover:border-gray-300 cursor-pointer"
                     }`}
                   >
                     <input
@@ -396,6 +468,7 @@ const Checkout = () => {
                       value={method.id}
                       checked={selectedPaymentMethod === method.id}
                       onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                      disabled={!method.available}
                       className="sr-only"
                     />
                     <div
@@ -416,6 +489,11 @@ const Checkout = () => {
                         }`}
                       >
                         {method.name}
+                        {method.id === "cod" && !method.available && (
+                          <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                            Verification Required
+                          </span>
+                        )}
                       </div>
                       <div
                         className={`text-sm ${
@@ -425,6 +503,11 @@ const Checkout = () => {
                         }`}
                       >
                         {method.description}
+                        {method.id === "cod" && !method.available && (
+                          <span className="block text-xs mt-1 text-red-600">
+                            Upload ID/Passport in profile to enable COD
+                          </span>
+                        )}
                       </div>
                     </div>
                   </label>
@@ -550,6 +633,107 @@ const Checkout = () => {
           </div>
         </div>
       </div>
+
+      {/* Bank Transfer Details Modal */}
+      {showBankTransfer && bankTransferData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-90vh overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Bank Transfer Details</h2>
+                <button
+                  onClick={() => {
+                    setShowBankTransfer(false);
+                    navigate("/orders");
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <p className="text-blue-800 font-medium">
+                  Please transfer LKR {formatLKR(bankTransferData.totalAmount)} to the bank account(s) below and contact the store with your transfer receipt.
+                </p>
+              </div>
+
+              {bankTransferData.bankDetails.map((bank, index) => (
+                <div key={index} className="mb-6 p-4 border border-gray-200 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    {bank.storeName}
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Bank Name</label>
+                      <p className="text-gray-900">{bank.bankDetails.bankName}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Account Holder</label>
+                      <p className="text-gray-900">{bank.bankDetails.accountHolderName}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Account Number</label>
+                      <p className="text-gray-900 font-mono">{bank.bankDetails.accountNumber}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Branch</label>
+                      <p className="text-gray-900">{bank.bankDetails.branchName}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Routing Number</label>
+                      <p className="text-gray-900 font-mono">{bank.bankDetails.routingNumber}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Contact Store:</p>
+                    <div className="flex flex-wrap gap-4">
+                      {bank.contactInfo.whatsapp && (
+                        <a
+                          href={`https://wa.me/${bank.contactInfo.whatsapp.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 hover:text-green-700 font-medium"
+                        >
+                          WhatsApp: {bank.contactInfo.whatsapp}
+                        </a>
+                      )}
+                      {bank.contactInfo.email && (
+                        <a
+                          href={`mailto:${bank.contactInfo.email}`}
+                          className="text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Email: {bank.contactInfo.email}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <div className="bg-yellow-50 p-4 rounded-lg mb-6">
+                <p className="text-yellow-800 text-sm">
+                  <strong>Important:</strong> Please contact the store via WhatsApp or email after making the transfer with your payment receipt for order confirmation.
+                </p>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowBankTransfer(false);
+                    navigate("/orders");
+                  }}
+                  className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  Go to My Orders
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

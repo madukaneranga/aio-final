@@ -307,16 +307,6 @@ const WalletDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'withdraw' && (
-          <div className="space-y-8">
-            <WalletSummary summary={summary} loading={loading} />
-            <WithdrawalRequest 
-              summary={summary} 
-              onWithdrawalSuccess={handleWithdrawalSuccess} 
-            />
-          </div>
-        )}
-
         {activeTab === 'bank-details' && (
           <BankDetailsForm />
         )}

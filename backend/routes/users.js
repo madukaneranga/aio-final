@@ -207,4 +207,78 @@ router.get("/usage-summary", authenticate, async (req, res) => {
   }
 });
 
+// Upload verification document for COD eligibility (Firebase URL)
+router.post(
+  "/upload-verification",
+  authenticate,
+  async (req, res) => {
+    try {
+      const { idDocumentUrl, originalName, size } = req.body;
+
+      if (!idDocumentUrl) {
+        return res.status(400).json({ error: "Please provide an ID document URL" });
+      }
+
+      if (req.user.verificationStatus === "verified") {
+        return res.status(400).json({ error: "You are already verified" });
+      }
+
+      if (req.user.verificationStatus === "pending") {
+        return res.status(400).json({ 
+          error: "Your verification is already under review. Please wait for approval." 
+        });
+      }
+
+      // Validate Firebase URL format
+      if (!idDocumentUrl.includes('firebase') || !idDocumentUrl.includes('id-documents')) {
+        return res.status(400).json({ error: "Invalid document URL format" });
+      }
+
+      // Validate file size if provided (max 5MB)
+      if (size && size > 5 * 1024 * 1024) {
+        return res.status(400).json({ error: "File size must be less than 5MB" });
+      }
+
+      // Update user with verification document and status
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+          idDocument: idDocumentUrl,
+          verificationStatus: "pending",
+          verificationSubmittedAt: new Date(),
+        },
+        { new: true }
+      ).select("-password");
+
+      res.json({
+        success: true,
+        message: "Verification document uploaded successfully. Your request is under review.",
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Verification upload error:", error);
+      res.status(500).json({ error: "Failed to upload verification document" });
+    }
+  }
+);
+
+// Get verification status
+router.get("/verification-status", authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(
+      "verificationStatus idDocument verificationSubmittedAt"
+    );
+    
+    res.json({
+      verificationStatus: user.verificationStatus,
+      hasDocument: !!user.idDocument,
+      submittedAt: user.verificationSubmittedAt,
+      canUseCOD: user.verificationStatus === "verified",
+    });
+  } catch (error) {
+    console.error("Error fetching verification status:", error);
+    res.status(500).json({ error: "Failed to fetch verification status" });
+  }
+});
+
 export default router;

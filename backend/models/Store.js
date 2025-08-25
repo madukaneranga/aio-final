@@ -110,6 +110,10 @@ const storeSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  canReuploadDocs: {
+    type: Boolean,
+    default: true, // Allow initial upload, then lock after first submission
+  },
   isFeatured: {
     type: Boolean,
     default: false,

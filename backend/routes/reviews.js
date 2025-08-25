@@ -253,8 +253,8 @@ router.put(
       };
       await review.save();
 
-      // Notify store owner about the order creation
-      const store = await Store.findById(storeId);
+      // Notify customer about the response
+      const store = await Store.findById(review.storeId);
 
       try {
         const notification = await Notification.create({

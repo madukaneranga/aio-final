@@ -1,5 +1,7 @@
 import express from "express";
 import crypto from "crypto";
+import path from "path";
+import fs from "fs";
 import Order from "../models/Order.js";
 import Booking from "../models/Booking.js";
 import Product from "../models/Product.js";
@@ -7,10 +9,12 @@ import Service from "../models/Service.js";
 import Store from "../models/Store.js";
 import Commission from "../models/Commission.js";
 import Notification from "../models/Notification.js";
+import BankDetails from "../models/BankDetails.js";
 import { authenticate } from "../middleware/auth.js";
 import { emitNotification } from "../utils/socketUtils.js";
 import { v4 as uuidv4 } from "uuid";
 import WalletTransaction from "../models/WalletTransaction.js";
+import { generateReceipt } from "../utils/receiptGenerator.js";
 
 const router = express.Router();
 
@@ -28,19 +32,14 @@ const PAYHERE_APP_SECRET =
   "8cJlAdroxID8n0No30NAwT8m22kmMKNW98cJlqgSYpMa";
 const PAYHERE_OAUTH_URL = `${PAYHERE_BASE_URL}/merchant/v1/oauth/token`;
 
-//checkout
-router.post("/create-combined-intent", authenticate, async (req, res) => {
+//PayHere Payment Intent
+router.post("/payhere-intent", authenticate, async (req, res) => {
   try {
     const {
       orderItems = [],
       bookingItems = [],
       shippingAddress = {},
-      paymentMethod,
     } = req.body;
-
-    if (!paymentMethod || paymentMethod !== "payhere") {
-      return res.status(400).json({ error: "Unsupported payment method" });
-    }
 
     const generateTransactionId = (prefix = "TX", userId = "") =>
       `${prefix}-${Date.now()}-${userId}-${uuidv4()}`;
@@ -112,6 +111,10 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
           shippingAddress,
           status: "pending",
           combinedId,
+          paymentDetails: {
+            paymentMethod: "payhere",
+            paymentStatus: "pending_payhere",
+          },
         });
 
         await order.save();
@@ -187,6 +190,10 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
           storeAmount,
           status: "pending",
           combinedId,
+          paymentDetails: {
+            paymentMethod: "payhere",
+            paymentStatus: "pending_payhere",
+          },
         });
 
         await booking.save();
@@ -279,6 +286,452 @@ router.post("/create-combined-intent", authenticate, async (req, res) => {
   } catch (error) {
     console.error("Combined payment intent error:", error);
     res.status(500).json({ error: "Failed to create payment intent" });
+  }
+});
+
+// Bank Transfer Payment Intent
+router.post("/bank-transfer-intent", authenticate, async (req, res) => {
+  try {
+    const {
+      orderItems = [],
+      bookingItems = [],
+      shippingAddress = {},
+    } = req.body;
+
+    if (!req.user || req.user.role !== "customer") {
+      return res.status(403).json({ error: "Only customers can create bank transfer payments" });
+    }
+
+    const generateTransactionId = (prefix = "BT", userId = "") =>
+      `${prefix}-${Date.now()}-${userId}-${uuidv4()}`;
+
+    const combinedId = generateTransactionId("BT", req.user._id);
+    let totalAmount = 0;
+    const createdEntities = { order: [], bookings: [] };
+    let storeOwners = new Set();
+
+    // --- Handle Orders ---
+    if (orderItems.length > 0) {
+      const storeOrderMap = new Map();
+
+      for (const item of orderItems) {
+        const product = await Product.findById(item.productId);
+        if (!product) {
+          return res.status(404).json({ error: `Product ${item.productId} not found` });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).json({ error: `Insufficient stock for ${product.title}` });
+        }
+
+        const storeId = typeof item.storeId === "object" ? item.storeId._id.toString() : item.storeId.toString();
+        storeOwners.add(storeId);
+
+        if (!storeOrderMap.has(storeId)) {
+          storeOrderMap.set(storeId, { items: [], totalAmount: 0 });
+        }
+
+        const storeData = storeOrderMap.get(storeId);
+        storeData.items.push({
+          productId: product._id,
+          quantity: item.quantity,
+          price: product.price,
+        });
+        storeData.totalAmount += product.price * item.quantity;
+      }
+
+      // Create orders
+      for (const [storeId, storeData] of storeOrderMap.entries()) {
+        const commissionRate = 0.05;
+        const commissionAmount = storeData.totalAmount * commissionRate;
+        const storeAmount = storeData.totalAmount - commissionAmount;
+
+        const order = new Order({
+          customerId: req.user._id,
+          storeId,
+          items: storeData.items,
+          totalAmount: storeData.totalAmount,
+          platformFee: commissionAmount.toFixed(2),
+          storeAmount,
+          shippingAddress,
+          status: "pending",
+          combinedId,
+          paymentDetails: {
+            paymentMethod: "bank_transfer",
+            paymentStatus: "pending_bank_transfer",
+          },
+          canCustomerUpdateStatus: false,
+        });
+
+        await order.save();
+
+        // Create wallet transaction
+        const transaction = new WalletTransaction({
+          userId: (await Store.findById(storeId)).ownerId,
+          transactionId: combinedId,
+          type: "sale",
+          amount: storeAmount.toFixed(2),
+          status: "pending",
+          description: `Bank transfer payment for order ${combinedId}`,
+        });
+        await transaction.save();
+
+        createdEntities.order.push(order);
+        totalAmount += storeData.totalAmount;
+      }
+    }
+
+    // --- Handle Bookings ---
+    if (bookingItems.length > 0) {
+      for (const item of bookingItems) {
+        const service = await Service.findById(item.serviceId);
+        if (!service) {
+          return res.status(404).json({ error: `Service ${item.serviceId} not found` });
+        }
+
+        const serviceAmount = service.price;
+        const commissionRate = 0.07;
+        const commissionAmount = serviceAmount * commissionRate;
+        const storeAmount = serviceAmount - commissionAmount;
+
+        storeOwners.add(service.storeId.toString());
+
+        const booking = new Booking({
+          customerId: req.user._id,
+          storeId: service.storeId,
+          serviceId: service._id,
+          bookingDetails: item.bookingDetails,
+          totalAmount: serviceAmount.toFixed(2),
+          platformFee: commissionAmount.toFixed(2),
+          storeAmount,
+          status: "pending",
+          combinedId,
+          paymentDetails: {
+            paymentMethod: "bank_transfer",
+            paymentStatus: "pending_bank_transfer",
+          },
+          canCustomerUpdateStatus: false,
+        });
+
+        await booking.save();
+
+        // Create wallet transaction
+        const transaction = new WalletTransaction({
+          userId: (await Store.findById(service.storeId)).ownerId,
+          transactionId: combinedId,
+          type: "sale",
+          amount: storeAmount.toFixed(2),
+          status: "pending",
+          description: `Bank transfer payment for booking ${combinedId}`,
+        });
+        await transaction.save();
+
+        createdEntities.bookings.push(booking);
+        totalAmount += serviceAmount;
+      }
+    }
+
+    if (totalAmount <= 0) {
+      return res.status(400).json({ error: "Total amount must be greater than zero" });
+    }
+
+    // Get bank details for all store owners
+    const bankDetails = [];
+    for (const storeId of storeOwners) {
+      const store = await Store.findById(storeId);
+      const bankDetail = await BankDetails.findOne({ userId: store.ownerId });
+      if (bankDetail) {
+        bankDetails.push({
+          storeId,
+          storeName: store.name,
+          bankDetails: {
+            bankName: bankDetail.bankName,
+            accountHolderName: bankDetail.accountHolderName,
+            accountNumber: bankDetail.accountNumber,
+            branchName: bankDetail.branchName,
+            routingNumber: bankDetail.routingNumber,
+          },
+          contactInfo: store.contactInfo,
+        });
+      }
+    }
+
+    // Generate receipt immediately for Bank Transfer orders
+    try {
+      console.log("Starting Bank Transfer receipt generation for", createdEntities.order.length, "orders and", createdEntities.bookings.length, "bookings");
+      
+      for (const order of createdEntities.order) {
+        console.log("Generating Bank Transfer receipt for order:", order._id);
+        const populatedOrder = await Order.findById(order._id)
+          .populate('customerId', 'name email')
+          .populate('storeId', 'name contactInfo')
+          .populate('items.productId', 'title');
+        
+        if (populatedOrder) {
+          const receiptUrl = await generateReceipt(populatedOrder, 'order');
+          console.log("Bank Transfer order receipt generated at:", receiptUrl);
+          await Order.findByIdAndUpdate(order._id, {
+            receiptUrl,
+            receiptGenerated: true,
+            receiptGeneratedAt: new Date(),
+          });
+          console.log("Bank Transfer order updated with receipt info");
+        } else {
+          console.log("Failed to populate Bank Transfer order:", order._id);
+        }
+      }
+
+      for (const booking of createdEntities.bookings) {
+        console.log("Generating Bank Transfer receipt for booking:", booking._id);
+        const populatedBooking = await Booking.findById(booking._id)
+          .populate('customerId', 'name email')
+          .populate('storeId', 'name contactInfo')
+          .populate('serviceId', 'title');
+        
+        if (populatedBooking) {
+          const receiptUrl = await generateReceipt(populatedBooking, 'booking');
+          console.log("Bank Transfer booking receipt generated at:", receiptUrl);
+          await Booking.findByIdAndUpdate(booking._id, {
+            receiptUrl,
+            receiptGenerated: true,
+            receiptGeneratedAt: new Date(),
+          });
+          console.log("Bank Transfer booking updated with receipt info");
+        } else {
+          console.log("Failed to populate Bank Transfer booking:", booking._id);
+        }
+      }
+
+      console.log("Bank Transfer receipt generation completed successfully");
+    } catch (receiptError) {
+      console.error("Bank Transfer receipt generation error:", receiptError);
+      // Don't fail the entire request if receipt generation fails
+    }
+
+    res.json({
+      success: true,
+      combinedId,
+      totalAmount,
+      bankDetails,
+      instructions: "Please transfer the amount to the bank account(s) above and contact the store via WhatsApp or email with your transfer receipt.",
+      createdEntities,
+    });
+
+  } catch (error) {
+    console.error("Bank transfer intent error:", error);
+    res.status(500).json({ error: "Failed to create bank transfer payment" });
+  }
+});
+
+// COD Payment Intent
+router.post("/cod-intent", authenticate, async (req, res) => {
+  try {
+    const {
+      orderItems = [],
+      bookingItems = [],
+      shippingAddress = {},
+    } = req.body;
+
+    if (!req.user || req.user.role !== "customer") {
+      return res.status(403).json({ error: "Only customers can create COD payments" });
+    }
+
+    if (req.user.verificationStatus !== "verified") {
+      return res.status(403).json({ 
+        error: "Document verification required for Cash on Delivery",
+        requiresVerification: true 
+      });
+    }
+
+    const generateTransactionId = (prefix = "COD", userId = "") =>
+      `${prefix}-${Date.now()}-${userId}-${uuidv4()}`;
+
+    const combinedId = generateTransactionId("COD", req.user._id);
+    let totalAmount = 0;
+    const createdEntities = { order: [], bookings: [] };
+
+    // --- Handle Orders ---
+    if (orderItems.length > 0) {
+      const storeOrderMap = new Map();
+
+      for (const item of orderItems) {
+        const product = await Product.findById(item.productId);
+        if (!product) {
+          return res.status(404).json({ error: `Product ${item.productId} not found` });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).json({ error: `Insufficient stock for ${product.title}` });
+        }
+
+        const storeId = typeof item.storeId === "object" ? item.storeId._id.toString() : item.storeId.toString();
+
+        if (!storeOrderMap.has(storeId)) {
+          storeOrderMap.set(storeId, { items: [], totalAmount: 0 });
+        }
+
+        const storeData = storeOrderMap.get(storeId);
+        storeData.items.push({
+          productId: product._id,
+          quantity: item.quantity,
+          price: product.price,
+        });
+        storeData.totalAmount += product.price * item.quantity;
+      }
+
+      // Create orders
+      for (const [storeId, storeData] of storeOrderMap.entries()) {
+        const commissionRate = 0.05;
+        const commissionAmount = storeData.totalAmount * commissionRate;
+        const storeAmount = storeData.totalAmount - commissionAmount;
+
+        const order = new Order({
+          customerId: req.user._id,
+          storeId,
+          items: storeData.items,
+          totalAmount: storeData.totalAmount,
+          platformFee: commissionAmount.toFixed(2),
+          storeAmount,
+          shippingAddress,
+          status: "pending",
+          combinedId,
+          paymentDetails: {
+            paymentMethod: "cod",
+            paymentStatus: "cod_pending",
+          },
+          canCustomerUpdateStatus: true,
+        });
+
+        await order.save();
+
+        // Create wallet transaction (will be completed when customer marks as delivered)
+        const transaction = new WalletTransaction({
+          userId: (await Store.findById(storeId)).ownerId,
+          transactionId: combinedId,
+          type: "sale",
+          amount: storeAmount.toFixed(2),
+          status: "pending",
+          description: `COD payment for order ${combinedId}`,
+        });
+        await transaction.save();
+
+        createdEntities.order.push(order);
+        totalAmount += storeData.totalAmount;
+      }
+    }
+
+    // --- Handle Bookings ---
+    if (bookingItems.length > 0) {
+      for (const item of bookingItems) {
+        const service = await Service.findById(item.serviceId);
+        if (!service) {
+          return res.status(404).json({ error: `Service ${item.serviceId} not found` });
+        }
+
+        const serviceAmount = service.price;
+        const commissionRate = 0.07;
+        const commissionAmount = serviceAmount * commissionRate;
+        const storeAmount = serviceAmount - commissionAmount;
+
+        const booking = new Booking({
+          customerId: req.user._id,
+          storeId: service.storeId,
+          serviceId: service._id,
+          bookingDetails: item.bookingDetails,
+          totalAmount: serviceAmount.toFixed(2),
+          platformFee: commissionAmount.toFixed(2),
+          storeAmount,
+          status: "pending",
+          combinedId,
+          paymentDetails: {
+            paymentMethod: "cod",
+            paymentStatus: "cod_pending",
+          },
+          canCustomerUpdateStatus: true,
+        });
+
+        await booking.save();
+
+        // Create wallet transaction
+        const transaction = new WalletTransaction({
+          userId: (await Store.findById(service.storeId)).ownerId,
+          transactionId: combinedId,
+          type: "sale",
+          amount: storeAmount.toFixed(2),
+          status: "pending",
+          description: `COD payment for booking ${combinedId}`,
+        });
+        await transaction.save();
+
+        createdEntities.bookings.push(booking);
+        totalAmount += serviceAmount;
+      }
+    }
+
+    if (totalAmount <= 0) {
+      return res.status(400).json({ error: "Total amount must be greater than zero" });
+    }
+
+    // Generate receipt immediately for COD orders
+    try {
+      console.log("Starting COD receipt generation for", createdEntities.order.length, "orders and", createdEntities.bookings.length, "bookings");
+      
+      for (const order of createdEntities.order) {
+        console.log("Generating COD receipt for order:", order._id);
+        const populatedOrder = await Order.findById(order._id)
+          .populate('customerId', 'name email')
+          .populate('storeId', 'name contactInfo')
+          .populate('items.productId', 'title');
+        
+        if (populatedOrder) {
+          const receiptUrl = await generateReceipt(populatedOrder, 'order');
+          console.log("COD order receipt generated at:", receiptUrl);
+          await Order.findByIdAndUpdate(order._id, {
+            receiptUrl,
+            receiptGenerated: true,
+            receiptGeneratedAt: new Date(),
+          });
+          console.log("COD order updated with receipt info");
+        } else {
+          console.log("Failed to populate COD order:", order._id);
+        }
+      }
+
+      for (const booking of createdEntities.bookings) {
+        console.log("Generating COD receipt for booking:", booking._id);
+        const populatedBooking = await Booking.findById(booking._id)
+          .populate('customerId', 'name email')
+          .populate('storeId', 'name contactInfo')
+          .populate('serviceId', 'title');
+        
+        if (populatedBooking) {
+          const receiptUrl = await generateReceipt(populatedBooking, 'booking');
+          console.log("COD booking receipt generated at:", receiptUrl);
+          await Booking.findByIdAndUpdate(booking._id, {
+            receiptUrl,
+            receiptGenerated: true,
+            receiptGeneratedAt: new Date(),
+          });
+          console.log("COD booking updated with receipt info");
+        } else {
+          console.log("Failed to populate COD booking:", booking._id);
+        }
+      }
+    } catch (receiptError) {
+      console.error("Error generating COD receipt:", receiptError);
+    }
+
+    res.json({
+      success: true,
+      combinedId,
+      totalAmount,
+      message: "COD order created successfully. You can mark it as delivered once you receive your order/service.",
+      createdEntities,
+    });
+
+  } catch (error) {
+    console.error("COD intent error:", error);
+    res.status(500).json({ error: "Failed to create COD payment" });
   }
 });
 
@@ -382,16 +835,18 @@ router.post(
       }
 
       if (data.status_code === "2") {
-        // Find unpaid orders for this combinedId
+        // Find PayHere orders pending payment for this combinedId
         const orders = await Order.find({
           combinedId: data.order_id,
-          "paymentDetails.paymentStatus": { $ne: "paid" },
+          "paymentDetails.paymentMethod": "payhere",
+          "paymentDetails.paymentStatus": "pending_payhere",
         });
 
-        // Find unpaid bookings for this combinedId
+        // Find PayHere bookings pending payment for this combinedId
         const bookings = await Booking.find({
           combinedId: data.order_id,
-          "paymentDetails.paymentStatus": { $ne: "paid" },
+          "paymentDetails.paymentMethod": "payhere", 
+          "paymentDetails.paymentStatus": "pending_payhere",
         });
 
         const sales = await WalletTransaction.find({
@@ -460,6 +915,31 @@ router.post(
               transactionId: data.payment_id,
             };
             await order.save();
+
+            // Generate receipt for PayHere order
+            try {
+              console.log("Starting receipt generation for order:", order._id);
+              const populatedOrder = await Order.findById(order._id)
+                .populate('customerId', 'name email')
+                .populate('storeId', 'name contactInfo')
+                .populate('items.productId', 'title');
+              
+              if (populatedOrder) {
+                console.log("Populated order found, generating receipt...");
+                const receiptUrl = await generateReceipt(populatedOrder, 'order');
+                console.log("Receipt generated at:", receiptUrl);
+                await Order.findByIdAndUpdate(order._id, {
+                  receiptUrl,
+                  receiptGenerated: true,
+                  receiptGeneratedAt: new Date(),
+                });
+                console.log("Order updated with receipt info");
+              } else {
+                console.log("No populated order found for ID:", order._id);
+              }
+            } catch (receiptError) {
+              console.error("Error generating PayHere receipt for order:", receiptError);
+            }
           }
         } else if (bookings.length > 0) {
           // Process all bookings
@@ -495,6 +975,31 @@ router.post(
               transactionId: data.payment_id,
             };
             await booking.save();
+
+            // Generate receipt for PayHere booking
+            try {
+              console.log("Starting receipt generation for booking:", booking._id);
+              const populatedBooking = await Booking.findById(booking._id)
+                .populate('customerId', 'name email')
+                .populate('storeId', 'name contactInfo')
+                .populate('serviceId', 'title');
+              
+              if (populatedBooking) {
+                console.log("Populated booking found, generating receipt...");
+                const receiptUrl = await generateReceipt(populatedBooking, 'booking');
+                console.log("Booking receipt generated at:", receiptUrl);
+                await Booking.findByIdAndUpdate(booking._id, {
+                  receiptUrl,
+                  receiptGenerated: true,
+                  receiptGeneratedAt: new Date(),
+                });
+                console.log("Booking updated with receipt info");
+              } else {
+                console.log("No populated booking found for ID:", booking._id);
+              }
+            } catch (receiptError) {
+              console.error("Error generating PayHere receipt for booking:", receiptError);
+            }
           }
         } else {
           console.warn(
@@ -553,13 +1058,197 @@ router.get("/payment-methods", (req, res) => {
     {
       id: "payhere",
       name: "PayHere",
-      description: "Pay using PayHere",
+      description: "Pay using PayHere (Cards, Mobile, Online Banking)",
       icon: "smartphone",
       available: true,
+    },
+    {
+      id: "bank_transfer",
+      name: "Bank Transfer",
+      description: "Transfer directly to store's bank account",
+      icon: "building-2",
+      available: true,
+    },
+    {
+      id: "cod",
+      name: "Cash on Delivery",
+      description: "Pay when you receive your order/service",
+      icon: "banknote",
+      available: true, // Will be checked during checkout
+      requiresVerification: true,
     },
   ];
 
   res.json(paymentMethods);
+});
+
+// Generate receipt for order or booking
+router.post("/generate-receipt/:id", authenticate, async (req, res) => {
+  try {
+    const { type } = req.body; // 'order' or 'booking'
+    const id = req.params.id;
+
+    if (!type || !['order', 'booking'].includes(type)) {
+      return res.status(400).json({ error: "Type must be 'order' or 'booking'" });
+    }
+
+    let item;
+    if (type === 'order') {
+      item = await Order.findById(id)
+        .populate('customerId', 'name email')
+        .populate('storeId', 'name contactInfo')
+        .populate('items.productId', 'title');
+    } else {
+      item = await Booking.findById(id)
+        .populate('customerId', 'name email')
+        .populate('storeId', 'name contactInfo')
+        .populate('serviceId', 'title');
+    }
+
+    if (!item) {
+      return res.status(404).json({ error: `${type} not found` });
+    }
+
+    // Check if user owns this item or owns the store
+    const isOwner = item.customerId._id.toString() === req.user._id.toString();
+    const isStoreOwner = item.storeId._id.toString() === req.user.storeId?.toString();
+
+    if (!isOwner && !isStoreOwner) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Generate receipt
+    const receiptUrl = await generateReceipt(item, type);
+
+    // Update the item with receipt info
+    const updateData = {
+      receiptUrl,
+      receiptGenerated: true,
+      receiptGeneratedAt: new Date(),
+    };
+
+    if (type === 'order') {
+      await Order.findByIdAndUpdate(id, updateData);
+    } else {
+      await Booking.findByIdAndUpdate(id, updateData);
+    }
+
+    res.json({
+      success: true,
+      message: "Receipt generated successfully",
+      receiptUrl,
+    });
+
+  } catch (error) {
+    console.error("Error generating receipt:", error);
+    res.status(500).json({ error: "Failed to generate receipt" });
+  }
+});
+
+// Test route to manually generate receipt
+router.post("/test-generate-receipt/:id", authenticate, async (req, res) => {
+  try {
+    const { type } = req.body; // 'order' or 'booking'
+    const id = req.params.id;
+
+    let item;
+    if (type === 'order') {
+      item = await Order.findById(id)
+        .populate('customerId', 'name email')
+        .populate('storeId', 'name contactInfo')
+        .populate('items.productId', 'title');
+    } else {
+      item = await Booking.findById(id)
+        .populate('customerId', 'name email')
+        .populate('storeId', 'name contactInfo')
+        .populate('serviceId', 'title');
+    }
+
+    if (!item) {
+      return res.status(404).json({ error: `${type} not found` });
+    }
+
+    console.log(`Testing receipt generation for ${type}:`, item._id);
+    const receiptUrl = await generateReceipt(item, type);
+    console.log("Test receipt generated at:", receiptUrl);
+
+    // Update the item with receipt info
+    const updateData = {
+      receiptUrl,
+      receiptGenerated: true,
+      receiptGeneratedAt: new Date(),
+    };
+
+    if (type === 'order') {
+      await Order.findByIdAndUpdate(id, updateData);
+    } else {
+      await Booking.findByIdAndUpdate(id, updateData);
+    }
+
+    res.json({
+      success: true,
+      message: "Test receipt generated successfully",
+      receiptUrl,
+    });
+
+  } catch (error) {
+    console.error("Error generating test receipt:", error);
+    res.status(500).json({ error: "Failed to generate test receipt" });
+  }
+});
+
+// Download receipt
+router.get("/download-receipt/:id", authenticate, async (req, res) => {
+  try {
+    const { type } = req.query; // 'order' or 'booking'
+    const id = req.params.id;
+
+    if (!type || !['order', 'booking'].includes(type)) {
+      return res.status(400).json({ error: "Type parameter must be 'order' or 'booking'" });
+    }
+
+    let item;
+    if (type === 'order') {
+      item = await Order.findById(id);
+    } else {
+      item = await Booking.findById(id);
+    }
+
+    if (!item) {
+      return res.status(404).json({ error: `${type} not found` });
+    }
+
+    // Check if user owns this item or owns the store
+    const isOwner = item.customerId.toString() === req.user._id.toString();
+    const isStoreOwner = item.storeId.toString() === req.user.storeId?.toString();
+
+    if (!isOwner && !isStoreOwner) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (!item.receiptUrl) {
+      return res.status(404).json({ error: "No receipt available for this " + type });
+    }
+
+    // Construct file path
+    const filePath = path.join(process.cwd(), item.receiptUrl);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "Receipt file not found" });
+    }
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=receipt_${id}.pdf`);
+
+    // Send file
+    res.sendFile(filePath);
+
+  } catch (error) {
+    console.error("Error downloading receipt:", error);
+    res.status(500).json({ error: "Failed to download receipt" });
+  }
 });
 
 // Main Cancel Route
@@ -636,17 +1325,40 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
         if (!refundResponse.ok) {
           const text = await refundResponse.text();
           console.error("Refund API error:", refundResponse.status, text);
-          return res.status(500).json({ error: "Refund API call failed" });
+          
+          // Log detailed error for debugging
+          console.error("PayHere Refund Request Details:", {
+            payment_id: paymentId,
+            url: PAYHERE_REFUND_URL,
+            status: refundResponse.status,
+            response: text
+          });
+          
+          return res.status(500).json({ 
+            error: "Refund API call failed",
+            details: process.env.NODE_ENV === 'development' ? text : undefined
+          });
         }
 
         const result = await refundResponse.json();
+        console.log("PayHere refund response:", result);
+        
         if (result.status !== 1) {
-          console.error("Refund failed:", result.msg);
+          console.error("Refund failed:", result.msg || result.message);
           return res
             .status(500)
-            .json({ error: "Refund failed: " + result.msg });
+            .json({ 
+              error: "Refund failed: " + (result.msg || result.message || 'Unknown error'),
+              refundStatus: result.status
+            });
         }
 
+        console.log(`PayHere refund successful for ${itemType} ${id}:`, {
+          refund_id: result.refund_id || result.id,
+          amount: item.totalAmount,
+          payment_id: paymentId
+        });
+        
         notes += " and refunded via PayHere";
 
         // Restore stock for orders (not bookings) and non-preorder products
