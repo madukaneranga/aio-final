@@ -212,11 +212,6 @@ const ContactReveal = ({ store, onReveal }) => {
               <CheckCircle className="w-4 h-4" />
               <span>Contact Details Revealed</span>
             </div>
-            {revealStatus?.revealExpiresAt && (
-              <div className="text-xs text-gray-600">
-                Available until {new Date(revealStatus.revealExpiresAt).toLocaleString()}
-              </div>
-            )}
           </div>
           <div className="space-y-1 text-sm">
             {contactDetails.email && (

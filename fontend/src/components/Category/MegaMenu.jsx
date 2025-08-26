@@ -280,7 +280,7 @@ const MegaMenu = ({
         {/* Sidebar */}
         <div 
           ref={menuRef}
-          className="absolute left-0 top-0 h-full w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-out overflow-hidden"
+          className="absolute left-0 top-0 h-full w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-out flex flex-col"
           style={{
             transform: isOpen ? 'translateX(0)' : 'translateX(-100%)'
           }}
@@ -299,7 +299,7 @@ const MegaMenu = ({
           </div>
           
           {/* Categories */}
-          <div className="overflow-y-auto h-full pb-24">
+          <div className="overflow-y-auto flex-1 pb-6" style={{ maxHeight: 'calc(100vh - 120px)' }}>
             <div className="py-4">
               {categories.map((category, categoryIndex) => (
                 <div key={category._id} className="mb-2">
@@ -322,24 +322,24 @@ const MegaMenu = ({
                   </button>
                   
                   {/* Expanded Subcategories */}
-                  <div className={`overflow-hidden transition-all duration-300 ease-out ${
-                    activeCategory === category._id ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                  <div className={`overflow-hidden transition-all duration-500 ease-out ${
+                    activeCategory === category._id ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
                   }`}>
                     <div className="bg-gradient-to-b from-gray-50 to-gray-100 border-y border-gray-200">
                       {category.subcategories.map((subcategory, index) => (
-                        <div key={index} className="px-8 py-4 border-b border-gray-200/50 last:border-b-0">
+                        <div key={index} className="px-6 py-3 border-b border-gray-200/50 last:border-b-0">
                           <button
                             onClick={() => handleSubcategoryClick(category, subcategory)}
-                            className="block w-full text-left text-base font-semibold text-gray-900 hover:text-black transition-all duration-200 mb-3"
+                            className="block w-full text-left text-sm font-semibold text-gray-900 hover:text-black transition-all duration-200 mb-2"
                           >
                             {subcategory.name}
                           </button>
-                          <div className="space-y-2 pl-4 border-l-2 border-gray-300">
+                          <div className="space-y-1 pl-3 border-l-2 border-gray-300">
                             {subcategory.childCategories.map((childCategory, childIndex) => (
                               <button
                                 key={childIndex}
                                 onClick={() => handleChildCategoryClick(category, subcategory, childCategory)}
-                                className="block w-full text-left text-sm text-gray-600 hover:text-black hover:font-medium transition-all duration-200 py-1"
+                                className="block w-full text-left text-xs text-gray-600 hover:text-black hover:font-medium transition-all duration-200 py-1 leading-relaxed"
                               >
                                 {childCategory}
                               </button>

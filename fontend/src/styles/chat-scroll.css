@@ -1,0 +1,86 @@
+/* Chat Scroll Container Styles */
+.chat-scroll-container {
+  height: calc(100vh - 280px);
+  max-height: calc(100vh - 280px);
+  min-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar styles for chat */
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 3px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+
+/* Ensure chat messages don't overflow container */
+.chat-messages-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Message list with proper scroll */
+.chat-message-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Important for flexbox scroll */
+}
+
+/* Input area fixed at bottom */
+.chat-input-area {
+  flex-shrink: 0;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+}
+
+/* Chat interface layout */
+.chat-interface-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Responsive adjustments */
+@media (max-height: 600px) {
+  .chat-scroll-container {
+    height: calc(100vh - 200px);
+    max-height: calc(100vh - 200px);
+    min-height: 200px;
+  }
+}
+
+@media (max-height: 400px) {
+  .chat-scroll-container {
+    height: calc(100vh - 150px);
+    max-height: calc(100vh - 150px);
+    min-height: 150px;
+  }
+}
