@@ -20,18 +20,6 @@ const packageSchema = new mongoose.Schema({
     type: Number,
     default: 8,
   },
-  headerImages: {
-    type: Number,
-    default: 2,
-  },
-  itemImages: {
-    type: Number,
-    default: 3,
-  },
-  itemVariant: {
-    type: Boolean,
-    default: false,
-  },
   themeColor: {
     type: Boolean,
     default: false,

@@ -4,6 +4,35 @@ import WalletTransaction from "../models/WalletTransaction.js";
 import BankDetails from "../models/BankDetails.js";
 import BankChangeRequest from "../models/BankChangeRequest.js";
 import Store from "../models/Store.js";
+import User from "../models/User.js";
+import Product from "../models/Product.js";
+import Service from "../models/Service.js";
+import Order from "../models/Order.js";
+import Booking from "../models/Booking.js";
+import Chat from "../models/Chat.js";
+import ChatAnalytics from "../models/ChatAnalytics.js";
+import Commission from "../models/Commission.js";
+import ContactReveal from "../models/ContactReveal.js";
+import EmailSubscription from "../models/EmailSubscription.js";
+import FlashDeal from "../models/FlashDeal.js";
+import Notification from "../models/Notification.js";
+import Package from "../models/Package.js";
+import PendingTransaction from "../models/PendingTransaction.js";
+import PlatformSettings from "../models/PlatformSettings.js";
+import Post from "../models/Post.js";
+import PostComment from "../models/PostComment.js";
+import PostLike from "../models/PostLike.js";
+import Review from "../models/Review.js";
+import SearchHistory from "../models/SearchHistory.js";
+import Subscription from "../models/Subscription.js";
+import TimeSlot from "../models/TimeSlot.js";
+import Category from "../models/Category.js";
+import Variant from "../models/Variant.js";
+import Wallet from "../models/Wallet.js";
+import Addon from "../models/Addon.js";
+import CommentLike from "../models/CommentLike.js";
+import CommentReaction from "../models/CommentReaction.js";
+import Marketing from "../models/marketing.js";
 import { authenticate, authorize } from "../middleware/auth.js"
 
 // Custom validation for admin actions - UPDATED
@@ -541,5 +570,548 @@ router.post('/lock-all-bank-details', authenticate, authorize('admin'), async (r
     });
   }
 });
+
+// =================== COMPREHENSIVE ADMIN CRUD ROUTES ===================
+
+// Generic helper function for building queries with search, filter, and sort
+const buildAdminQuery = (req, searchFields = ['name'], filterField = 'isActive') => {
+  const { search, status, userId, storeId, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+  let query = {};
+  
+  // Search functionality
+  if (search) {
+    const searchConditions = searchFields.map(field => ({
+      [field]: { $regex: search, $options: 'i' }
+    }));
+    if (searchConditions.length > 0) {
+      query.$or = searchConditions;
+    }
+  }
+  
+  // Status/filter functionality
+  if (status && status !== 'all') {
+    if (filterField === 'isActive') {
+      query.isActive = status === 'active';
+    } else {
+      query[filterField] = status;
+    }
+  }
+  
+  // Additional filters
+  if (userId) query.userId = userId;
+  if (storeId) query.storeId = storeId;
+  
+  // Sort object
+  const sortObj = {};
+  sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+  
+  return { query, sortObj };
+};
+
+// Generic CRUD endpoints for each collection
+const createCRUDRoutes = (path, Model, searchFields = ['name'], filterField = 'isActive', populateFields = '') => {
+  
+  // GET all items with pagination, search, filter, sort
+  router.get(`/${path}`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const { page = 1, limit = 20 } = req.query;
+      const { query, sortObj } = buildAdminQuery(req, searchFields, filterField);
+      
+      const items = await Model.find(query)
+        .populate(populateFields)
+        .sort(sortObj)
+        .limit(parseInt(limit))
+        .skip((parseInt(page) - 1) * parseInt(limit));
+      
+      const total = await Model.countDocuments(query);
+      
+      res.json({
+        success: true,
+        data: {
+          items,
+          pagination: {
+            current: parseInt(page),
+            pages: Math.ceil(total / parseInt(limit)),
+            total,
+            limit: parseInt(limit)
+          }
+        }
+      });
+    } catch (error) {
+      console.error(`Get ${path} error:`, error);
+      console.error(`Error details:`, error.message);
+      console.error(`Stack trace:`, error.stack);
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to fetch ${path}`,
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+  
+  // GET single item by ID
+  router.get(`/${path}/:id`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const item = await Model.findById(req.params.id).populate(populateFields);
+      if (!item) {
+        return res.status(404).json({ success: false, message: `${path} not found` });
+      }
+      res.json({ success: true, data: item });
+    } catch (error) {
+      console.error(`Get single ${path} error:`, error);
+      res.status(500).json({ success: false, message: `Failed to fetch ${path}` });
+    }
+  });
+  
+  // POST create new item
+  router.post(`/${path}`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const item = new Model(req.body);
+      await item.save();
+      res.status(201).json({ success: true, data: item, message: `${path} created successfully` });
+    } catch (error) {
+      console.error(`Create ${path} error:`, error);
+      res.status(400).json({ success: false, message: error.message || `Failed to create ${path}` });
+    }
+  });
+  
+  // PUT update item
+  router.put(`/${path}/:id`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const item = await Model.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+      if (!item) {
+        return res.status(404).json({ success: false, message: `${path} not found` });
+      }
+      res.json({ success: true, data: item, message: `${path} updated successfully` });
+    } catch (error) {
+      console.error(`Update ${path} error:`, error);
+      res.status(400).json({ success: false, message: error.message || `Failed to update ${path}` });
+    }
+  });
+  
+  // DELETE item
+  router.delete(`/${path}/:id`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const item = await Model.findByIdAndDelete(req.params.id);
+      if (!item) {
+        return res.status(404).json({ success: false, message: `${path} not found` });
+      }
+      res.json({ success: true, message: `${path} deleted successfully` });
+    } catch (error) {
+      console.error(`Delete ${path} error:`, error);
+      res.status(500).json({ success: false, message: `Failed to delete ${path}` });
+    }
+  });
+  
+  // PATCH toggle status (if applicable)
+  router.patch(`/${path}/:id/toggle-status`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const item = await Model.findById(req.params.id);
+      if (!item) {
+        return res.status(404).json({ success: false, message: `${path} not found` });
+      }
+      
+      if (filterField === 'isActive') {
+        item.isActive = !item.isActive;
+      } else if (filterField === 'status') {
+        item.status = item.status === 'active' ? 'inactive' : 'active';
+      }
+      
+      await item.save();
+      res.json({ success: true, data: item, message: `${path} status updated successfully` });
+    } catch (error) {
+      console.error(`Toggle ${path} status error:`, error);
+      res.status(500).json({ success: false, message: `Failed to update ${path} status` });
+    }
+  });
+  
+  // POST bulk operations
+  router.post(`/${path}/bulk`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const { ids, action, data } = req.body;
+      
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'IDs array is required' });
+      }
+      
+      let result;
+      switch (action) {
+        case 'delete':
+          result = await Model.deleteMany({ _id: { $in: ids } });
+          break;
+        case 'update':
+          result = await Model.updateMany({ _id: { $in: ids } }, data);
+          break;
+        case 'toggle-status':
+          const items = await Model.find({ _id: { $in: ids } });
+          for (const item of items) {
+            if (filterField === 'isActive') {
+              item.isActive = !item.isActive;
+            }
+            await item.save();
+          }
+          result = { modifiedCount: items.length };
+          break;
+        default:
+          return res.status(400).json({ success: false, message: 'Invalid bulk action' });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Bulk ${action} completed successfully`, 
+        affected: result.modifiedCount || result.deletedCount || ids.length 
+      });
+    } catch (error) {
+      console.error(`Bulk ${path} operation error:`, error);
+      res.status(500).json({ success: false, message: `Failed to perform bulk ${action}` });
+    }
+  });
+};
+
+// Create CRUD routes for all collections
+createCRUDRoutes('all-users', User, ['name', 'email'], 'isActive', '');
+createCRUDRoutes('all-stores', Store, ['name', 'email'], 'isActive', 'ownerId');
+createCRUDRoutes('all-products', Product, ['title', 'description'], 'isActive', 'storeId');
+createCRUDRoutes('all-services', Service, ['title', 'description'], 'isActive', 'storeId');
+createCRUDRoutes('all-orders', Order, [], 'status', 'customerId storeId');
+createCRUDRoutes('all-bookings', Booking, [], 'status', 'customerId storeId serviceId');
+createCRUDRoutes('all-chats', Chat, [], 'status', 'participants.userId');
+createCRUDRoutes('all-chat-analytics', ChatAnalytics, [], '', 'chatId storeId');
+createCRUDRoutes('all-commissions', Commission, [], 'status', 'storeId orderId bookingId');
+createCRUDRoutes('all-contact-reveals', ContactReveal, [], '', 'customerId storeId');
+createCRUDRoutes('all-email-subscriptions', EmailSubscription, ['email'], 'isActive', '');
+createCRUDRoutes('all-flash-deals', FlashDeal, ['saleName', 'saleSubtitle'], 'isActive', '');
+createCRUDRoutes('all-notifications', Notification, ['title', 'body'], '', 'userId');
+createCRUDRoutes('all-packages', Package, ['name', 'description'], 'isActive', '');
+createCRUDRoutes('all-pending-transactions', PendingTransaction, [], 'status', 'userId orderId');
+createCRUDRoutes('all-platform-settings', PlatformSettings, ['key'], '', '');
+createCRUDRoutes('all-posts', Post, ['content'], 'isActive', 'userId storeId');
+createCRUDRoutes('all-post-comments', PostComment, ['content'], '', 'userId postId');
+createCRUDRoutes('all-post-likes', PostLike, [], '', 'userId postId');
+createCRUDRoutes('all-reviews', Review, ['comment'], '', 'userId storeId productId serviceId orderId bookingId');
+createCRUDRoutes('all-search-history', SearchHistory, ['query'], '', 'userId');
+createCRUDRoutes('all-subscriptions', Subscription, [], 'status', 'userId storeId');
+createCRUDRoutes('all-time-slots', TimeSlot, [], 'isActive', 'storeId serviceId');
+createCRUDRoutes('all-categories', Category, ['name', 'description'], 'isActive', '');
+createCRUDRoutes('all-variants', Variant, ['name'], 'isActive', 'productId');
+createCRUDRoutes('all-wallets', Wallet, [], '', 'userId');
+createCRUDRoutes('all-addons', Addon, ['name', 'description'], 'isActive', '');
+createCRUDRoutes('all-comment-likes', CommentLike, [], '', 'userId commentId');
+createCRUDRoutes('all-comment-reactions', CommentReaction, [], '', 'userId commentId');
+createCRUDRoutes('all-marketing', Marketing, [], 'isActive', '');
+
+// =================== ADVANCED ADMIN ANALYTICS & MONITORING ===================
+
+// Real-time system statistics
+router.get('/system/stats', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const stats = await Promise.all([
+      User.countDocuments(),
+      Store.countDocuments(),
+      Product.countDocuments(),
+      Service.countDocuments(),
+      Order.countDocuments(),
+      Booking.countDocuments(),
+      Chat.countDocuments(),
+      Notification.countDocuments(),
+      Review.countDocuments(),
+      Post.countDocuments(),
+      
+      // Active counts
+      User.countDocuments({ isActive: true }),
+      Store.countDocuments({ isActive: true }),
+      Product.countDocuments({ isActive: true }),
+      Service.countDocuments({ isActive: true }),
+      
+      // Recent activity (last 24 hours)
+      Order.countDocuments({ createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }),
+      Booking.countDocuments({ createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }),
+      User.countDocuments({ createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }),
+      Store.countDocuments({ createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }),
+      
+      // Revenue calculations
+      Order.aggregate([
+        { $match: { status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      ]),
+      Booking.aggregate([
+        { $match: { status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      ]),
+    ]);
+    
+    const [
+      totalUsers, totalStores, totalProducts, totalServices, totalOrders, totalBookings,
+      totalChats, totalNotifications, totalReviews, totalPosts,
+      activeUsers, activeStores, activeProducts, activeServices,
+      recentOrders, recentBookings, newUsers, newStores,
+      orderRevenue, bookingRevenue
+    ] = stats;
+    
+    const totalRevenue = (orderRevenue[0]?.total || 0) + (bookingRevenue[0]?.total || 0);
+    
+    res.json({
+      success: true,
+      data: {
+        totals: {
+          users: totalUsers,
+          stores: totalStores, 
+          products: totalProducts,
+          services: totalServices,
+          orders: totalOrders,
+          bookings: totalBookings,
+          chats: totalChats,
+          notifications: totalNotifications,
+          reviews: totalReviews,
+          posts: totalPosts,
+          revenue: totalRevenue
+        },
+        active: {
+          users: activeUsers,
+          stores: activeStores,
+          products: activeProducts,
+          services: activeServices
+        },
+        recent24h: {
+          orders: recentOrders,
+          bookings: recentBookings,
+          users: newUsers,
+          stores: newStores
+        },
+        timestamp: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('System stats error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch system statistics' });
+  }
+});
+
+// Advanced analytics dashboard
+router.get('/analytics/dashboard', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { period = '30' } = req.query;
+    const days = parseInt(period);
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    
+    const [userGrowth, storeGrowth, orderTrends, revenueTrends, topCategories, topStores] = await Promise.all([
+      // User growth over period
+      User.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      
+      // Store growth
+      Store.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      
+      // Order trends
+      Order.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { 
+              date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+              status: '$status'
+            },
+            count: { $sum: 1 },
+            revenue: { $sum: '$totalAmount' }
+          }
+        },
+        { $sort: { '_id.date': 1 } }
+      ]),
+      
+      // Revenue trends
+      Order.aggregate([
+        { $match: { status: 'completed', createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            revenue: { $sum: '$totalAmount' }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      
+      // Top categories
+      Product.aggregate([
+        {
+          $group: {
+            _id: '$category',
+            count: { $sum: 1 },
+            avgPrice: { $avg: '$price' }
+          }
+        },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]),
+      
+      // Top performing stores
+      Order.aggregate([
+        { $match: { status: 'completed', createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: '$storeId',
+            orders: { $sum: 1 },
+            revenue: { $sum: '$totalAmount' }
+          }
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: 'stores',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'store'
+          }
+        }
+      ])
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        userGrowth,
+        storeGrowth, 
+        orderTrends,
+        revenueTrends,
+        topCategories,
+        topStores,
+        period: days
+      }
+    });
+  } catch (error) {
+    console.error('Analytics dashboard error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch analytics data' });
+  }
+});
+
+// System health monitoring
+router.get('/system/health', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const healthChecks = {
+      database: { status: 'healthy', responseTime: 0 },
+      memory: process.memoryUsage(),
+      uptime: process.uptime(),
+      timestamp: new Date(),
+      version: process.version,
+      platform: process.platform
+    };
+    
+    // Database response time check
+    const start = Date.now();
+    await User.findOne().limit(1);
+    healthChecks.database.responseTime = Date.now() - start;
+    
+    // Check for any critical issues
+    const criticalIssues = [];
+    if (healthChecks.database.responseTime > 1000) {
+      criticalIssues.push('Database response time is high');
+    }
+    if (healthChecks.memory.heapUsed / healthChecks.memory.heapTotal > 0.9) {
+      criticalIssues.push('Memory usage is critical');
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        ...healthChecks,
+        criticalIssues,
+        overallStatus: criticalIssues.length === 0 ? 'healthy' : 'warning'
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'System health check failed',
+      data: {
+        overallStatus: 'critical',
+        criticalIssues: ['Health check endpoint failed']
+      }
+    });
+  }
+});
+
+// Admin activity logging
+const adminActionLog = [];
+const logAdminAction = (adminId, action, target, details = {}) => {
+  const logEntry = {
+    id: Date.now() + Math.random(),
+    adminId,
+    action,
+    target,
+    details,
+    timestamp: new Date(),
+    ip: details.ip || 'unknown'
+  };
+  
+  adminActionLog.unshift(logEntry);
+  // Keep only last 1000 entries
+  if (adminActionLog.length > 1000) {
+    adminActionLog.splice(1000);
+  }
+  
+  console.log(`Admin Action Log: ${adminId} performed ${action} on ${target}`, details);
+};
+
+// Get admin activity logs
+router.get('/activity-logs', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    
+    const logs = adminActionLog.slice(startIndex, endIndex);
+    
+    res.json({
+      success: true,
+      data: {
+        logs,
+        pagination: {
+          current: parseInt(page),
+          total: adminActionLog.length,
+          pages: Math.ceil(adminActionLog.length / limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Activity logs error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch activity logs' });
+  }
+});
+
+// Middleware to log admin actions
+const logAction = (action, target) => {
+  return (req, res, next) => {
+    const originalSend = res.send;
+    res.send = function(data) {
+      if (res.statusCode < 400) {
+        logAdminAction(req.user.id, action, target, {
+          ip: req.ip || req.connection.remoteAddress,
+          userAgent: req.get('User-Agent'),
+          body: req.method !== 'GET' ? req.body : undefined
+        });
+      }
+      originalSend.call(this, data);
+    };
+    next();
+  };
+};
 
 export default router;
