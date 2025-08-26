@@ -172,3 +172,33 @@
     padding-right: 2rem;
   }
 }
+
+/* Marketing Psychology Animations */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s infinite;
+}
+
+/* Pulse effect for premium features */
+@keyframes premiumPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-premium-pulse {
+  animation: premiumPulse 2s infinite;
+}
+
+/* Trust indicator glow */
+@keyframes trustGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.6); }
+}
+
+.animate-trust-glow {
+  animation: trustGlow 2s infinite;
+}

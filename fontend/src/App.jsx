@@ -33,6 +33,7 @@ import ManageProducts from "./pages/ManageProducts";
 import ManageServices from "./pages/ManageServices";
 import Orders from "./pages/Orders";
 import Bookings from "./pages/Bookings";
+import Receipt from "./pages/Receipt";
 import StoreManagement from "./pages/StoreManagement";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
@@ -52,7 +53,6 @@ import Test from "./pages/Test";
 import NewPost from "./pages/NewPost";
 import SocialFeed from "./pages/SocialFeed";
 import CustomSales from "./pages/CustomSales";
-import ChatDashboard from "./pages/ChatDashboard";
 
 import "./App.css";
 
@@ -134,6 +134,7 @@ function App() {
                             />
                             <Route path="/orders" element={<Orders />} />
                             <Route path="/bookings" element={<Bookings />} />
+                            <Route path="/receipt/:id" element={<Receipt />} />
                             <Route
                               path="/store-management"
                               element={<StoreManagement />}
@@ -176,9 +177,6 @@ function App() {
                               path="/sub-management"
                               element={<SubscriptionManagement />}
                             />
-
-                            <Route path="/chats" element={<ChatDashboard />} />
-
                             <Route path="/sale" element={<CustomSales />} />
                             <Route path="/test" element={<Test />} />
                             <Route path="/new-post" element={<NewPost />} />

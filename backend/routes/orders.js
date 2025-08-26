@@ -5,6 +5,7 @@ import Notification from "../models/Notification.js";
 import { emitNotification } from "../utils/socketUtils.js";
 import WalletTransaction from "../models/WalletTransaction.js";
 import Store from "../models/Store.js";
+import BankDetails from "../models/BankDetails.js";
 
 const router = express.Router();
 
@@ -47,11 +48,42 @@ function getOrderNotificationContent(status) {
 router.get("/customer", authenticate, async (req, res) => {
   try {
     const orders = await Order.find({ customerId: req.user._id })
-      .populate("storeId", "name")
+      .populate("storeId", "name ownerId")
       .populate("items.productId", "title images")
       .sort({ createdAt: -1 });
 
-    res.json(orders);
+    // For bank transfer orders, populate bank details
+    const ordersWithBankDetails = await Promise.all(
+      orders.map(async (order) => {
+        const orderObj = order.toObject();
+        
+        // If this is a bank transfer payment, get store owner's bank details
+        if (order.paymentDetails?.paymentMethod === "bank_transfer" && 
+            order.paymentDetails?.paymentStatus === "pending_bank_transfer" &&
+            order.storeId?.ownerId) {
+          
+          const bankDetails = await BankDetails.findOne({ 
+            userId: order.storeId.ownerId, 
+            isActive: true 
+          });
+          
+          if (bankDetails) {
+            orderObj.bankDetails = {
+              bankName: bankDetails.bankName,
+              accountHolderName: bankDetails.accountHolderName,
+              accountNumber: bankDetails.accountNumber,
+              branchName: bankDetails.branchName,
+              isVerified: bankDetails.isVerified,
+              isLocked: bankDetails.isLocked
+            };
+          }
+        }
+        
+        return orderObj;
+      })
+    );
+
+    res.json(ordersWithBankDetails);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -91,7 +123,7 @@ router.get("/:id", authenticate, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("customerId", "name email")
-      .populate("storeId", "name")
+      .populate("storeId", "name ownerId")
       .populate("items.productId", "title images");
 
     if (!order) {
@@ -106,13 +138,36 @@ router.get("/:id", authenticate, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Store owners don't need to see any bank details - they already know their own bank info
     let responseOrder = order.toObject();
+    
+    // Store owners don't need to see any bank details - they already know their own bank info
     if (isStoreOwner && !isCustomer) {
       delete responseOrder.bankTransferInstructions;
       delete responseOrder.bankDetails;
       delete responseOrder.instructions;
       delete responseOrder.transferInstructions;
+    } else if (isCustomer) {
+      // For customers with bank transfer orders, populate bank details
+      if (order.paymentDetails?.paymentMethod === "bank_transfer" && 
+          order.paymentDetails?.paymentStatus === "pending_bank_transfer" &&
+          order.storeId?.ownerId) {
+        
+        const bankDetails = await BankDetails.findOne({ 
+          userId: order.storeId.ownerId, 
+          isActive: true 
+        });
+        
+        if (bankDetails) {
+          responseOrder.bankDetails = {
+            bankName: bankDetails.bankName,
+            accountHolderName: bankDetails.accountHolderName,
+            accountNumber: bankDetails.accountNumber,
+            branchName: bankDetails.branchName,
+            isVerified: bankDetails.isVerified,
+            isLocked: bankDetails.isLocked
+          };
+        }
+      }
     }
 
     res.json(responseOrder);

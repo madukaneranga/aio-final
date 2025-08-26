@@ -9,7 +9,6 @@ import "swiper/css/pagination";
 import { Star, ArrowLeft } from "lucide-react";
 import StoreHero from "../components/StoreHero";
 import StoreInfo from "../components/StoreInfo";
-import ChatPopup from "../components/Chat/ChatPopup";
 import { set } from "mongoose";
 
 const StoreDetail = () => {
@@ -495,9 +494,6 @@ const StoreDetail = () => {
           )}
         </div>
       </div>
-      {user && user.role === "customer" && (
-        <ChatPopup storeId={store._id} position="bottom-left" user={user} />
-      )}
     </div>
   );
 };

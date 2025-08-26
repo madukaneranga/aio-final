@@ -341,17 +341,31 @@ router.get(
       const userId = req.user._id;
       const bankDetails = await BankDetails.findOne({ userId, isActive: true });
       
+      // Get pending change request if any
+      let pendingChangeRequest = null;
+      try {
+        pendingChangeRequest = await BankChangeRequest.findOne({
+          userId,
+          status: 'pending'
+        }).sort({ requestedAt: -1 });
+      } catch (err) {
+        console.warn('Could not fetch pending change requests:', err);
+      }
+      
       console.log('📄 Fetching bank details for user:', {
         userId: userId.toString(),
         found: !!bankDetails,
         isLocked: bankDetails?.isLocked,
         lockReason: bankDetails?.lockReason,
-        lockedAt: bankDetails?.lockedAt
+        lockedAt: bankDetails?.lockedAt,
+        hasPendingRequest: !!pendingChangeRequest
       });
 
       res.json({
         success: true,
         data: bankDetails,
+        lockInfo: bankDetails?.getLockInfo() || null,
+        pendingChangeRequest
       });
     } catch (error) {
       console.error("Get bank details error:", error);
@@ -418,31 +432,25 @@ router.put(
       if (existingDetails) {
         console.log('🔄 Updating existing bank details');
         
-        // If existing details are not locked, lock them now (legacy data)
-        if (!existingDetails.isLocked) {
-          console.log('⚠️ Found unlocked existing bank details, locking now');
-          existingDetails.isLocked = true;
-          existingDetails.lockReason = 'auto_lock_legacy_data';
-          existingDetails.lockedAt = new Date();
-          await existingDetails.save();
-          
+        // Check if details are locked
+        if (existingDetails.isLocked) {
+          console.log('🔒 Bank details are locked, blocking update');
           return res.status(403).json({
             success: false,
-            message: "Your bank details have been locked for security. Please submit a change request to modify them.",
+            message: "Bank details are locked for security. Please submit a change request to modify them.",
             lockInfo: existingDetails.getLockInfo(),
-            requiresChangeRequest: true,
-            wasJustLocked: true
+            requiresChangeRequest: true
           });
         }
         
-        // This should never be reached if locking works correctly
-        console.log('⚠️ WARNING: Existing bank details found but not locked!');
+        // If unlocked (e.g., after change request approval), allow update
+        console.log('🔓 Bank details are unlocked, allowing update');
         
         // Track modification for existing details
         existingDetails.trackModification(
           userId, 
           bankData, 
-          'Direct bank details update', 
+          'Direct bank details update after approval', 
           ipAddress
         );
         
@@ -451,7 +459,13 @@ router.put(
         existingDetails.isVerified = false;
         existingDetails.verifiedAt = null;
         
+        // Lock again after update for security
+        existingDetails.isLocked = true;
+        existingDetails.lockReason = 'auto_lock_after_update';
+        existingDetails.lockedAt = new Date();
+        
         bankDetails = await existingDetails.save();
+        console.log('✅ Bank details updated and locked again for security');
       } else {
         // Create new bank details (will be auto-locked after save)
         console.log('💾 Creating new bank details (will be auto-locked)');
@@ -480,8 +494,8 @@ router.put(
         data: bankDetails,
         lockInfo: bankDetails.getLockInfo(),
         message: bankDetails.isLocked ? 
-          "Bank details saved and locked for security. Future changes will require admin approval." :
-          "Bank details updated successfully."
+          "Bank details updated and locked for security. Future changes will require admin approval." :
+          "Bank details saved successfully."
       });
     } catch (error) {
       console.error("Update bank details error:", error);

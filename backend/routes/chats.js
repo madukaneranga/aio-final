@@ -602,12 +602,12 @@ router.get("/unread-count", authenticate, async (req, res) => {
 
 /**
  * GET /api/chat/:chatId
- * Get chat details and messages
+ * Get chat details and messages with reverse pagination support
  */
 router.get("/:chatId", authenticate, async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 50, before } = req.query;
     const userId = req.user._id;
 
     // Validate chatId
@@ -646,18 +646,52 @@ router.get("/:chatId", authenticate, async (req, res) => {
       });
     }
 
-    // Get messages with pagination (newest first)
-    const messages = chat.messages
-      .filter((msg) => !msg.isDeleted)
-      .slice(-(page * limit))
-      .slice(-limit)
-      .map((msg) => ({
+    // Filter out deleted messages first
+    let allMessages = chat.messages.filter((msg) => !msg.isDeleted);
+    const totalMessages = allMessages.length;
+
+    let messages = [];
+    let hasMore = false;
+
+    if (page === 1 && !before) {
+      // First page: get latest messages
+      const startIndex = Math.max(0, allMessages.length - parseInt(limit));
+      messages = allMessages.slice(startIndex).map((msg) => ({
         ...msg.toObject(),
         isSent: msg.senderId.toString() === userId.toString(),
       }));
+      hasMore = allMessages.length > parseInt(limit);
+    } else if (before) {
+      // Cursor-based pagination: get messages before a specific message
+      const beforeIndex = allMessages.findIndex(msg => msg._id.toString() === before);
+      
+      if (beforeIndex > 0) {
+        const startIndex = Math.max(0, beforeIndex - parseInt(limit));
+        const endIndex = beforeIndex;
+        
+        messages = allMessages.slice(startIndex, endIndex).map((msg) => ({
+          ...msg.toObject(),
+          isSent: msg.senderId.toString() === userId.toString(),
+        }));
+        hasMore = startIndex > 0;
+      }
+    } else {
+      // Page-based pagination for older messages
+      const totalPages = Math.ceil(totalMessages / parseInt(limit));
+      const startIndex = Math.max(0, totalMessages - (parseInt(page) * parseInt(limit)));
+      const endIndex = Math.max(0, totalMessages - ((parseInt(page) - 1) * parseInt(limit)));
+      
+      messages = allMessages.slice(startIndex, endIndex).map((msg) => ({
+        ...msg.toObject(),
+        isSent: msg.senderId.toString() === userId.toString(),
+      }));
+      hasMore = parseInt(page) < totalPages;
+    }
 
-    // Mark messages as read
-    await chat.markAsRead(userId, req.user.role);
+    // Mark messages as read only for the first page
+    if (page === 1 && !before) {
+      await chat.markAsRead(userId, req.user.role);
+    }
 
     // Get other participant info
     const otherParticipant =
@@ -676,8 +710,10 @@ router.get("/:chatId", authenticate, async (req, res) => {
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: chat.messages.filter((msg) => !msg.isDeleted).length,
-        hasMore: chat.messages.length > page * limit,
+        total: totalMessages,
+        hasMore,
+        messageCount: messages.length,
+        cursor: messages.length > 0 ? messages[0]._id : null,
       },
     });
   } catch (error) {

@@ -256,6 +256,7 @@ walletSchema.methods.updateBalanceFromTransactions = async function () {
         $match: {
           userId: this.userId,
           status: "completed",
+          excludeFromBalance: { $ne: true }, // Exclude transactions marked as excludeFromBalance
         },
       },
       {
@@ -320,6 +321,7 @@ walletSchema.methods.updateBalanceFromTransactions = async function () {
           userId: this.userId,
           type: "sale",
           status: "completed",
+          excludeFromBalance: { $ne: true }, // Exclude transactions marked as excludeFromBalance
           createdAt: { $gte: startOfMonth },
         },
       },

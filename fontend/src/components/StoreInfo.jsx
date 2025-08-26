@@ -411,15 +411,14 @@ const StoreInfo = ({
                   <div className="absolute -bottom-1 -right-1 flex space-x-1">
                     {storeData.isVerified && (
                       <div title="Verified"
-                        className="w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center"
-                        style={{ backgroundColor: colors.primary }}
+                        className="w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-500"
                       >
                         <CheckCircle className="w-3 h-3 text-white" />
                       </div>
                     )}
                     {storeData.isPremium && (
                       <div
-                        className="w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center"
+                        className="w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-500"
                         style={{ backgroundColor: levelInfo.color }}
                       >
                         <Crown className="w-3 h-3 text-white" />
@@ -462,8 +461,7 @@ const StoreInfo = ({
                     {/* Action buttons */}
                     <div className="flex items-center justify-center sm:justify-start space-x-2 sm:ml-auto">
                       {/* Follow Button */}
-                      {/* Follow Button - Updated without outside colors */}
-                      {/* Follow Button - Using theme colors with black/white text */}
+
                       {!followData.isOwnStore && (
                         <div className="flex items-center space-x-2">
                           <button
@@ -478,12 +476,12 @@ const StoreInfo = ({
                               followData.isFollowing
                                 ? {
                                     backgroundColor: colors.light,
-                                    color: "#000000",
+                                    color: colors.primary,
                                     border: `1px solid ${colors.primary}`,
                                   }
                                 : {
-                                    backgroundColor: colors.primary,
-                                    color: "#ffffff",
+                                    backgroundColor: colors.light,
+                                    color: colors.primary,
                                   }
                             }
                           >
@@ -507,13 +505,12 @@ const StoreInfo = ({
                               style={
                                 followData.isFollowing
                                   ? {
-                                      backgroundColor: colors.primary,
-                                      color: "#ffffff",
+                                      backgroundColor: colors.light,
+                                    color: colors.primary,
                                     }
                                   : {
-                                      backgroundColor:
-                                        "rgba(255, 255, 255, 0.2)",
-                                      color: "#ffffff",
+                                      backgroundColor: colors.light,
+                                    color: colors.primary,
                                     }
                               }
                             >
@@ -723,7 +720,7 @@ const StoreInfo = ({
                           href={social.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-12 h-12 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 group transform hover:scale-110 hover:shadow-lg min-h-[44px]"
+                          className="w-12 h-12 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 group transform hover:scale-110 hover:shadow-lg"
                           style={{
                             background:
                               social.platform === "instagram"

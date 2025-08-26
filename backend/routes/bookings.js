@@ -5,6 +5,7 @@ import Notification from "../models/Notification.js";
 import { emitNotification } from "../utils/socketUtils.js";
 import WalletTransaction from "../models/WalletTransaction.js";
 import Store from "../models/Store.js";
+import BankDetails from "../models/BankDetails.js";
 
 
 const router = express.Router();
@@ -43,11 +44,42 @@ function getNotificationContent(status) {
 router.get("/customer", authenticate, async (req, res) => {
   try {
     const bookings = await Booking.find({ customerId: req.user._id })
-      .populate("storeId", "name")
+      .populate("storeId", "name ownerId")
       .populate("serviceId", "title images")
       .sort({ createdAt: -1 });
 
-    res.json(bookings);
+    // For bank transfer bookings, populate bank details
+    const bookingsWithBankDetails = await Promise.all(
+      bookings.map(async (booking) => {
+        const bookingObj = booking.toObject();
+        
+        // If this is a bank transfer payment, get store owner's bank details
+        if (booking.paymentDetails?.paymentMethod === "bank_transfer" && 
+            booking.paymentDetails?.paymentStatus === "pending_bank_transfer" &&
+            booking.storeId?.ownerId) {
+          
+          const bankDetails = await BankDetails.findOne({ 
+            userId: booking.storeId.ownerId, 
+            isActive: true 
+          });
+          
+          if (bankDetails) {
+            bookingObj.bankDetails = {
+              bankName: bankDetails.bankName,
+              accountHolderName: bankDetails.accountHolderName,
+              accountNumber: bankDetails.accountNumber,
+              branchName: bankDetails.branchName,
+              isVerified: bankDetails.isVerified,
+              isLocked: bankDetails.isLocked
+            };
+          }
+        }
+        
+        return bookingObj;
+      })
+    );
+
+    res.json(bookingsWithBankDetails);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -90,7 +122,7 @@ router.get("/:id", authenticate, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
       .populate("customerId", "name email")
-      .populate("storeId", "name")
+      .populate("storeId", "name ownerId")
       .populate("serviceId", "title images");
 
     if (!booking) {
@@ -105,13 +137,36 @@ router.get("/:id", authenticate, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Filter out sensitive bank transfer information for store owners
     let responseBooking = booking.toObject();
+    
+    // Filter out sensitive bank transfer information for store owners
     if (isStoreOwner && !isCustomer && responseBooking.paymentDetails?.paymentMethod === "bank_transfer") {
       delete responseBooking.bankTransferInstructions;
       delete responseBooking.bankDetails;
       delete responseBooking.instructions;
       delete responseBooking.transferInstructions;
+    } else if (isCustomer) {
+      // For customers with bank transfer bookings, populate bank details
+      if (booking.paymentDetails?.paymentMethod === "bank_transfer" && 
+          booking.paymentDetails?.paymentStatus === "pending_bank_transfer" &&
+          booking.storeId?.ownerId) {
+        
+        const bankDetails = await BankDetails.findOne({ 
+          userId: booking.storeId.ownerId, 
+          isActive: true 
+        });
+        
+        if (bankDetails) {
+          responseBooking.bankDetails = {
+            bankName: bankDetails.bankName,
+            accountHolderName: bankDetails.accountHolderName,
+            accountNumber: bankDetails.accountNumber,
+            branchName: bankDetails.branchName,
+            isVerified: bankDetails.isVerified,
+            isLocked: bankDetails.isLocked
+          };
+        }
+      }
     }
 
     res.json(responseBooking);

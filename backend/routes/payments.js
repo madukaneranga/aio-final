@@ -14,7 +14,6 @@ import { authenticate } from "../middleware/auth.js";
 import { emitNotification } from "../utils/socketUtils.js";
 import { v4 as uuidv4 } from "uuid";
 import WalletTransaction from "../models/WalletTransaction.js";
-import { generateReceipt } from "../utils/receiptGenerator.js";
 
 const router = express.Router();
 
@@ -365,7 +364,7 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
 
         await order.save();
 
-        // Create wallet transaction
+        // Create wallet transaction (excluded from balance - bank transfer money never comes to platform)
         const transaction = new WalletTransaction({
           userId: (await Store.findById(storeId)).ownerId,
           transactionId: combinedId,
@@ -373,6 +372,7 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
           amount: storeAmount.toFixed(2),
           status: "pending",
           description: `Bank transfer payment for order ${combinedId}`,
+          excludeFromBalance: true, // This money never comes to the platform
         });
         await transaction.save();
 
@@ -415,7 +415,7 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
 
         await booking.save();
 
-        // Create wallet transaction
+        // Create wallet transaction (excluded from balance - bank transfer money never comes to platform)
         const transaction = new WalletTransaction({
           userId: (await Store.findById(service.storeId)).ownerId,
           transactionId: combinedId,
@@ -423,6 +423,7 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
           amount: storeAmount.toFixed(2),
           status: "pending",
           description: `Bank transfer payment for booking ${combinedId}`,
+          excludeFromBalance: true, // This money never comes to the platform
         });
         await transaction.save();
 
@@ -456,57 +457,7 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
       }
     }
 
-    // Generate receipt immediately for Bank Transfer orders
-    try {
-      console.log("Starting Bank Transfer receipt generation for", createdEntities.order.length, "orders and", createdEntities.bookings.length, "bookings");
-      
-      for (const order of createdEntities.order) {
-        console.log("Generating Bank Transfer receipt for order:", order._id);
-        const populatedOrder = await Order.findById(order._id)
-          .populate('customerId', 'name email')
-          .populate('storeId', 'name contactInfo')
-          .populate('items.productId', 'title');
-        
-        if (populatedOrder) {
-          const receiptUrl = await generateReceipt(populatedOrder, 'order');
-          console.log("Bank Transfer order receipt generated at:", receiptUrl);
-          await Order.findByIdAndUpdate(order._id, {
-            receiptUrl,
-            receiptGenerated: true,
-            receiptGeneratedAt: new Date(),
-          });
-          console.log("Bank Transfer order updated with receipt info");
-        } else {
-          console.log("Failed to populate Bank Transfer order:", order._id);
-        }
-      }
-
-      for (const booking of createdEntities.bookings) {
-        console.log("Generating Bank Transfer receipt for booking:", booking._id);
-        const populatedBooking = await Booking.findById(booking._id)
-          .populate('customerId', 'name email')
-          .populate('storeId', 'name contactInfo')
-          .populate('serviceId', 'title');
-        
-        if (populatedBooking) {
-          const receiptUrl = await generateReceipt(populatedBooking, 'booking');
-          console.log("Bank Transfer booking receipt generated at:", receiptUrl);
-          await Booking.findByIdAndUpdate(booking._id, {
-            receiptUrl,
-            receiptGenerated: true,
-            receiptGeneratedAt: new Date(),
-          });
-          console.log("Bank Transfer booking updated with receipt info");
-        } else {
-          console.log("Failed to populate Bank Transfer booking:", booking._id);
-        }
-      }
-
-      console.log("Bank Transfer receipt generation completed successfully");
-    } catch (receiptError) {
-      console.error("Bank Transfer receipt generation error:", receiptError);
-      // Don't fail the entire request if receipt generation fails
-    }
+    // Bank Transfer orders created - receipts will be generated on-demand
 
     res.json({
       success: true,
@@ -604,7 +555,7 @@ router.post("/cod-intent", authenticate, async (req, res) => {
 
         await order.save();
 
-        // Create wallet transaction (will be completed when customer marks as delivered)
+        // Create wallet transaction (excluded from balance - COD money never comes to platform)
         const transaction = new WalletTransaction({
           userId: (await Store.findById(storeId)).ownerId,
           transactionId: combinedId,
@@ -612,6 +563,7 @@ router.post("/cod-intent", authenticate, async (req, res) => {
           amount: storeAmount.toFixed(2),
           status: "pending",
           description: `COD payment for order ${combinedId}`,
+          excludeFromBalance: true, // This money never comes to the platform
         });
         await transaction.save();
 
@@ -652,7 +604,7 @@ router.post("/cod-intent", authenticate, async (req, res) => {
 
         await booking.save();
 
-        // Create wallet transaction
+        // Create wallet transaction (excluded from balance - COD money never comes to platform)
         const transaction = new WalletTransaction({
           userId: (await Store.findById(service.storeId)).ownerId,
           transactionId: combinedId,
@@ -660,6 +612,7 @@ router.post("/cod-intent", authenticate, async (req, res) => {
           amount: storeAmount.toFixed(2),
           status: "pending",
           description: `COD payment for booking ${combinedId}`,
+          excludeFromBalance: true, // This money never comes to the platform
         });
         await transaction.save();
 
@@ -672,54 +625,7 @@ router.post("/cod-intent", authenticate, async (req, res) => {
       return res.status(400).json({ error: "Total amount must be greater than zero" });
     }
 
-    // Generate receipt immediately for COD orders
-    try {
-      console.log("Starting COD receipt generation for", createdEntities.order.length, "orders and", createdEntities.bookings.length, "bookings");
-      
-      for (const order of createdEntities.order) {
-        console.log("Generating COD receipt for order:", order._id);
-        const populatedOrder = await Order.findById(order._id)
-          .populate('customerId', 'name email')
-          .populate('storeId', 'name contactInfo')
-          .populate('items.productId', 'title');
-        
-        if (populatedOrder) {
-          const receiptUrl = await generateReceipt(populatedOrder, 'order');
-          console.log("COD order receipt generated at:", receiptUrl);
-          await Order.findByIdAndUpdate(order._id, {
-            receiptUrl,
-            receiptGenerated: true,
-            receiptGeneratedAt: new Date(),
-          });
-          console.log("COD order updated with receipt info");
-        } else {
-          console.log("Failed to populate COD order:", order._id);
-        }
-      }
-
-      for (const booking of createdEntities.bookings) {
-        console.log("Generating COD receipt for booking:", booking._id);
-        const populatedBooking = await Booking.findById(booking._id)
-          .populate('customerId', 'name email')
-          .populate('storeId', 'name contactInfo')
-          .populate('serviceId', 'title');
-        
-        if (populatedBooking) {
-          const receiptUrl = await generateReceipt(populatedBooking, 'booking');
-          console.log("COD booking receipt generated at:", receiptUrl);
-          await Booking.findByIdAndUpdate(booking._id, {
-            receiptUrl,
-            receiptGenerated: true,
-            receiptGeneratedAt: new Date(),
-          });
-          console.log("COD booking updated with receipt info");
-        } else {
-          console.log("Failed to populate COD booking:", booking._id);
-        }
-      }
-    } catch (receiptError) {
-      console.error("Error generating COD receipt:", receiptError);
-    }
+    // COD orders created - receipts will be generated on-demand
 
     res.json({
       success: true,
@@ -916,30 +822,7 @@ router.post(
             };
             await order.save();
 
-            // Generate receipt for PayHere order
-            try {
-              console.log("Starting receipt generation for order:", order._id);
-              const populatedOrder = await Order.findById(order._id)
-                .populate('customerId', 'name email')
-                .populate('storeId', 'name contactInfo')
-                .populate('items.productId', 'title');
-              
-              if (populatedOrder) {
-                console.log("Populated order found, generating receipt...");
-                const receiptUrl = await generateReceipt(populatedOrder, 'order');
-                console.log("Receipt generated at:", receiptUrl);
-                await Order.findByIdAndUpdate(order._id, {
-                  receiptUrl,
-                  receiptGenerated: true,
-                  receiptGeneratedAt: new Date(),
-                });
-                console.log("Order updated with receipt info");
-              } else {
-                console.log("No populated order found for ID:", order._id);
-              }
-            } catch (receiptError) {
-              console.error("Error generating PayHere receipt for order:", receiptError);
-            }
+            // PayHere order payment completed - receipt available on-demand
           }
         } else if (bookings.length > 0) {
           // Process all bookings
@@ -976,30 +859,7 @@ router.post(
             };
             await booking.save();
 
-            // Generate receipt for PayHere booking
-            try {
-              console.log("Starting receipt generation for booking:", booking._id);
-              const populatedBooking = await Booking.findById(booking._id)
-                .populate('customerId', 'name email')
-                .populate('storeId', 'name contactInfo')
-                .populate('serviceId', 'title');
-              
-              if (populatedBooking) {
-                console.log("Populated booking found, generating receipt...");
-                const receiptUrl = await generateReceipt(populatedBooking, 'booking');
-                console.log("Booking receipt generated at:", receiptUrl);
-                await Booking.findByIdAndUpdate(booking._id, {
-                  receiptUrl,
-                  receiptGenerated: true,
-                  receiptGeneratedAt: new Date(),
-                });
-                console.log("Booking updated with receipt info");
-              } else {
-                console.log("No populated booking found for ID:", booking._id);
-              }
-            } catch (receiptError) {
-              console.error("Error generating PayHere receipt for booking:", receiptError);
-            }
+            // PayHere booking payment completed - receipt available on-demand
           }
         } else {
           console.warn(
@@ -1082,174 +942,11 @@ router.get("/payment-methods", (req, res) => {
   res.json(paymentMethods);
 });
 
-// Generate receipt for order or booking
-router.post("/generate-receipt/:id", authenticate, async (req, res) => {
-  try {
-    const { type } = req.body; // 'order' or 'booking'
-    const id = req.params.id;
+// Receipt generation removed - receipts are now generated on-demand in frontend
 
-    if (!type || !['order', 'booking'].includes(type)) {
-      return res.status(400).json({ error: "Type must be 'order' or 'booking'" });
-    }
+// Test receipt generation removed - receipts are now generated on-demand in frontend
 
-    let item;
-    if (type === 'order') {
-      item = await Order.findById(id)
-        .populate('customerId', 'name email')
-        .populate('storeId', 'name contactInfo')
-        .populate('items.productId', 'title');
-    } else {
-      item = await Booking.findById(id)
-        .populate('customerId', 'name email')
-        .populate('storeId', 'name contactInfo')
-        .populate('serviceId', 'title');
-    }
-
-    if (!item) {
-      return res.status(404).json({ error: `${type} not found` });
-    }
-
-    // Check if user owns this item or owns the store
-    const isOwner = item.customerId._id.toString() === req.user._id.toString();
-    const isStoreOwner = item.storeId._id.toString() === req.user.storeId?.toString();
-
-    if (!isOwner && !isStoreOwner) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    // Generate receipt
-    const receiptUrl = await generateReceipt(item, type);
-
-    // Update the item with receipt info
-    const updateData = {
-      receiptUrl,
-      receiptGenerated: true,
-      receiptGeneratedAt: new Date(),
-    };
-
-    if (type === 'order') {
-      await Order.findByIdAndUpdate(id, updateData);
-    } else {
-      await Booking.findByIdAndUpdate(id, updateData);
-    }
-
-    res.json({
-      success: true,
-      message: "Receipt generated successfully",
-      receiptUrl,
-    });
-
-  } catch (error) {
-    console.error("Error generating receipt:", error);
-    res.status(500).json({ error: "Failed to generate receipt" });
-  }
-});
-
-// Test route to manually generate receipt
-router.post("/test-generate-receipt/:id", authenticate, async (req, res) => {
-  try {
-    const { type } = req.body; // 'order' or 'booking'
-    const id = req.params.id;
-
-    let item;
-    if (type === 'order') {
-      item = await Order.findById(id)
-        .populate('customerId', 'name email')
-        .populate('storeId', 'name contactInfo')
-        .populate('items.productId', 'title');
-    } else {
-      item = await Booking.findById(id)
-        .populate('customerId', 'name email')
-        .populate('storeId', 'name contactInfo')
-        .populate('serviceId', 'title');
-    }
-
-    if (!item) {
-      return res.status(404).json({ error: `${type} not found` });
-    }
-
-    console.log(`Testing receipt generation for ${type}:`, item._id);
-    const receiptUrl = await generateReceipt(item, type);
-    console.log("Test receipt generated at:", receiptUrl);
-
-    // Update the item with receipt info
-    const updateData = {
-      receiptUrl,
-      receiptGenerated: true,
-      receiptGeneratedAt: new Date(),
-    };
-
-    if (type === 'order') {
-      await Order.findByIdAndUpdate(id, updateData);
-    } else {
-      await Booking.findByIdAndUpdate(id, updateData);
-    }
-
-    res.json({
-      success: true,
-      message: "Test receipt generated successfully",
-      receiptUrl,
-    });
-
-  } catch (error) {
-    console.error("Error generating test receipt:", error);
-    res.status(500).json({ error: "Failed to generate test receipt" });
-  }
-});
-
-// Download receipt
-router.get("/download-receipt/:id", authenticate, async (req, res) => {
-  try {
-    const { type } = req.query; // 'order' or 'booking'
-    const id = req.params.id;
-
-    if (!type || !['order', 'booking'].includes(type)) {
-      return res.status(400).json({ error: "Type parameter must be 'order' or 'booking'" });
-    }
-
-    let item;
-    if (type === 'order') {
-      item = await Order.findById(id);
-    } else {
-      item = await Booking.findById(id);
-    }
-
-    if (!item) {
-      return res.status(404).json({ error: `${type} not found` });
-    }
-
-    // Check if user owns this item or owns the store
-    const isOwner = item.customerId.toString() === req.user._id.toString();
-    const isStoreOwner = item.storeId.toString() === req.user.storeId?.toString();
-
-    if (!isOwner && !isStoreOwner) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    if (!item.receiptUrl) {
-      return res.status(404).json({ error: "No receipt available for this " + type });
-    }
-
-    // Construct file path
-    const filePath = path.join(process.cwd(), item.receiptUrl);
-
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "Receipt file not found" });
-    }
-
-    // Set headers for PDF download
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=receipt_${id}.pdf`);
-
-    // Send file
-    res.sendFile(filePath);
-
-  } catch (error) {
-    console.error("Error downloading receipt:", error);
-    res.status(500).json({ error: "Failed to download receipt" });
-  }
-});
+// Receipt download removed - receipts are now generated on-demand in frontend
 
 // Main Cancel Route
 router.put("/:id/cancel", authenticate, async (req, res) => {
@@ -1280,9 +977,26 @@ router.put("/:id/cancel", authenticate, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    if (item.status !== "pending") {
-      console.error("Status not pending:", item.status);
-      return res.status(400).json({ error: "Item cannot be cancelled" });
+    // Customers cannot cancel anything - ever
+    if (isCustomer) {
+      console.error("Customer attempting to cancel:", req.user._id, itemType, id);
+      return res.status(403).json({ 
+        error: "Customers cannot cancel orders or bookings" 
+      });
+    }
+    
+    // Store owners can only cancel pending items
+    if (isStoreOwner) {
+      if (item.status !== "pending") {
+        console.error("Store owner trying to cancel non-pending item:", item.status);
+        return res.status(400).json({ 
+          error: `Cannot cancel ${item.status} ${itemType}` 
+        });
+      }
+    } else {
+      // Fallback - only authorized users can cancel
+      console.error("Unauthorized cancellation attempt:", req.user._id);
+      return res.status(403).json({ error: "Access denied" });
     }
 
     // Prepare cancellation details

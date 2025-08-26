@@ -207,7 +207,7 @@ const BankDetailsForm = () => {
         </div>
       )}
 
-      <form onSubmit={lockInfo?.isLocked && !showChangeRequestForm ? handleChangeRequest : handleSubmit} className="space-y-6">
+      <form onSubmit={showChangeRequestForm ? handleChangeRequest : handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="accountHolderName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -392,7 +392,7 @@ const BankDetailsForm = () => {
             </button>
           )}
           
-          {(!lockInfo?.isLocked || showChangeRequestForm) && !pendingChangeRequest && (
+          {((!lockInfo?.isLocked && !showChangeRequestForm) || showChangeRequestForm) && !pendingChangeRequest && (
             <button
               type="submit"
               disabled={loading || isSubmittingRequest || (showChangeRequestForm && changeRequestReason.trim().length < 10)}

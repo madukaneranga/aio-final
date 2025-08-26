@@ -85,6 +85,12 @@ const walletTransactionSchema = new Schema(
       },
       packageId: String,
     },
+    excludeFromBalance: {
+      type: Boolean,
+      default: false,
+      // When true, this transaction will not affect wallet balance calculations
+      // Used for bank transfers and COD payments where money never comes to platform
+    },
   },
   {
     timestamps: true,
@@ -109,6 +115,7 @@ walletTransactionSchema.statics.getWalletBalance = async function (userId) {
       $match: {
         userId: new mongoose.Types.ObjectId(userId),
         status: "completed",
+        excludeFromBalance: { $ne: true }, // Exclude transactions marked as excludeFromBalance
       },
     },
     {

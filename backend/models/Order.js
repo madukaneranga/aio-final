@@ -77,19 +77,6 @@ const orderSchema = new mongoose.Schema({
   trackingNumber: String,
   notes: String,
   
-  // Receipt fields
-  receiptUrl: {
-    type: String,
-    default: "",
-  },
-  receiptGenerated: {
-    type: Boolean,
-    default: false,
-  },
-  receiptGeneratedAt: {
-    type: Date,
-  },
-  
   // Customer delivery confirmation for COD
   canCustomerUpdateStatus: {
     type: Boolean,

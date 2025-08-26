@@ -59,7 +59,7 @@ const useChat = (user) => {
 
     debugLog("🔗 Setting up socket event listeners for useChat");
 
-    // ENHANCED: New message handler with detailed logging
+    // ENHANCED: New message handler with detailed logging and pagination support
     const handleNewMessage = (message) => {
       debugLog("📥 NEW MESSAGE RECEIVED:", {
         messageId: message._id,
@@ -113,9 +113,6 @@ const useChat = (user) => {
         return updated;
       });
 
-      // Note: Global unread count is handled by ChatContext
-      // Local unread count here is just for useChat internal state
-
       // Update active chat messages
       setActiveChat((current) => {
         if (current && message.chat._id === current._id) {
@@ -123,6 +120,7 @@ const useChat = (user) => {
           setMessages((prev) => {
             const messageExists = prev.some((msg) => msg._id === message._id);
             if (messageExists) return prev;
+            // Append new message to the end (most recent)
             return [...prev, message];
           });
         }
@@ -291,15 +289,16 @@ const useChat = (user) => {
     [globalSocket]
   );
 
-  // Load messages with proper room joining
+  // Load messages with proper room joining (updated for pagination)
   const loadMessages = useCallback(
-    async (chatId) => {
+    async (chatId, page = 1, limit = MESSAGE_PAGE_SIZE) => {
       try {
         setIsLoading(true);
 
-        debugLog("📖 Loading messages for chat:", chatId);
+        debugLog("📖 Loading messages for chat:", chatId, "page:", page);
 
-        const response = await fetch(`${API_URL}/api/chat/${chatId}`, {
+        const url = `${API_URL}/api/chat/${chatId}?page=${page}&limit=${limit}`;
+        const response = await fetch(url, {
           credentials: "include",
         });
 
@@ -310,7 +309,19 @@ const useChat = (user) => {
         }
 
         setActiveChat(data.chat);
-        setMessages(data.chat.messages || []);
+        
+        // For first page, replace messages. For subsequent pages, prepend them
+        if (page === 1) {
+          setMessages(data.chat.messages || []);
+          messageIdsRef.current.clear();
+        } else {
+          setMessages(prev => {
+            const newMessages = data.chat.messages || [];
+            const existingIds = new Set(prev.map(m => m._id));
+            const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m._id));
+            return [...uniqueNewMessages, ...prev];
+          });
+        }
 
         // CRITICAL: Join this specific chat room
         if (
@@ -323,12 +334,14 @@ const useChat = (user) => {
         }
 
         // Track loaded message IDs
-        messageIdsRef.current.clear();
         data.chat.messages?.forEach((msg) => {
           if (msg._id) messageIdsRef.current.add(msg._id);
         });
 
-        return data.chat;
+        return {
+          chat: data.chat,
+          pagination: data.pagination,
+        };
       } catch (error) {
         debugLog("❌ Load messages error:", error);
         setError({
@@ -467,6 +480,50 @@ const useChat = (user) => {
     debugLog("🔄 Note: Using global socket, cannot force reconnect from useChat");
   }, []);
 
+  // Add pagination support functions
+  const loadOlderMessages = useCallback(
+    async (chatId, beforeMessageId) => {
+      try {
+        debugLog("📖 Loading older messages for chat:", chatId, "before:", beforeMessageId);
+
+        const url = `${API_URL}/api/chat/${chatId}?before=${beforeMessageId}&limit=${MESSAGE_PAGE_SIZE}`;
+        const response = await fetch(url, {
+          credentials: "include",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load older messages");
+        }
+
+        const olderMessages = data.chat.messages || [];
+        
+        if (olderMessages.length > 0) {
+          setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m._id));
+            const uniqueOlderMessages = olderMessages.filter(m => !existingIds.has(m._id));
+            return [...uniqueOlderMessages, ...prev];
+          });
+
+          // Track loaded message IDs
+          olderMessages.forEach((msg) => {
+            if (msg._id) messageIdsRef.current.add(msg._id);
+          });
+        }
+
+        return {
+          messages: olderMessages,
+          hasMore: data.pagination?.hasMore || false,
+        };
+      } catch (error) {
+        debugLog("❌ Load older messages error:", error);
+        throw error;
+      }
+    },
+    [API_URL]
+  );
+
   return {
     // Core state
     conversations,
@@ -481,6 +538,7 @@ const useChat = (user) => {
     // Functions
     sendMessage,
     loadMessages,
+    loadOlderMessages, // New pagination function
     markAsRead,
     startTyping,
     stopTyping,
