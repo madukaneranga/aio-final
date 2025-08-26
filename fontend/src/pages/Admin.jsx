@@ -44,7 +44,22 @@ import {
   Database,
   Bell,
   Lock,
-  Unlock
+  Unlock,
+  MessageCircle,
+  Heart,
+  ThumbsUp,
+  Bookmark,
+  CreditCard,
+  Wallet,
+  ShoppingBag,
+  Tags,
+  Layers,
+  Server,
+  HardDrive,
+  Wifi,
+  Monitor,
+  PieChart,
+  LineChart
 } from 'lucide-react';
 import { formatLKR } from '../utils/currency';
 import { adminAPI } from '../utils/api';
@@ -52,6 +67,10 @@ import Modal from '../components/Modal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AnalyticsChart from '../components/admin/AnalyticsChart';
 import StatsCard from '../components/admin/StatsCard';
+import SystemMonitoring from '../components/admin/SystemMonitoring';
+import AdvancedDataTable from '../components/admin/AdvancedDataTable';
+import AdvancedAnalytics from '../components/admin/AdvancedAnalytics';
+import ErrorBoundary from '../components/admin/ErrorBoundary';
 
 // Utility functions
 const formatCurrency = (amount) => {
@@ -234,21 +253,21 @@ const Admin = () => {
     try {
       // Fetch all basic stats
       const [usersRes, storesRes, productsRes, servicesRes, ordersRes, bookingsRes, withdrawalsRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/users`, { credentials: "include" }),
-        fetch(`${import.meta.env.VITE_API_URL}/api/stores`, { credentials: "include" }),
-        fetch(`${import.meta.env.VITE_API_URL}/api/products`, { credentials: "include" }),
-        fetch(`${import.meta.env.VITE_API_URL}/api/services`, { credentials: "include" }),
-        fetch(`${import.meta.env.VITE_API_URL}/api/orders`, { credentials: "include" }),
-        fetch(`${import.meta.env.VITE_API_URL}/api/bookings`, { credentials: "include" }),
+        adminAPI.getAllUsers({ limit: 100 }),
+        adminAPI.getAllStores({ limit: 100 }),
+        adminAPI.getAllProducts({ limit: 100 }),
+        adminAPI.getAllServices({ limit: 100 }),
+        adminAPI.getAllOrders({ limit: 100 }),
+        adminAPI.getAllBookings({ limit: 100 }),
         adminAPI.getAllWithdrawals({ status: '', page: 1, limit: 1 })
       ]);
 
-      const usersData = usersRes.ok ? await usersRes.json() : [];
-      const storesData = storesRes.ok ? await storesRes.json() : [];
-      const productsData = productsRes.ok ? await productsRes.json() : [];
-      const servicesData = servicesRes.ok ? await servicesRes.json() : [];
-      const ordersData = ordersRes.ok ? await ordersRes.json() : [];
-      const bookingsData = bookingsRes.ok ? await bookingsRes.json() : [];
+      const usersData = usersRes.success ? usersRes.data.items || [] : [];
+      const storesData = storesRes.success ? storesRes.data.items || [] : [];
+      const productsData = productsRes.success ? productsRes.data.items || [] : [];
+      const servicesData = servicesRes.success ? servicesRes.data.items || [] : [];
+      const ordersData = ordersRes.success ? ordersRes.data.items || [] : [];
+      const bookingsData = bookingsRes.success ? bookingsRes.data.items || [] : [];
       const withdrawalsData = withdrawalsRes.success ? withdrawalsRes.data : { withdrawals: [], pagination: { total: 0 } };
 
       // Calculate revenue from orders and bookings
@@ -275,11 +294,9 @@ const Admin = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const users = await response.json();
+      const response = await adminAPI.getAllUsers({ limit: 1000 });
+      if (response.success) {
+        const users = response.data.items || [];
         setData(prev => ({ ...prev, users }));
       }
     } catch (error) {
@@ -289,11 +306,9 @@ const Admin = () => {
 
   const fetchStores = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const stores = await response.json();
+      const response = await adminAPI.getAllStores({ limit: 1000 });
+      if (response.success) {
+        const stores = response.data.items || [];
         setData(prev => ({ ...prev, stores }));
       }
     } catch (error) {
@@ -303,11 +318,9 @@ const Admin = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const products = await response.json();
+      const response = await adminAPI.getAllProducts({ limit: 1000 });
+      if (response.success) {
+        const products = response.data.items || [];
         setData(prev => ({ ...prev, products }));
       }
     } catch (error) {
@@ -317,11 +330,9 @@ const Admin = () => {
 
   const fetchServices = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/services`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const services = await response.json();
+      const response = await adminAPI.getAllServices({ limit: 1000 });
+      if (response.success) {
+        const services = response.data.items || [];
         setData(prev => ({ ...prev, services }));
       }
     } catch (error) {
@@ -331,11 +342,9 @@ const Admin = () => {
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/admin/all`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const orders = await response.json();
+      const response = await adminAPI.getAllOrders({ limit: 1000 });
+      if (response.success) {
+        const orders = response.data.items || [];
         setData(prev => ({ ...prev, orders }));
       }
     } catch (error) {
@@ -345,11 +354,9 @@ const Admin = () => {
 
   const fetchBookings = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/bookings/admin/all`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const bookings = await response.json();
+      const response = await adminAPI.getAllBookings({ limit: 1000 });
+      if (response.success) {
+        const bookings = response.data.items || [];
         setData(prev => ({ ...prev, bookings }));
       }
     } catch (error) {
@@ -377,11 +384,9 @@ const Admin = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const categories = await response.json();
+      const response = await adminAPI.getAllCategories({ limit: 1000 });
+      if (response.success) {
+        const categories = response.data.items || [];
         setData(prev => ({ ...prev, categories }));
       }
     } catch (error) {
@@ -391,11 +396,9 @@ const Admin = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/analytics/admin`, {
-        credentials: "include"
-      });
-      if (response.ok) {
-        const analytics = await response.json();
+      const response = await adminAPI.getAnalyticsDashboard(30);
+      if (response.success) {
+        const analytics = response.data;
         setData(prev => ({ ...prev, analytics }));
       }
     } catch (error) {
@@ -686,6 +689,501 @@ const Admin = () => {
     setShowModal(true);
   };
 
+  // Collection configurations for each tab
+  const getCollectionConfig = (tabId) => {
+    const configs = {
+      'users': {
+        collection: 'all-users',
+        title: 'User Management',
+        columns: [
+          { key: 'name', label: 'Name', type: 'text' },
+          { key: 'email', label: 'Email', type: 'text' },
+          { key: 'role', label: 'Role', type: 'text' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['name', 'email'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: false // Users should be deactivated, not deleted
+      },
+      'stores': {
+        collection: 'all-stores',
+        title: 'Store Management',
+        columns: [
+          { key: 'name', label: 'Store Name', type: 'text' },
+          { key: 'type', label: 'Type', type: 'text' },
+          { key: 'ownerId.name', label: 'Owner', type: 'object' },
+          { key: 'isVerified', label: 'Verified', type: 'boolean' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['name', 'email'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: false
+      },
+      'products': {
+        collection: 'all-products',
+        title: 'Product Management',
+        columns: [
+          { key: 'title', label: 'Product Name', type: 'text' },
+          { key: 'category', label: 'Category', type: 'text' },
+          { key: 'price', label: 'Price', type: 'currency' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['title', 'description'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'services': {
+        collection: 'all-services',
+        title: 'Service Management',
+        columns: [
+          { key: 'title', label: 'Service Name', type: 'text' },
+          { key: 'category', label: 'Category', type: 'text' },
+          { key: 'price', label: 'Price', type: 'currency' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['title', 'description'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'orders': {
+        collection: 'all-orders',
+        title: 'Order Management',
+        columns: [
+          { key: 'customerId.name', label: 'Customer', type: 'object' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'totalAmount', label: 'Amount', type: 'currency' },
+          { key: 'status', label: 'Status', type: 'status' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: 'status',
+        canCreate: false,
+        canEdit: true,
+        canDelete: false
+      },
+      'bookings': {
+        collection: 'all-bookings',
+        title: 'Booking Management',
+        columns: [
+          { key: 'customerId.name', label: 'Customer', type: 'object' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'totalAmount', label: 'Amount', type: 'currency' },
+          { key: 'status', label: 'Status', type: 'status' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: 'status',
+        canCreate: false,
+        canEdit: true,
+        canDelete: false
+      },
+      'chats': {
+        collection: 'all-chats',
+        title: 'Chat Management',
+        columns: [
+          { key: 'participants', label: 'Participants', type: 'array' },
+          { key: 'lastMessage', label: 'Last Message', type: 'text' },
+          { key: 'status', label: 'Status', type: 'status' },
+          { key: 'updatedAt', label: 'Last Active', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: 'status',
+        canCreate: false,
+        canEdit: false,
+        canDelete: true
+      },
+      'posts': {
+        collection: 'all-posts',
+        title: 'Social Posts Management',
+        columns: [
+          { key: 'userId.name', label: 'Author', type: 'object' },
+          { key: 'content', label: 'Content', type: 'text' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['content'],
+        filterField: 'isActive',
+        canCreate: false,
+        canEdit: true,
+        canDelete: true
+      },
+      'reviews': {
+        collection: 'all-reviews',
+        title: 'Review Management',
+        columns: [
+          { key: 'customerId.name', label: 'Reviewer', type: 'object' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'rating', label: 'Rating', type: 'text' },
+          { key: 'comment', label: 'Comment', type: 'text' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['comment'],
+        filterField: 'isActive',
+        canCreate: false,
+        canEdit: true,
+        canDelete: true
+      },
+      'categories': {
+        collection: 'all-categories',
+        title: 'Category Management',
+        columns: [
+          { key: 'name', label: 'Category Name', type: 'text' },
+          { key: 'type', label: 'Type', type: 'text' },
+          { key: 'description', label: 'Description', type: 'text' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['name', 'description'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'notifications': {
+        collection: 'all-notifications',
+        title: 'Notification Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'title', label: 'Title', type: 'text' },
+          { key: 'type', label: 'Type', type: 'text' },
+          { key: 'isRead', label: 'Read', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['title', 'body'],
+        filterField: 'isRead',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'flash-deals': {
+        collection: 'all-flash-deals',
+        title: 'Flash Deals Management',
+        columns: [
+          { key: 'saleName', label: 'Deal Name', type: 'text' },
+          { key: 'discountText', label: 'Discount', type: 'text' },
+          { key: 'startDate', label: 'Start Date', type: 'date' },
+          { key: 'endDate', label: 'End Date', type: 'date' },
+          { key: 'isActive', label: 'Status', type: 'boolean' }
+        ],
+        searchFields: ['saleName', 'saleSubtitle'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'wallets': {
+        collection: 'all-wallets',
+        title: 'Wallet Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'balance', label: 'Balance', type: 'currency' },
+          { key: 'totalEarnings', label: 'Total Earnings', type: 'currency' },
+          { key: 'totalWithdrawals', label: 'Total Withdrawals', type: 'currency' },
+          { key: 'updatedAt', label: 'Last Updated', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: '',
+        canCreate: false,
+        canEdit: true,
+        canDelete: false
+      },
+      'commissions': {
+        collection: 'all-commissions',
+        title: 'Commission Management',
+        columns: [
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'totalAmount', label: 'Order Amount', type: 'currency' },
+          { key: 'commissionAmount', label: 'Commission', type: 'currency' },
+          { key: 'storeAmount', label: 'Store Amount', type: 'currency' },
+          { key: 'status', label: 'Status', type: 'status' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: 'status',
+        canCreate: false,
+        canEdit: true,
+        canDelete: false
+      },
+      'packages': {
+        collection: 'all-packages',
+        title: 'Package Management',
+        columns: [
+          { key: 'name', label: 'Package Name', type: 'text' },
+          { key: 'description', label: 'Description', type: 'text' },
+          { key: 'price', label: 'Price', type: 'currency' },
+          { key: 'features', label: 'Features', type: 'array' },
+          { key: 'isActive', label: 'Status', type: 'boolean' }
+        ],
+        searchFields: ['name', 'description'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'addons': {
+        collection: 'all-addons',
+        title: 'Addon Management',
+        columns: [
+          { key: 'name', label: 'Addon Name', type: 'text' },
+          { key: 'description', label: 'Description', type: 'text' },
+          { key: 'price', label: 'Price', type: 'currency' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['name', 'description'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'email-subscriptions': {
+        collection: 'all-email-subscriptions',
+        title: 'Email Subscription Management',
+        columns: [
+          { key: 'email', label: 'Email', type: 'text' },
+          { key: 'preferences', label: 'Preferences', type: 'object' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Subscribed', type: 'date' }
+        ],
+        searchFields: ['email'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'contact-reveals': {
+        collection: 'all-contact-reveals',
+        title: 'Contact Reveal Management',
+        columns: [
+          { key: 'customerId.name', label: 'Customer', type: 'object' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'creditsUsed', label: 'Credits Used', type: 'text' },
+          { key: 'createdAt', label: 'Revealed', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: '',
+        canCreate: false,
+        canEdit: false,
+        canDelete: false
+      },
+      'subscriptions': {
+        collection: 'all-subscriptions',
+        title: 'Subscription Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'planType', label: 'Plan', type: 'text' },
+          { key: 'status', label: 'Status', type: 'status' },
+          { key: 'createdAt', label: 'Started', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: 'status',
+        canCreate: false,
+        canEdit: true,
+        canDelete: false
+      },
+      'search-history': {
+        collection: 'all-search-history',
+        title: 'Search History Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'query', label: 'Search Query', type: 'text' },
+          { key: 'results', label: 'Results Count', type: 'text' },
+          { key: 'createdAt', label: 'Searched', type: 'date' }
+        ],
+        searchFields: ['query'],
+        filterField: '',
+        canCreate: false,
+        canEdit: false,
+        canDelete: true
+      },
+      'time-slots': {
+        collection: 'all-time-slots',
+        title: 'Time Slot Management',
+        columns: [
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'serviceId.title', label: 'Service', type: 'object' },
+          { key: 'startTime', label: 'Start Time', type: 'text' },
+          { key: 'endTime', label: 'End Time', type: 'text' },
+          { key: 'isActive', label: 'Status', type: 'boolean' }
+        ],
+        searchFields: [],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'variants': {
+        collection: 'all-variants',
+        title: 'Product Variant Management',
+        columns: [
+          { key: 'name', label: 'Variant Name', type: 'text' },
+          { key: 'productId.title', label: 'Product', type: 'object' },
+          { key: 'price', label: 'Price', type: 'currency' },
+          { key: 'stock', label: 'Stock', type: 'text' },
+          { key: 'isActive', label: 'Status', type: 'boolean' }
+        ],
+        searchFields: ['name'],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'platform-settings': {
+        collection: 'all-platform-settings',
+        title: 'Platform Settings Management',
+        columns: [
+          { key: 'key', label: 'Setting Key', type: 'text' },
+          { key: 'value', label: 'Value', type: 'text' },
+          { key: 'description', label: 'Description', type: 'text' },
+          { key: 'updatedAt', label: 'Last Updated', type: 'date' }
+        ],
+        searchFields: ['key'],
+        filterField: '',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'pending-transactions': {
+        collection: 'all-pending-transactions',
+        title: 'Pending Transaction Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'amount', label: 'Amount', type: 'currency' },
+          { key: 'type', label: 'Type', type: 'text' },
+          { key: 'status', label: 'Status', type: 'status' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: 'status',
+        canCreate: false,
+        canEdit: true,
+        canDelete: true
+      },
+      'post-comments': {
+        collection: 'all-post-comments',
+        title: 'Post Comment Management',
+        columns: [
+          { key: 'userId.name', label: 'Author', type: 'object' },
+          { key: 'postId', label: 'Post', type: 'text' },
+          { key: 'content', label: 'Comment', type: 'text' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: ['content'],
+        filterField: '',
+        canCreate: false,
+        canEdit: true,
+        canDelete: true
+      },
+      'post-likes': {
+        collection: 'all-post-likes',
+        title: 'Post Like Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'postId', label: 'Post', type: 'text' },
+          { key: 'createdAt', label: 'Liked', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: '',
+        canCreate: false,
+        canEdit: false,
+        canDelete: true
+      },
+      'comment-likes': {
+        collection: 'all-comment-likes',
+        title: 'Comment Like Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'commentId', label: 'Comment', type: 'text' },
+          { key: 'createdAt', label: 'Liked', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: '',
+        canCreate: false,
+        canEdit: false,
+        canDelete: true
+      },
+      'comment-reactions': {
+        collection: 'all-comment-reactions',
+        title: 'Comment Reaction Management',
+        columns: [
+          { key: 'userId.name', label: 'User', type: 'object' },
+          { key: 'commentId', label: 'Comment', type: 'text' },
+          { key: 'reactionType', label: 'Reaction', type: 'text' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: '',
+        canCreate: false,
+        canEdit: false,
+        canDelete: true
+      },
+      'chat-analytics': {
+        collection: 'all-chat-analytics',
+        title: 'Chat Analytics Management',
+        columns: [
+          { key: 'chatId', label: 'Chat ID', type: 'text' },
+          { key: 'storeId.name', label: 'Store', type: 'object' },
+          { key: 'messageCount', label: 'Messages', type: 'text' },
+          { key: 'updatedAt', label: 'Last Updated', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: '',
+        canCreate: false,
+        canEdit: false,
+        canDelete: false
+      },
+      'marketing': {
+        collection: 'all-marketing',
+        title: 'Marketing Campaign Management',
+        columns: [
+          { key: 'heroImages', label: 'Hero Images', type: 'array' },
+          { key: 'advertisements', label: 'Advertisements', type: 'array' },
+          { key: 'isActive', label: 'Status', type: 'boolean' },
+          { key: 'createdAt', label: 'Created', type: 'date' }
+        ],
+        searchFields: [],
+        filterField: 'isActive',
+        canCreate: true,
+        canEdit: true,
+        canDelete: true
+      },
+      'audit': {
+        collection: 'activity-logs',
+        title: 'Admin Activity Logs',
+        columns: [
+          { key: 'adminId', label: 'Admin', type: 'text' },
+          { key: 'action', label: 'Action', type: 'text' },
+          { key: 'target', label: 'Target', type: 'text' },
+          { key: 'timestamp', label: 'Time', type: 'date' },
+          { key: 'ip', label: 'IP Address', type: 'text' }
+        ],
+        searchFields: ['action', 'target'],
+        filterField: '',
+        canCreate: false,
+        canEdit: false,
+        canDelete: false
+      }
+    };
+
+    return configs[tabId] || null;
+  };
+
   if (!user || user.email !== 'admin@aio.com') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -707,22 +1205,61 @@ const Admin = () => {
   }
 
   const tabs = [
-    { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
-    { id: 'users', name: 'Users', icon: Users },
-    { id: 'stores', name: 'Stores', icon: Store },
-    { id: 'products', name: 'Products', icon: Package },
-    { id: 'services', name: 'Services', icon: Calendar },
-    { id: 'orders', name: 'Orders', icon: FileText },
-    { id: 'bookings', name: 'Bookings', icon: Calendar },
-    { id: 'withdrawals', name: 'Withdrawals', icon: DollarSign },
-    { id: 'categories', name: 'Categories', icon: Settings },
-    { id: 'analytics', name: 'Analytics', icon: TrendingUp },
-    { id: 'audit', name: 'Audit Logs', icon: Shield }
+    { id: 'dashboard', name: 'Dashboard', icon: BarChart3, description: 'Overview and quick stats' },
+    { id: 'system', name: 'System Monitor', icon: Monitor, description: 'Real-time system health' },
+    { id: 'analytics', name: 'Advanced Analytics', icon: LineChart, description: 'Business intelligence' },
+    
+    // Core Business Data
+    { id: 'users', name: 'Users', icon: Users, description: 'User management' },
+    { id: 'stores', name: 'Stores', icon: Store, description: 'Store management' },
+    { id: 'products', name: 'Products', icon: Package, description: 'Product catalog' },
+    { id: 'services', name: 'Services', icon: Calendar, description: 'Service offerings' },
+    { id: 'orders', name: 'Orders', icon: FileText, description: 'Order management' },
+    { id: 'bookings', name: 'Bookings', icon: Calendar, description: 'Booking management' },
+    
+    // Financial & Transactions
+    { id: 'withdrawals', name: 'Withdrawals', icon: DollarSign, description: 'Withdrawal requests' },
+    { id: 'wallets', name: 'Wallets', icon: Wallet, description: 'User wallets' },
+    { id: 'commissions', name: 'Commissions', icon: CreditCard, description: 'Commission tracking' },
+    { id: 'pending-transactions', name: 'Pending Transactions', icon: Clock, description: 'Pending payments' },
+    
+    // Communication & Social
+    { id: 'chats', name: 'Chats', icon: MessageCircle, description: 'Chat messages' },
+    { id: 'posts', name: 'Social Posts', icon: FileText, description: 'Social media posts' },
+    { id: 'post-comments', name: 'Post Comments', icon: MessageCircle, description: 'Post comments' },
+    { id: 'post-likes', name: 'Post Likes', icon: Heart, description: 'Post reactions' },
+    { id: 'reviews', name: 'Reviews', icon: Star, description: 'Product/service reviews' },
+    { id: 'notifications', name: 'Notifications', icon: Bell, description: 'System notifications' },
+    
+    // Platform Configuration
+    { id: 'categories', name: 'Categories', icon: Tags, description: 'Product/service categories' },
+    { id: 'packages', name: 'Packages', icon: Package, description: 'Subscription packages' },
+    { id: 'addons', name: 'Addons', icon: Plus, description: 'Additional features' },
+    { id: 'variants', name: 'Variants', icon: Layers, description: 'Product variants' },
+    { id: 'time-slots', name: 'Time Slots', icon: Clock, description: 'Service time slots' },
+    { id: 'flash-deals', name: 'Flash Deals', icon: Zap, description: 'Promotional deals' },
+    { id: 'platform-settings', name: 'Platform Settings', icon: Settings, description: 'System settings' },
+    
+    // Marketing & Engagement
+    { id: 'email-subscriptions', name: 'Email Subscriptions', icon: Mail, description: 'Newsletter subscriptions' },
+    { id: 'contact-reveals', name: 'Contact Reveals', icon: Eye, description: 'Contact information reveals' },
+    { id: 'subscriptions', name: 'Subscriptions', icon: CreditCard, description: 'User subscriptions' },
+    { id: 'search-history', name: 'Search History', icon: Search, description: 'User search patterns' },
+    
+    // Advanced Features
+    { id: 'comment-likes', name: 'Comment Likes', icon: ThumbsUp, description: 'Comment reactions' },
+    { id: 'comment-reactions', name: 'Comment Reactions', icon: Heart, description: 'Comment interactions' },
+    { id: 'chat-analytics', name: 'Chat Analytics', icon: BarChart3, description: 'Chat performance metrics' },
+    { id: 'marketing', name: 'Marketing', icon: Target, description: 'Marketing campaigns and ads' },
+    
+    // System Administration
+    { id: 'audit', name: 'Activity Logs', icon: Shield, description: 'Admin activity audit' }
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -774,10 +1311,10 @@ const Admin = () => {
           </div>
         )}
 
-        {/* Navigation Tabs */}
+        {/* Enhanced Navigation Tabs with Categorization */}
         <div className="mb-8">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            <nav className="-mb-px grid grid-cols-1 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 mb-4">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -788,14 +1325,25 @@ const Admin = () => {
                       setCurrentPage(1);
                       setSelectedItems([]);
                     }}
-                    className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                    className={`group flex flex-col items-center space-y-2 p-3 rounded-lg transition-all duration-200 ${
                       activeTab === tab.id
-                        ? 'border-black text-black'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'bg-black text-white shadow-md'
+                        : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
-                    <span>{tab.name}</span>
+                    <Icon className={`w-5 h-5 ${
+                      activeTab === tab.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'
+                    }`} />
+                    <div className="text-center">
+                      <span className="text-xs font-medium block">{tab.name}</span>
+                      {tab.description && (
+                        <span className={`text-[10px] block mt-1 ${
+                          activeTab === tab.id ? 'text-gray-200' : 'text-gray-400'
+                        }`}>
+                          {tab.description}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -904,8 +1452,35 @@ const Admin = () => {
           </div>
         )}
 
-        {/* Data Management Sections */}
-        {activeTab !== 'dashboard' && (
+        {/* System Monitoring */}
+        {activeTab === 'system' && (
+          <SystemMonitoring />
+        )}
+
+        {/* Advanced Analytics */}
+        {activeTab === 'analytics' && (
+          <AdvancedAnalytics />
+        )}
+
+        {/* Collection Management with AdvancedDataTable */}
+        {getCollectionConfig(activeTab) && (
+          <AdvancedDataTable
+            collection={getCollectionConfig(activeTab).collection}
+            title={getCollectionConfig(activeTab).title}
+            columns={getCollectionConfig(activeTab).columns}
+            searchFields={getCollectionConfig(activeTab).searchFields}
+            filterField={getCollectionConfig(activeTab).filterField}
+            canCreate={getCollectionConfig(activeTab).canCreate}
+            canEdit={getCollectionConfig(activeTab).canEdit}
+            canDelete={getCollectionConfig(activeTab).canDelete}
+            onItemSelect={(item) => openModal('view', item)}
+            onItemEdit={getCollectionConfig(activeTab).canEdit ? (item) => openModal('edit', item) : null}
+            onItemCreate={getCollectionConfig(activeTab).canCreate ? () => openModal('create') : null}
+          />
+        )}
+
+        {/* Legacy Data Management Sections (for specific cases) */}
+        {activeTab === 'withdrawals' && (
           <div className="space-y-6">
             {/* Search and Filter Bar */}
             <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -1935,8 +2510,9 @@ const Admin = () => {
             )}
           </div>
         </Modal>
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 

@@ -13,4 +13,4 @@ const variantSchema = new mongoose.Schema({
   price: { type: Number, min: 0 },
 });
 
-export default mongoose.model("Variant", productSchema);
+export default mongoose.model("Variant", variantSchema);

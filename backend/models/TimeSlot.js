@@ -5,4 +5,4 @@ const timeSlotSchema = new mongoose.Schema({
   endTime: { type: String, required: true },   // e.g. "10:00"
 }, { _id: false });
 
-export default mongoose.model("TimeSlot", serviceSchema);
+export default mongoose.model("TimeSlot", timeSlotSchema);
