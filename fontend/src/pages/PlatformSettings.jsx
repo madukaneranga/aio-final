@@ -28,7 +28,7 @@ const PlatformSettings = () => {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('commission');
+  const [activeTab, setActiveTab] = useState('payment');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
@@ -155,9 +155,8 @@ const PlatformSettings = () => {
   }
 
   const tabs = [
-    { id: 'commission', name: 'Commission Rates', icon: Percent },
-    { id: 'subscription', name: 'Subscriptions', icon: Calendar },
     { id: 'payment', name: 'Payment Settings', icon: CreditCard },
+    { id: 'subscription', name: 'Subscriptions', icon: Calendar },
     { id: 'platform', name: 'Platform Config', icon: Sliders },
     { id: 'features', name: 'Feature Flags', icon: Zap }
   ];
@@ -253,63 +252,6 @@ const PlatformSettings = () => {
 
         {/* Tab Content */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          {/* Commission Rates Tab */}
-          {activeTab === 'commission' && (
-            <div className="space-y-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <Percent className="w-6 h-6 text-gray-600" />
-                <h2 className="text-xl font-semibold text-gray-900">Commission Rate Settings</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Sales Commission (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={(getNestedValue(formData, 'commissionRates.productSales') || 0) * 100}
-                    onChange={(e) => updateFormData('commissionRates.productSales', parseFloat(e.target.value) / 100)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Current: {((getNestedValue(formData, 'commissionRates.productSales') || 0) * 100).toFixed(2)}%
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Service Bookings Commission (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={(getNestedValue(formData, 'commissionRates.serviceBookings') || 0) * 100}
-                    onChange={(e) => updateFormData('commissionRates.serviceBookings', parseFloat(e.target.value) / 100)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Current: {((getNestedValue(formData, 'commissionRates.serviceBookings') || 0) * 100).toFixed(2)}%
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                  <span className="font-medium text-yellow-800">Important Note</span>
-                </div>
-                <p className="text-yellow-700 mt-2">
-                  Commission rate changes will apply to all new transactions. Existing pending transactions will use the previous rates.
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Subscription Settings Tab */}
           {activeTab === 'subscription' && (
@@ -383,6 +325,20 @@ const PlatformSettings = () => {
               <div className="flex items-center space-x-2 mb-4">
                 <CreditCard className="w-6 h-6 text-gray-600" />
                 <h2 className="text-xl font-semibold text-gray-900">Payment Processing Settings</h2>
+              </div>
+
+              {/* PayHere Processing Fee Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Info className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-blue-900">PayHere Processing Fee</span>
+                </div>
+                <p className="text-blue-800 mb-2">
+                  {getNestedValue(formData, 'paymentProcessing.description') || 'PayHere processing fee - 4% of total transaction amount'}
+                </p>
+                <div className="bg-white rounded px-3 py-2 text-blue-900 font-medium">
+                  Fixed Rate: {((getNestedValue(formData, 'paymentProcessing.payhereProcessingFee') || 0.04) * 100).toFixed(2)}%
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -603,7 +559,6 @@ const PlatformSettings = () => {
                 {[
                   { key: 'enableReviews', label: 'Enable Reviews', icon: Star, description: 'Allow customers to review products and services' },
                   { key: 'enableSubscriptions', label: 'Enable Subscriptions', icon: Calendar, description: 'Enable store owner subscriptions' },
-                  { key: 'enableCommissions', label: 'Enable Commissions', icon: DollarSign, description: 'Collect platform commissions on transactions' },
                   { key: 'enableAnalytics', label: 'Enable Analytics', icon: Database, description: 'Provide analytics and reporting features' },
                   { key: 'enableNotifications', label: 'Enable Notifications', icon: Bell, description: 'Send email and push notifications' }
                 ].map((feature) => {
@@ -651,7 +606,6 @@ const PlatformSettings = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <h4 className="font-medium text-red-900 mb-2">This will reset:</h4>
               <ul className="text-sm text-red-800 space-y-1">
-                <li>• Commission rates</li>
                 <li>• Subscription pricing and settings</li>
                 <li>• Payment processing configuration</li>
                 <li>• Platform limits and configuration</li>

@@ -88,14 +88,9 @@ export const isImageFile = (file) => {
   return imageTypes.includes(extension);
 };
 
-// Calculate platform fee
-export const calculatePlatformFee = (amount, feePercentage = 0.05) => {
-  return amount * feePercentage;
-};
-
-// Calculate store amount after platform fee
-export const calculateStoreAmount = (amount, feePercentage = 0.05) => {
-  return amount * (1 - feePercentage);
+// Calculate store amount (no platform fee)
+export const calculateStoreAmount = (amount) => {
+  return amount;
 };
 
 // Debounce function

@@ -44,6 +44,24 @@ const Cart = () => {
           <p className="text-gray-600 mt-2">
             {totalItems} item{totalItems !== 1 ? 's' : ''} in your cart
           </p>
+          
+          {/* Cart Type Information */}
+          {(orderItems.length > 0 || bookingItems.length > 0) && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                {orderItems.length > 0 && (
+                  <span>
+                    🛍️ <strong>Product Cart:</strong> You can add multiple products. Adding a service will clear all products.
+                  </span>
+                )}
+                {bookingItems.length > 0 && (
+                  <span>
+                    📅 <strong>Service Cart:</strong> Only one service can be booked at a time. Adding products will clear the service.
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -55,7 +73,7 @@ const Cart = () => {
                 <h2 className="text-xl font-semibold mb-4">Products ({orderItems.length})</h2>
                 <div className="space-y-4">
                   {orderItems.map((item) => (
-                    <div key={item.id} className="cart-item-animate flex items-center space-x-4 p-4 border border-gray-200 rounded-lg">
+                    <div key={`${item.id}-${JSON.stringify(item.variants || {})}`} className="cart-item-animate flex items-center space-x-4 p-4 border border-gray-200 rounded-lg">
                       <img
                         src={item.image ? 
                           (item.image.startsWith('http') ? item.image : `${import.meta.env.VITE_API_URL}${item.image}`) : 
@@ -67,17 +85,26 @@ const Cart = () => {
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900">{item.title}</h3>
                         <p className="text-gray-600">{formatLKR(item.price)}</p>
+                        {item.variants && Object.keys(item.variants).length > 0 && (
+                          <div className="flex gap-2 mt-1">
+                            {Object.entries(item.variants).map(([key, value]) => (
+                              <span key={key} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                {key}: {value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity - 1, item.variants)}
                           className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
                         <span className="w-8 text-center">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1, item.variants)}
                           className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
                         >
                           <Plus className="w-4 h-4" />
@@ -86,7 +113,7 @@ const Cart = () => {
                       <div className="text-right">
                         <p className="font-semibold">{formatLKR(item.price * item.quantity)}</p>
                         <button
-                          onClick={() => removeFromOrder(item.id)}
+                          onClick={() => removeFromOrder(item.id, item.variants)}
                           className="text-red-500 hover:text-red-700 transition-colors mt-1"
                         >
                           <Trash2 className="w-4 h-4" />

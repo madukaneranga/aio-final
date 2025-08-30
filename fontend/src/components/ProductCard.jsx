@@ -11,42 +11,61 @@ import {
 } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useWishlist } from "../contexts/WishlistContext";
 import { formatLKR } from "../utils/currency";
+import useImpression from "../hooks/useImpression";
 
 const ProductCard = ({ product }) => {
   const cardRef = useRef(null);
   const { addToOrder } = useCart();
   const { user } = useAuth();
+  const { addToWishlist, removeFromWishlist, isInWishlist, isLoading: wishlistLoading } = useWishlist();
+  const { trackProductImpression, createImpressionObserver } = useImpression();
 
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  
+  const isWishlisted = isInWishlist(product._id);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            // Send impression
-            fetch(`${import.meta.env.VITE_API_URL}/api/products/impression`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ productId: product._id }),
-            }).catch((err) => console.error("Impression error:", err));
-
-            observer.unobserve(entry.target); // stop observing after first impression
-          }
+    const observer = createImpressionObserver((target) => {
+      // Track product impression using our new system
+      trackProductImpression(product);
+      
+      // Google Analytics 4 - Product View Event
+      if (typeof gtag !== 'undefined') {
+        gtag('event', 'view_item', {
+          currency: 'LKR',
+          value: product.price,
+          items: [{
+            item_id: product._id,
+            item_name: product.title,
+            category: product.category,
+            price: product.price
+          }]
         });
-      },
-      { threshold: 0.5 } // 50% of the card visible = impression
-    );
+      }
+
+      // Microsoft Clarity - Product View Event
+      if (typeof clarity !== 'undefined') {
+        clarity('event', 'product_view', {
+          product_id: product._id,
+          product_name: product.title,
+          category: product.category,
+          price: product.price
+        });
+      }
+    }, { 
+      threshold: 0.5, // 50% of the card visible = impression
+      rootMargin: '0px'
+    });
 
     if (cardRef.current) observer.observe(cardRef.current);
 
     return () => {
       if (cardRef.current) observer.unobserve(cardRef.current);
     };
-  }, [product._id]);
+  }, [product._id, trackProductImpression, createImpressionObserver, product]);
 
   //const formatLKR = (price) => `LKR ${price.toLocaleString()}`;
 
@@ -86,10 +105,24 @@ const ProductCard = ({ product }) => {
     setIsQuickViewOpen(true);
   };
 
-  const handleWishlist = (e) => {
+  const handleWishlist = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
+    
+    if (user?.role !== "customer") {
+      alert("Only customers can add items to wishlist");
+      return;
+    }
+    
+    try {
+      if (isWishlisted) {
+        await removeFromWishlist(product._id);
+      } else {
+        await addToWishlist(product);
+      }
+    } catch (error) {
+      console.error('Wishlist error:', error);
+    }
   };
 
   return (
@@ -125,17 +158,22 @@ const ProductCard = ({ product }) => {
                 <>
                   <button
                     onClick={handleWishlist}
-                    className={`p-2 sm:p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-xl ${
+                    disabled={wishlistLoading}
+                    className={`p-2 sm:p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${
                       isWishlisted
                         ? "bg-black text-white"
                         : "bg-white/95 text-gray-700 hover:bg-black hover:text-white border border-gray-200"
                     }`}
                   >
-                    <Heart
-                      className={`w-3 h-3 sm:w-4 sm:h-4 ${
-                        isWishlisted ? "fill-current" : ""
-                      }`}
-                    />
+                    {wishlistLoading ? (
+                      <div className="w-3 h-3 sm:w-4 sm:h-4 animate-spin border border-current border-t-transparent rounded-full" />
+                    ) : (
+                      <Heart
+                        className={`w-3 h-3 sm:w-4 sm:h-4 ${
+                          isWishlisted ? "fill-current" : ""
+                        }`}
+                      />
+                    )}
                   </button>
                   <button
                     onClick={handleQuickView}

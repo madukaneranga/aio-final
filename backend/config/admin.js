@@ -78,7 +78,7 @@ export const ADMIN_CONFIG = {
       'users', 'stores', 'products', 'services', 'orders', 'bookings',
       'categories', 'packages', 'addons', 'variants', 'time-slots',
       'flash-deals', 'email-subscriptions', 'notifications', 'posts',
-      'post-comments', 'reviews', 'wallets', 'commissions', 
+      'post-comments', 'reviews', 'wallets', 
       'pending-transactions', 'subscriptions', 'platform-settings', 'marketing'
     ],
     

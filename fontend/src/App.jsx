@@ -3,8 +3,10 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
+import { WishlistProvider } from "./contexts/WishlistContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ChatProvider } from "./contexts/ChatContext";
+import { ImpressionProvider } from "./contexts/ImpressionContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -53,6 +55,8 @@ import Test from "./pages/Test";
 import NewPost from "./pages/NewPost";
 import SocialFeed from "./pages/SocialFeed";
 import CustomSales from "./pages/CustomSales";
+import Wishlist from "./pages/Wishlist";
+import ThankYou from "./pages/ThankYou";
 
 import "./App.css";
 
@@ -66,6 +70,8 @@ function App() {
         <ChatProvider>
           <NotificationProvider>
             <CartProvider>
+              <WishlistProvider>
+                <ImpressionProvider>
             <Router>
               {maintenanceMode ? (
                 <Maintenance />
@@ -100,11 +106,13 @@ function App() {
                               element={<StoreDetail />}
                             />
                             <Route path="/cart" element={<Cart />} />
+                            <Route path="/wishlist" element={<Wishlist />} />
                             <Route
                               path="/booking-summary"
                               element={<BookingSummary />}
                             />
                             <Route path="/checkout" element={<Checkout />} />
+                            <Route path="/thank-you" element={<ThankYou />} />
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
                             <Route path="/profile" element={<Profile />} />
@@ -195,6 +203,8 @@ function App() {
                 </Routes>
               )}
             </Router>
+                </ImpressionProvider>
+              </WishlistProvider>
             </CartProvider>
           </NotificationProvider>
         </ChatProvider>

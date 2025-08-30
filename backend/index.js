@@ -101,6 +101,7 @@ import {
   initializeChatHandlers,
   handleChatDisconnect,
 } from "./utils/chatSocketHandlers.js";
+import { startOrderScheduler, stopOrderScheduler } from "./utils/scheduler.js";
 
 io.on("connection", (socket) => {
   const { userId, user } = socket;
@@ -272,6 +273,9 @@ const startServer = async () => {
       console.log(`🔗 Socket.IO CORS origins:`, allowedOrigins);
       console.log(`📊 Online users: ${getOnlineUsersCount()}`);
 
+      // Start order auto-confirmation scheduler
+      startOrderScheduler();
+
       if (process.env.NODE_ENV === "development") {
         console.log(`🔧 API Base URL: http://localhost:${PORT}/api`);
         console.log(`🏠 Health Check: http://localhost:${PORT}/ping`);
@@ -301,6 +305,10 @@ const gracefulShutdown = async (signal) => {
   });
 
   try {
+    // Stop order scheduler
+    console.log("⏰ Stopping order scheduler...");
+    stopOrderScheduler();
+    
     // Disconnect all socket connections
     console.log("🔌 Closing Socket.IO connections...");
 

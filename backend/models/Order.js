@@ -33,10 +33,6 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  platformFee: {
-    type: Number,
-    required: true,
-  },
   reviewed: {
     type: Boolean,
     default: false,
@@ -50,11 +46,11 @@ const orderSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: [
-      "paid",
       "pending",
       "processing",
       "shipped",
       "delivered",
+      "completed",
       "cancelled",
     ],
     default: "pending",
@@ -68,11 +64,26 @@ const orderSchema = new mongoose.Schema({
   },
   paymentDetails: {
     transactionId: String,
-    paymentStatus: String,
+    paymentStatus: {
+      type: String,
+      enum: [
+        "paid",
+        "pending",
+        "failed",
+        "pending_bank_transfer",
+        "customer_paid_pending_confirmation",
+        "cod_pending",
+      ],
+    },
     paidAt: Date,
-    paymentMethod: String,
+    paymentMethod: {
+      type: String,
+      enum: ["stripe", "bank_transfer", "cod", "wallet"],
+    },
     authorizationToken: String,
     bankTransferReference: String,
+    updatedAt: Date,
+    updatedBy: String,
   },
   trackingNumber: String,
   notes: String,
@@ -81,6 +92,20 @@ const orderSchema = new mongoose.Schema({
   canCustomerUpdateStatus: {
     type: Boolean,
     default: false,
+  },
+
+  // Order completion tracking
+  deliveredAt: {
+    type: Date,
+  },
+  customerConfirmationDeadline: {
+    type: Date,
+  },
+  confirmedAt: {
+    type: Date,
+  },
+  autoConfirmedAt: {
+    type: Date,
   },
   statusHistory: [
     {

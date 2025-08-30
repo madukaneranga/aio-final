@@ -467,10 +467,6 @@ export const adminAPI = {
   updatePackage: (id, data) => adminAPI.updateCollectionItem('all-packages', id, data),
   deletePackage: (id) => adminAPI.deleteCollectionItem('all-packages', id),
 
-  // Pending Transactions management
-  getAllPendingTransactions: (params = {}) => adminAPI.getCollectionData('all-pending-transactions', params),
-  updatePendingTransaction: (id, data) => adminAPI.updateCollectionItem('all-pending-transactions', id, data),
-  deletePendingTransaction: (id) => adminAPI.deleteCollectionItem('all-pending-transactions', id),
 
   // Platform Settings management
   getAllPlatformSettings: (params = {}) => adminAPI.getCollectionData('all-platform-settings', params),
@@ -638,6 +634,172 @@ export const contactRevealAPI = {
         headers: getAuthHeaders(),
       }
     );
+    return handleResponse(response);
+  },
+};
+
+export const cartAPI = {
+  getCart: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/cart`, {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  addToCart: async (itemData) => {
+    const response = await fetch(`${API_BASE_URL}/api/cart/add`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(itemData),
+    });
+    return handleResponse(response);
+  },
+
+  updateQuantity: async (itemId, quantity) => {
+    const response = await fetch(`${API_BASE_URL}/api/cart/update/${itemId}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ quantity }),
+    });
+    return handleResponse(response);
+  },
+
+  removeFromCart: async (itemId, permanent = false) => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/cart/remove/${itemId}?permanent=${permanent}`,
+      {
+        method: "DELETE",
+        credentials: "include",
+        headers: getAuthHeaders(),
+      }
+    );
+    return handleResponse(response);
+  },
+
+  clearCart: async (permanent = false) => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/cart/clear?permanent=${permanent}`,
+      {
+        method: "DELETE",
+        credentials: "include",
+        headers: getAuthHeaders(),
+      }
+    );
+    return handleResponse(response);
+  },
+
+  getCartAnalytics: async (days = 30) => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/cart/analytics?days=${days}`,
+      {
+        credentials: "include",
+        headers: getAuthHeaders(),
+      }
+    );
+    return handleResponse(response);
+  },
+
+  getCartState: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/cart/state`, {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+};
+
+export const wishlistAPI = {
+  getWishlist: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist`, {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  addToWishlist: async (itemData) => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/add`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(itemData),
+    });
+    return handleResponse(response);
+  },
+
+  removeFromWishlist: async (itemId) => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/remove/${itemId}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  updateItemPriority: async (itemId, priority) => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/priority/${itemId}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ priority }),
+    });
+    return handleResponse(response);
+  },
+
+  updateItemNotes: async (itemId, notes) => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/notes/${itemId}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+    return handleResponse(response);
+  },
+
+  moveToCart: async (itemId, quantity = 1, bookingDetails = null) => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/move-to-cart/${itemId}`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ quantity, bookingDetails }),
+    });
+    return handleResponse(response);
+  },
+
+  filterWishlist: async (filters = {}) => {
+    const queryString = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/filter?${queryString}`, {
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  shareWishlist: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/share`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  removeSharing: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/share`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  getSharedWishlist: async (shareToken) => {
+    const response = await fetch(`${API_BASE_URL}/api/wishlist/shared/${shareToken}`, {
+      headers: getAuthHeaders(),
+    });
     return handleResponse(response);
   },
 };

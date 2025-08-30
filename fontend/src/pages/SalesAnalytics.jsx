@@ -1,193 +1,246 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
-import {
-  TrendingUp,
-  DollarSign,
-  Package,
-  Calendar,
-  Users,
-  BarChart3,
-  Download,
-  Filter,
-  Eye,
-} from "lucide-react";
-import { formatLKR, formatLKRCompact } from "../utils/currency";
 import LoadingSpinner from "../components/LoadingSpinner";
-import { use } from "react";
+import Level1Analytics from "../components/analytics/Level1Analytics";
+import Level2Analytics from "../components/analytics/Level2Analytics";
+import Level3Analytics from "../components/analytics/Level3Analytics";
+import UpgradePrompt from "../components/analytics/UpgradePrompt";
+import AnalyticsErrorBoundary from "../components/analytics/AnalyticsErrorBoundary";
+import { AnalyticsDashboardSkeleton } from "../components/analytics/SkeletonLoader";
+import useAnalyticsTracking from "../hooks/useAnalyticsTracking";
+import { BarChart3, TrendingUp, Globe } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const SalesAnalytics = () => {
   const { user } = useAuth();
-  const [analytics, setAnalytics] = useState({
-    totalRevenue: 0,
-    totalCount: 0,
-    avgValue: 0,
-    topProducts: [],
-    topServices: [],
-    topItems: [],
-    revenueByMonth: [],
-    revenueByMonthAllTime: [],
-    ordersByStatus: {},
-    bookingsByStatus: {},
-    totalUniqueCustomers: 0,
-    returningCustomers: 0,
-    retentionRate: 0,
-    revenueChangePct: 0,
-    countChangePct: 0,
-    avgValueChangePct: 0,
-    currency: "LKR",
-  });
-
+  const [analytics, setAnalytics] = useState(null);
+  const [globalInsights, setGlobalInsights] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState("30");
-  const [monthRange, setMonthRange] = useState("0");
-  const [viewType, setViewType] = useState("overview");
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const {
+    trackAnalyticsView,
+    trackTabSwitch,
+    trackTimeOnPage,
+    trackFeatureAttempt,
+  } = useAnalyticsTracking();
+  const startTimeRef = useRef(Date.now());
+  const previousTabRef = useRef("overview");
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user?.role === "store_owner" && user?.storeId) {
       fetchAnalytics();
     }
-  }, [user, monthRange]);
+  }, [user]);
+
+  // Track page view and time spent
+  useEffect(() => {
+    if (analytics?.analyticsLevel) {
+      trackAnalyticsView(analytics.analyticsLevel, activeTab);
+    }
+
+    // Track time spent when user leaves or component unmounts
+    return () => {
+      if (startTimeRef.current) {
+        const timeSpent = Date.now() - startTimeRef.current;
+        trackTimeOnPage(
+          Math.round(timeSpent / 1000),
+          analytics?.analyticsLevel || 1
+        );
+      }
+    };
+  }, [
+    analytics?.analyticsLevel,
+    activeTab,
+    trackAnalyticsView,
+    trackTimeOnPage,
+  ]);
+
+  const handleUpgradeClick = () => {
+    navigate("/sub-management");
+  };
+  // Track tab switches
+  const handleTabSwitch = (newTab, canAccess) => {
+    if (canAccess) {
+      trackTabSwitch(
+        previousTabRef.current,
+        newTab,
+        analytics?.analyticsLevel || 1
+      );
+      previousTabRef.current = newTab;
+      setActiveTab(newTab);
+    } else {
+      trackFeatureAttempt(
+        `${newTab}_tab`,
+        analytics?.analyticsLevel || 1,
+        newTab === "trends" ? 2 : 3
+      );
+    }
+  };
 
   const fetchAnalytics = async () => {
+    console.log("🔍 Fetching analytics for user:", {
+      userId: user?._id,
+      storeId: user?.storeId,
+      role: user?.role,
+      email: user?.email,
+      timestamp: new Date().toISOString(),
+    });
+
     try {
       setLoading(true);
-      const storeId = user.storeId;
+      setError(null);
 
-      // Fetch Analytics Summary
-      const analyricsResponse = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
-        }/api/analytics/${storeId}?months=${monthRange}`,
+      if (!user?.storeId) {
+        console.error("❌ No storeId found for user");
+        throw new Error("No store ID found. Please contact support.");
+      }
+
+      console.log("📡 Making analytics request...");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/analytics/${user.storeId}`,
         {
           credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
       );
 
-      if (analyricsResponse.ok) {
-        const analyticsData = await analyricsResponse.json();
-        setAnalytics(analyticsData);
+      console.log("📊 Analytics response status:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      const data = await response.json();
+      console.log("📈 Analytics data received:", {
+        analyticsLevel: data.analyticsLevel,
+        packageName: data.packageName,
+        hasError: !!data.error,
+        dataKeys: Object.keys(data),
+        totalRevenue: data.totalRevenue,
+        totalCount: data.totalCount,
+      });
+
+      if (!response.ok) {
+        // Handle server errors but still try to use fallback data if available
+        if (data.error) {
+          console.warn(
+            "⚠️ Server returned error with fallback data:",
+            data.error
+          );
+          setAnalytics(data); // Use fallback data from server
+          setError(
+            `${data.error}${data.errorDetails ? " - " + data.errorDetails : ""}`
+          );
+        } else {
+          throw new Error(
+            `Server error: ${response.status} ${response.statusText}`
+          );
+        }
+      } else {
+        setAnalytics(data);
+        console.log("✅ Analytics data set successfully");
       }
-    } catch (error) {
-      console.error("Error fetching analytics:", error);
+
+      // Fetch global insights if premium user
+      if (data.analyticsLevel >= 3) {
+        console.log("🌍 Fetching global insights for premium user...");
+        try {
+          const globalResponse = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/analytics/global/insights`,
+            {
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          console.log("🌍 Global insights response:", {
+            status: globalResponse.status,
+            ok: globalResponse.ok,
+          });
+
+          if (globalResponse.ok) {
+            const globalData = await globalResponse.json();
+            setGlobalInsights(globalData.globalInsights);
+            console.log("✅ Global insights loaded successfully");
+          } else {
+            console.warn(
+              "⚠️ Could not load global insights:",
+              globalResponse.status
+            );
+          }
+        } catch (globalError) {
+          console.warn("❌ Global insights fetch error:", globalError);
+        }
+      }
+    } catch (err) {
+      console.error("❌ Analytics fetch error:", {
+        message: err.message,
+        stack: err.stack,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Set a more user-friendly error message
+      let userFriendlyError = "Unable to load analytics data";
+
+      if (err.message.includes("No store ID")) {
+        userFriendlyError =
+          "Your account is not properly set up. Please contact support.";
+      } else if (
+        err.message.includes("Failed to fetch") ||
+        err.message.includes("NetworkError")
+      ) {
+        userFriendlyError =
+          "Network error. Please check your connection and try again.";
+      } else if (
+        err.message.includes("403") ||
+        err.message.includes("Access denied")
+      ) {
+        userFriendlyError =
+          "Access denied. You may not have permission to view this data.";
+      } else if (err.message.includes("404")) {
+        userFriendlyError = "Store not found. Please verify your store setup.";
+      }
+
+      setError(userFriendlyError);
+
+      // Set fallback analytics data to prevent blank screen
+      setAnalytics({
+        analyticsLevel: 1,
+        packageName: "basic",
+        totalRevenue: 0,
+        totalCount: 0,
+        avgValue: 0,
+        topProducts: [],
+        topServices: [],
+        totalUniqueCustomers: 0,
+        returningCustomers: 0,
+        customerMixNewVsReturning: {
+          new: 0,
+          returning: 0,
+          percentage: 0,
+        },
+        bestSellingItem: null,
+        currency: "LKR",
+        error: userFriendlyError,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const ChangePercent = ({ value, label = "from last period" }) => {
-  const formatted =
-    value > 0 ? `+${value}%` : `${value}%`;
-  const colorClass =
-    value > 0 ? "text-green-600" : value < 0 ? "text-red-600" : "text-gray-600";
-
-  return (
-    <p className={`text-sm mt-1 ${colorClass}`}>
-      {formatted} {label}
-    </p>
-  );
-};
-
-
-  const exportToExcel = (analytics, monthRange, storeId) => {
-    try {
-      // Create a new workbook
-      const wb = XLSX.utils.book_new();
-
-      // Format monthRange display string
-      const formattedMonthRange =
-        monthRange === 0
-          ? "All Time"
-          : typeof monthRange === "number"
-          ? `Last ${monthRange} month${monthRange > 1 ? "s" : ""}`
-          : String(monthRange);
-
-      // Prepare summary data
-      const summaryData = [
-        ["Store ID", storeId || "unknown"],
-        ["Export Date", new Date().toISOString()],
-        ["Month Range", formattedMonthRange],
-        ["Currency", analytics.currency || "LKR"],
-        [],
-        ["Total Revenue", analytics.totalRevenue],
-        ["Total Orders/Bookings", analytics.totalCount],
-        ["Average Value", analytics.avgValue],
-        ["Total Unique Customers", analytics.totalUniqueCustomers],
-        ["Returning Customers", analytics.returningCustomers],
-        ["Retention Rate (%)", analytics.retentionRate || "0"],
-      ];
-
-      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
-
-      // Revenue By Month
-      if (analytics.revenueByMonth?.length > 0) {
-        const revenueByMonthData = [
-          ["Year", "Month", "Revenue"],
-          ...analytics.revenueByMonth.map(({ year, month, revenue }) => [
-            year,
-            month,
-            revenue,
-          ]),
-        ];
-        const revenueSheet = XLSX.utils.aoa_to_sheet(revenueByMonthData);
-        XLSX.utils.book_append_sheet(wb, revenueSheet, "RevenueByMonth");
-      }
-
-      // Top Items
-      if (analytics.topItems?.length > 0) {
-        const topItemsHeaders = Object.keys(analytics.topItems[0]);
-        const topItemsData = [
-          topItemsHeaders,
-          ...analytics.topItems.map((item) =>
-            topItemsHeaders.map((h) => item[h])
-          ),
-        ];
-        const topItemsSheet = XLSX.utils.aoa_to_sheet(topItemsData);
-        XLSX.utils.book_append_sheet(wb, topItemsSheet, "TopItems");
-      }
-
-      // Orders By Status
-      if (analytics.ordersByStatus) {
-        const ordersByStatusData = [["Status", "Count"]];
-        for (const [status, count] of Object.entries(
-          analytics.ordersByStatus
-        )) {
-          ordersByStatusData.push([status, count]);
-        }
-        const ordersSheet = XLSX.utils.aoa_to_sheet(ordersByStatusData);
-        XLSX.utils.book_append_sheet(wb, ordersSheet, "OrdersByStatus");
-      }
-
-      // Bookings By Status
-      if (analytics.bookingsByStatus) {
-        const bookingsByStatusData = [["Status", "Count"]];
-        for (const [status, count] of Object.entries(
-          analytics.bookingsByStatus
-        )) {
-          bookingsByStatusData.push([status, count]);
-        }
-        const bookingsSheet = XLSX.utils.aoa_to_sheet(bookingsByStatusData);
-        XLSX.utils.book_append_sheet(wb, bookingsSheet, "BookingsByStatus");
-      }
-
-      // Generate Excel and save
-      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([wbout], { type: "application/octet-stream" });
-      saveAs(
-        blob,
-        `sales-analytics-${new Date().toISOString().split("T")[0]}.xlsx`
-      );
-    } catch (error) {
-      console.error("Failed to export Excel:", error);
-    }
-  };
-
   if (!user || user.role !== "store_owner") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center mx-auto mb-6">
+            <BarChart3 className="w-8 h-8 text-white" />
+          </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Access Denied
           </h2>
@@ -200,71 +253,116 @@ const SalesAnalytics = () => {
   }
 
   if (loading) {
+    return <AnalyticsDashboardSkeleton />;
+  }
+
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="xl" />
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <BarChart3 className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Error Loading Analytics
+          </h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={fetchAnalytics}
+            className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Sales Analytics
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Track your store's performance and growth
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <select
-                value={monthRange}
-                onChange={(e) => setMonthRange(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-              >
-                <option value="1">Last month</option>
-                <option value="3">Last 3 months</option>
-                <option value="6">Last 6 months</option>
-                <option value="12">Last year</option>
-                <option value="0">All Time</option>
-              </select>
-              <button
-                onClick={exportToExcel}
-                className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center space-x-2"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button>
-            </div>
-          </div>
-        </div>
+  const analyticsLevel = analytics?.analyticsLevel || 1;
+  const packageName = analytics?.packageName || "basic";
 
-        {/* View Type Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: "overview", name: "Overview", icon: BarChart3 },
-                { id: "customers", name: "Customers", icon: Users },
-              ].map((tab) => {
+  const tabs = [
+    {
+      id: "overview",
+      name: "Overview",
+      icon: BarChart3,
+      available: true,
+    },
+    {
+      id: "trends",
+      name: "Trends",
+      icon: TrendingUp,
+      available: analyticsLevel >= 2,
+      upgradePrompt: analyticsLevel < 2 ? "Upgrade to Standard" : null,
+    },
+    {
+      id: "global",
+      name: "Global Insights",
+      icon: Globe,
+      available: analyticsLevel >= 3,
+      upgradePrompt: analyticsLevel < 3 ? "Upgrade to Premium" : null,
+    },
+  ];
+
+  return (
+    <AnalyticsErrorBoundary>
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <div className="border-b border-gray-200 bg-white sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center mb-4 sm:mb-0">
+                <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center mr-4">
+                  <BarChart3 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    Analytics
+                  </h1>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {packageName.charAt(0).toUpperCase() + packageName.slice(1)}{" "}
+                    Plan • Level {analyticsLevel}
+                  </p>
+                </div>
+              </div>
+
+              {analyticsLevel < 3 && (
+                <UpgradePrompt currentLevel={analyticsLevel} compact />
+              )}
+            </div>
+
+            {/* Navigation Tabs */}
+            <nav className="flex space-x-4 sm:space-x-8 mt-6 -mb-px">
+              {tabs.map((tab) => {
                 const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                const canAccess = tab.available;
+
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setViewType(tab.id)}
-                    className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
-                      viewType === tab.id
+                    onClick={() => handleTabSwitch(tab.id, canAccess)}
+                    disabled={!canAccess}
+                    className={`
+                    flex items-center space-x-2 py-3 px-1 border-b-2 font-medium text-sm transition-colors
+                    ${
+                      isActive && canAccess
                         ? "border-black text-black"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
+                        : canAccess
+                        ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        : "border-transparent text-gray-300 cursor-not-allowed"
+                    }
+                  `}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon
+                      className={`w-4 h-4 ${!canAccess ? "opacity-50" : ""}`}
+                    />
                     <span>{tab.name}</span>
+                    {tab.upgradePrompt && (
+                      <span className="text-xs bg-black text-white px-2 py-1 rounded-full ml-2">
+                        Pro
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -272,185 +370,59 @@ const SalesAnalytics = () => {
           </div>
         </div>
 
-        {/* Overview Tab */}
-        {viewType === "overview" && (
-          <div className="space-y-8">
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Total Revenue</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {formatLKRCompact(analytics.totalRevenue)}
-                    </p>
-                    <ChangePercent value={analytics.revenueChangePct} />
-                  </div>
-                  <DollarSign className="w-8 h-8 text-green-500" />
-                </div>
-              </div>
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          {activeTab === "overview" && (
+            <>
+              {analyticsLevel === 1 && <Level1Analytics data={analytics} />}
+              {analyticsLevel === 2 && <Level2Analytics data={analytics} />}
+              {analyticsLevel >= 3 && (
+                <Level3Analytics
+                  data={analytics}
+                  globalInsights={globalInsights}
+                />
+              )}
+            </>
+          )}
 
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Total Orders</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {analytics.totalCount}
-                    </p>
-                    <ChangePercent value={analytics.countChangePct} />
-                  </div>
-                  <Package className="w-8 h-8 text-blue-500" />
-                </div>
-              </div>
+          {activeTab === "trends" && (
+            <>
+              {analyticsLevel >= 2 ? (
+                <Level2Analytics
+                  data={analytics}
+                  viewMode="trends"
+                  handleUpgradeClick={handleUpgradeClick}
+                />
+              ) : (
+                <UpgradePrompt
+                  currentLevel={analyticsLevel}
+                  targetLevel={2}
+                  feature="Historical Trends & Advanced Analytics"
+                />
+              )}
+            </>
+          )}
 
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Total Bookings</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {analytics.totalCount}
-                    </p>
-                    <ChangePercent value={analytics.countChangePct} />
-                  </div>
-                  <Calendar className="w-8 h-8 text-purple-500" />
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Avg. Order Value</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {formatLKRCompact(analytics.avgValue)}
-                    </p>
-                    <ChangePercent value={analytics.avgValueChangePct} />
-                  </div>
-                  <TrendingUp className="w-8 h-8 text-orange-500" />
-                </div>
-              </div>
-            </div>
-
-            {/* Revenue Chart */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Revenue Trend
-              </h3>
-              <div className="h-64 flex items-end space-x-2">
-                {analytics.revenueByMonthAllTime.map((data, index) => (
-                  <div
-                    key={index}
-                    className="flex-1 flex flex-col items-center"
-                  >
-                    <div
-                      className="bg-black rounded-t w-full"
-                      style={{
-                        height: `${Math.max(
-                          (data.revenue /
-                            Math.max(
-                              ...analytics.revenueByMonthAllTime.map(
-                                (d) => d.revenue
-                              )
-                            )) *
-                            200,
-                          10
-                        )}px`,
-                      }}
-                    ></div>
-                    <p className="text-xs text-gray-500 mt-2">{data.month}</p>
-                    <p className="text-xs font-medium">
-                      {formatLKRCompact(data.revenue)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Order Status Distribution */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Order Status Distribution
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(analytics.ordersByStatus).map(
-                  ([status, count]) => (
-                    <div key={status} className="text-center">
-                      <div className="text-2xl font-bold text-gray-900">
-                        {count}
-                      </div>
-                      <div className="text-sm text-gray-500 capitalize">
-                        {status}
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-
-            {/* Booking Status Distribution */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Booking Status Distribution
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(analytics.bookingsByStatus).map(
-                  ([status, count]) => (
-                    <div key={status} className="text-center">
-                      <div className="text-2xl font-bold text-gray-900">
-                        {count}
-                      </div>
-                      <div className="text-sm text-gray-500 capitalize">
-                        {status}
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Customers Tab */}
-        {viewType === "customers" && (
-          <div className="space-y-8">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Customer Analytics
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-600">Total Customers</p>
-                  <p className="text-2xl font-bold text-blue-900">
-                    {analytics.totalUniqueCustomers || 0}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-600">Returning Customers</p>
-                  <p className="text-2xl font-bold text-green-900">
-                    {analytics.returningCustomers || 0}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-purple-600">Retention Rate</p>
-                  <p className="text-2xl font-bold text-purple-900">
-                    <span
-                      className={`${
-                        analytics.retentionRate >= 50
-                          ? "text-green-600"
-                          : analytics.retentionRate > 0
-                          ? "text-yellow-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {(analytics.retentionRate || 0)}%
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          {activeTab === "global" && (
+            <>
+              {analyticsLevel >= 3 ? (
+                <Level3Analytics
+                  data={analytics}
+                  globalInsights={globalInsights}
+                  viewMode="global"
+                />
+              ) : (
+                <UpgradePrompt
+                  currentLevel={analyticsLevel}
+                  targetLevel={3}
+                  feature="Global Market Insights & Competitive Analysis"
+                />
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </AnalyticsErrorBoundary>
   );
 };
 

@@ -4,49 +4,83 @@ import { Link } from "react-router-dom";
 import { formatLKR } from "../utils/currency";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useWishlist } from "../contexts/WishlistContext";
+import useImpression from "../hooks/useImpression";
 
 const ServiceCard = ({ service }) => {
   const cardRef = useRef(null);
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const { addToBooking } = useCart();
   const { user } = useAuth();
+  const { addToWishlist, removeFromWishlist, isInWishlist, isLoading: wishlistLoading } = useWishlist();
+  const { trackServiceImpression, createImpressionObserver } = useImpression();
+  
+  const isWishlisted = isInWishlist(service._id);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            // Send impression
-            fetch(`${import.meta.env.VITE_API_URL}/api/services/impression`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ serviceId: service._id }),
-            }).catch((err) => console.error("Impression error:", err));
-
-            observer.unobserve(entry.target); // stop observing after first impression
-          }
+    const observer = createImpressionObserver((target) => {
+      // Track service impression using our new comprehensive system
+      trackServiceImpression(service);
+      
+      // Google Analytics 4 - Service View Event
+      if (typeof gtag !== 'undefined') {
+        gtag('event', 'view_item', {
+          currency: 'LKR',
+          value: service.price,
+          items: [{
+            item_id: service._id,
+            item_name: service.title,
+            category: service.category,
+            price: service.price
+          }]
         });
-      },
-      { threshold: 0.5 } // 50% of the card visible = impression
-    );
+      }
+
+      // Microsoft Clarity - Service View Event
+      if (typeof clarity !== 'undefined') {
+        clarity('event', 'service_view', {
+          service_id: service._id,
+          service_name: service.title,
+          category: service.category,
+          price: service.price,
+          duration: service.duration
+        });
+      }
+    }, { 
+      threshold: 0.5, // 50% of the card visible = impression
+      rootMargin: '0px'
+    });
 
     if (cardRef.current) observer.observe(cardRef.current);
 
     return () => {
       if (cardRef.current) observer.unobserve(cardRef.current);
     };
-  }, [service._id]);
+  }, [service._id, trackServiceImpression, createImpressionObserver, service]);
 
   const isNew = () => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     return new Date(service.createdAt) > sevenDaysAgo;
   };
 
-  const handleWishlist = (e) => {
+  const handleWishlist = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
+    
+    if (user?.role !== "customer") {
+      alert("Only customers can add items to wishlist");
+      return;
+    }
+    
+    try {
+      if (isWishlisted) {
+        await removeFromWishlist(service._id);
+      } else {
+        await addToWishlist(service);
+      }
+    } catch (error) {
+      console.error('Wishlist error:', error);
+    }
   };
 
   const handleQuickView = (e) => {
@@ -55,24 +89,12 @@ const ServiceCard = ({ service }) => {
     setIsQuickViewOpen(true);
   };
 
-  const handleAddToCart = (e) => {
+  const handleViewService = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (user?.role !== "customer") {
-      alert("Only customers can add items to cart");
-      return;
-    }
-    // Ensure we pass the service with proper storeId
-    const serviceWithStoreId = {
-      ...service,
-      storeId: service.storeId?._id || service.storeId,
-    };
-    console.log("Added to cart:", {
-      service: service._id,
-    });
-
     setIsQuickViewOpen(false);
-    addToBooking(serviceWithStoreId);
+    // Navigate to service detail page
+    window.location.href = `/service/${service._id}`;
   };
 
   return (
@@ -101,17 +123,22 @@ const ServiceCard = ({ service }) => {
                 <>
                   <button
                     onClick={handleWishlist}
-                    className={`p-2 sm:p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-xl ${
+                    disabled={wishlistLoading}
+                    className={`p-2 sm:p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${
                       isWishlisted
                         ? "bg-black text-white"
                         : "bg-white/95 text-black hover:bg-black hover:text-white border border-black"
                     }`}
                   >
-                    <Heart
-                      className={`w-3 h-3 sm:w-4 sm:h-4 ${
-                        isWishlisted ? "fill-current" : ""
-                      }`}
-                    />
+                    {wishlistLoading ? (
+                      <div className="w-3 h-3 sm:w-4 sm:h-4 animate-spin border border-current border-t-transparent rounded-full" />
+                    ) : (
+                      <Heart
+                        className={`w-3 h-3 sm:w-4 sm:h-4 ${
+                          isWishlisted ? "fill-current" : ""
+                        }`}
+                      />
+                    )}
                   </button>
                   <button
                     onClick={handleQuickView}
@@ -357,13 +384,13 @@ const ServiceCard = ({ service }) => {
                   </div>
                 )}
 
-                {/* Book Service Button */}
+                {/* View Service Button */}
                 <button
-                  onClick={handleAddToCart}
+                  onClick={handleViewService}
                   className="w-full bg-black text-white py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold transition-all duration-300 hover:bg-gray-800 hover:shadow-2xl transform hover:scale-[1.02] flex items-center justify-center gap-2 sm:gap-3 tracking-wide text-sm sm:text-base"
                 >
-                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-                  BOOK SERVICE
+                  <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                  VIEW SERVICE
                 </button>
               </div>
             </div>

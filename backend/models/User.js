@@ -86,6 +86,14 @@ const userSchema = new mongoose.Schema({
   refreshTokenId: String,
 
   subscriptionId: String,
+  cartId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Cart",
+  },
+  wishlistId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Wishlist",
+  },
   createdAt: {
     type: Date,
     default: Date.now,

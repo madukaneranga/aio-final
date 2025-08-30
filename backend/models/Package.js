@@ -28,6 +28,15 @@ const packageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  analyticsLevel: {
+    type: Number,
+    enum: [0, 1, 2, 3],
+    default: 0,
+  },
+  analyticsFeatures: {
+    type: [String],
+    default: [],
+  },
   businessCard: {
     type: Boolean,
     default: false,

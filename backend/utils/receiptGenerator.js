@@ -124,10 +124,6 @@ export const generateReceipt = async (orderData, type = 'order') => {
     // Totals
     doc.text(`Subtotal: LKR ${orderData.totalAmount.toFixed(2)}`, 350, yPosition);
     yPosition += 15;
-    if (orderData.platformFee) {
-      doc.text(`Platform Fee: LKR ${orderData.platformFee.toFixed ? orderData.platformFee.toFixed(2) : orderData.platformFee}`, 350, yPosition);
-      yPosition += 15;
-    }
     doc.fontSize(12).text(`Total Amount: LKR ${orderData.totalAmount.toFixed(2)}`, 350, yPosition);
     yPosition += 30;
     

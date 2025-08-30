@@ -5,7 +5,7 @@ import ImageUpload from "../components/ImageUpload";
 import imageCompression from "browser-image-compression";
 
 import LoadingSpinner from "../components/LoadingSpinner";
-import { Store, Package, Calendar, MapPin, Phone, Mail } from "lucide-react";
+import { Store, Package, Calendar, MapPin, Phone, Mail, MessageCircle } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase";
 import Pricing from "../components/Pricing";
@@ -20,6 +20,7 @@ const CreateStore = () => {
       email: "",
       phone: "",
       address: "",
+      whatsapp: "",
     },
   });
   const [idImages, setIdImages] = useState([]);
@@ -30,7 +31,6 @@ const CreateStore = () => {
   const [checkingStore, setCheckingStore] = useState(true);
   const [payhereLoaded, setPayhereLoaded] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState("basic");
-  const [packages, setPackages] = useState({});
 
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -422,6 +422,20 @@ const CreateStore = () => {
                       value={formData.contactInfo.phone}
                       onChange={handleChange}
                       required
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+                      placeholder="+94 77 123 4567"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
+                      <MessageCircle className="w-4 h-4" />
+                      <span>WhatsApp</span>
+                    </label>
+                    <input
+                      type="tel"
+                      name="contactInfo.whatsapp"
+                      value={formData.contactInfo.whatsapp}
+                      onChange={handleChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                       placeholder="+94 77 123 4567"
                     />

@@ -18,6 +18,8 @@ import {
   Wallet,
 } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
+import UpdateProduct from "../components/UpdateProduct";
+import UpdateService from "../components/UpdateService";
 import useUserPackage from "../hooks/useUserPackage";
 import { useWallet } from "../hooks/useWallet";
 
@@ -56,8 +58,8 @@ const StoreDashboard = () => {
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editingItem, setEditingItem] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [editingService, setEditingService] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const navigate = useNavigate();
 
@@ -171,80 +173,23 @@ const StoreDashboard = () => {
     }
   };
 
-  const handleEdit = (editingItem) => {
-    setEditingItem({
-      ...editingItem,
-      price: editingItem.price?.toString() || "",
-      stock: editingItem.stock?.toString() || "",
-      variants: {
-        colors: editingItem.variants?.colors || [],
-        sizes: editingItem.variants?.sizes || [],
-      },
-    });
-
-    setShowEditModal(true);
+  const handleEditProduct = (product) => {
+    setEditingProduct(product);
   };
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
+  const handleEditService = (service) => {
+    setEditingService(service);
+  };
 
-    try {
-      // Prepare the JSON payload
-      const updates = {
-        title: editingItem.title,
-        description: editingItem.description,
-        price: editingItem.price,
-        category: editingItem.category,
-        ...(store?.type === "product"
-          ? {
-              stock: editingItem.stock,
-              ...(editingItem.variants?.colors?.length > 0 ||
-              editingItem.variants?.sizes?.length > 0
-                ? { variants: editingItem.variants }
-                : {}),
-            }
-          : {
-              duration: editingItem.duration,
-              priceType: editingItem.priceType || "fixed",
-            }),
-      };
+  const handleUpdateComplete = () => {
+    fetchDashboardData();
+    setEditingProduct(null);
+    setEditingService(null);
+  };
 
-      const endpoint = store?.type === "product" ? "products" : "services";
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/${endpoint}/${editingItem._id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updates),
-        }
-      );
-
-      if (response.ok) {
-        fetchDashboardData();
-        setShowEditModal(false);
-        setEditingItem(null);
-        alert(
-          `${
-            store?.type === "product" ? "Product" : "Service"
-          } updated successfully!`
-        );
-      } else {
-        alert(
-          `Failed to update ${
-            store?.type === "product" ? "product" : "service"
-          }`
-        );
-      }
-    } catch (error) {
-      console.error("Error updating item:", error);
-      alert(
-        `Error updating ${store?.type === "product" ? "product" : "service"}`
-      );
-    }
+  const handleUpdateCancel = () => {
+    setEditingProduct(null);
+    setEditingService(null);
   };
 
   const handleDelete = async (itemId, type) => {
@@ -312,28 +257,6 @@ const StoreDashboard = () => {
     );
   }
 
-  const categories =
-    store?.type === "product"
-      ? [
-          "Electronics",
-          "Clothing",
-          "Home & Garden",
-          "Sports & Outdoors",
-          "Books",
-          "Beauty & Health",
-          "Toys & Games",
-          "Food & Beverages",
-        ]
-      : [
-          "Tutoring",
-          "Home Services",
-          "Beauty & Wellness",
-          "Consulting",
-          "Fitness",
-          "Technology",
-          "Creative Services",
-          "Professional Services",
-        ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -694,7 +617,7 @@ const StoreDashboard = () => {
                             <Eye className="w-4 h-4" />
                           </Link>
                           <button
-                            onClick={() => handleEdit(product)}
+                            onClick={() => handleEditProduct(product)}
                             className="text-green-600 hover:text-green-800 p-1"
                           >
                             <Edit className="w-4 h-4" />
@@ -791,7 +714,7 @@ const StoreDashboard = () => {
                             <Eye className="w-4 h-4" />
                           </Link>
                           <button
-                            onClick={() => handleEdit(service)}
+                            onClick={() => handleEditService(service)}
                             className="text-green-600 hover:text-green-800 p-1"
                           >
                             <Edit className="w-4 h-4" />
@@ -893,366 +816,22 @@ const StoreDashboard = () => {
           </div>
         </div>
 
-        {/* Edit Modal */}
-        {showEditModal && editingItem && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Edit {store?.type === "product" ? "Product" : "Service"}
-                  </h2>
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl"
-                  >
-                    ×
-                  </button>
-                </div>
+        {/* Update Components */}
+        {editingProduct && (
+          <UpdateProduct
+            product={editingProduct}
+            onUpdate={handleUpdateComplete}
+            onCancel={handleUpdateCancel}
+            limitsInfo={limitsInfo}
+          />
+        )}
 
-                <form onSubmit={handleUpdate} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Title
-                    </label>
-                    <input
-                      type="text"
-                      value={editingItem.title}
-                      onChange={(e) =>
-                        setEditingItem({
-                          ...editingItem,
-                          title: e.target.value,
-                        })
-                      }
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={editingItem.description}
-                      onChange={(e) =>
-                        setEditingItem({
-                          ...editingItem,
-                          description: e.target.value,
-                        })
-                      }
-                      rows={3}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Price (LKR)
-                      </label>
-                      <input
-                        type="number"
-                        value={editingItem.price}
-                        onChange={(e) =>
-                          setEditingItem({
-                            ...editingItem,
-                            price: e.target.value,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                        required
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-
-                    {store?.type === "product" ? (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Stock Quantity
-                        </label>
-                        <input
-                          type="number"
-                          value={editingItem.stock}
-                          onChange={(e) =>
-                            setEditingItem({
-                              ...editingItem,
-                              stock: e.target.value,
-                            })
-                          }
-                          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                          required
-                          min="0"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Duration (minutes)
-                        </label>
-                        <input
-                          type="number"
-                          value={editingItem.duration}
-                          onChange={(e) =>
-                            setEditingItem({
-                              ...editingItem,
-                              duration: e.target.value,
-                            })
-                          }
-                          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                          required
-                          min="15"
-                          step="15"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Category
-                    </label>
-                    <select
-                      value={editingItem.category}
-                      onChange={(e) =>
-                        setEditingItem({
-                          ...editingItem,
-                          category: e.target.value,
-                        })
-                      }
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                      required
-                    >
-                      <option value="">Select a category</option>
-                      {categories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {store?.type === "service" && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Price Type
-                      </label>
-                      <select
-                        value={editingItem.priceType || "fixed"}
-                        onChange={(e) =>
-                          setEditingItem({
-                            ...editingItem,
-                            priceType: e.target.value,
-                          })
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                      >
-                        <option value="fixed">Fixed Price</option>
-                        <option value="hourly">Hourly Rate</option>
-                      </select>
-                    </div>
-                  )}
-                  {store?.type === "product" && limitsInfo.itemVariants && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Color Variants
-                      </label>
-                      {(editingItem?.variants?.colors || []).map(
-                        (color, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center space-x-2 mb-2"
-                          >
-                            <input
-                              type="text"
-                              placeholder="Color Name"
-                              value={color.name}
-                              onChange={(e) => {
-                                const updated = [
-                                  ...editingItem.variants.colors,
-                                ];
-                                updated[index].name = e.target.value;
-                                setEditingItem((prev) => ({
-                                  ...prev,
-                                  variants: {
-                                    ...prev.variants,
-                                    colors: updated,
-                                  },
-                                }));
-                              }}
-                              className="border border-gray-300 rounded px-2 py-1"
-                            />
-                            <input
-                              type="color"
-                              value={color.hex}
-                              onChange={(e) => {
-                                const updated = [
-                                  ...editingItem.variants.colors,
-                                ];
-                                updated[index].hex = e.target.value;
-                                setEditingItem((prev) => ({
-                                  ...prev,
-                                  variants: {
-                                    ...prev.variants,
-                                    colors: updated,
-                                  },
-                                }));
-                              }}
-                              className="w-10 h-10 border"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated =
-                                  editingItem.variants.colors.filter(
-                                    (_, i) => i !== index
-                                  );
-                                setEditingItem((prev) => ({
-                                  ...prev,
-                                  variants: {
-                                    ...prev.variants,
-                                    colors: updated,
-                                  },
-                                }));
-                              }}
-                              className="text-red-500 hover:underline"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        )
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingItem((prev) => ({
-                            ...prev,
-                            variants: {
-                              ...prev.variants,
-                              colors: [
-                                ...(prev.variants.colors || []),
-                                { name: "", hex: "#000000" },
-                              ],
-                            },
-                          }));
-                        }}
-                        className="text-blue-500 hover:underline mt-2"
-                      >
-                        + Add Color
-                      </button>
-                    </div>
-                  )}
-                  {store?.type === "product" && limitsInfo.itemVariants && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Size Variants
-                      </label>
-                      {(editingItem?.variants?.sizes || []).map(
-                        (size, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center space-x-2 mb-2"
-                          >
-                            <input
-                              type="text"
-                              placeholder="Size Name"
-                              value={size.name}
-                              onChange={(e) => {
-                                const updated = [...editingItem.variants.sizes];
-                                updated[index].name = e.target.value;
-                                setEditingItem((prev) => ({
-                                  ...prev,
-                                  variants: {
-                                    ...prev.variants,
-                                    sizes: updated,
-                                  },
-                                }));
-                              }}
-                              className="border border-gray-300 rounded px-2 py-1"
-                            />
-                            <select
-                              value={size.inStock ? "true" : "false"}
-                              onChange={(e) => {
-                                const updated = [...editingItem.variants.sizes];
-                                updated[index].inStock =
-                                  e.target.value === "true";
-                                setEditingItem((prev) => ({
-                                  ...prev,
-                                  variants: {
-                                    ...prev.variants,
-                                    sizes: updated,
-                                  },
-                                }));
-                              }}
-                              className="border border-gray-300 rounded px-2 py-1"
-                            >
-                              <option value="true">In Stock</option>
-                              <option value="false">Out of Stock</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated =
-                                  editingItem.variants.sizes.filter(
-                                    (_, i) => i !== index
-                                  );
-                                setEditingItem((prev) => ({
-                                  ...prev,
-                                  variants: {
-                                    ...prev.variants,
-                                    sizes: updated,
-                                  },
-                                }));
-                              }}
-                              className="text-red-500 hover:underline"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        )
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingItem((prev) => ({
-                            ...prev,
-                            variants: {
-                              ...prev.variants,
-                              sizes: [
-                                ...(prev.variants.sizes || []),
-                                { name: "", inStock: true },
-                              ],
-                            },
-                          }));
-                        }}
-                        className="text-blue-500 hover:underline mt-2"
-                      >
-                        + Add Size
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowEditModal(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
-                    >
-                      Update {store?.type === "product" ? "Product" : "Service"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
+        {editingService && (
+          <UpdateService
+            service={editingService}
+            onUpdate={handleUpdateComplete}
+            onCancel={handleUpdateCancel}
+          />
         )}
       </div>
     </div>
