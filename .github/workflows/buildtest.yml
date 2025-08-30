@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [22.x]   # upgraded to Node 22
 
     steps:
       - name: Checkout code
@@ -23,19 +23,17 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       # Frontend steps
-      - name: Install fontend dependencies
+      - name: Install frontend dependencies
         working-directory: ./fontend
         run: npm ci
 
-      - name: Build fontend
+      - name: Build frontend
         working-directory: ./fontend
         run: npm run build
 
-      - name: Run fontend tests
+      - name: Run frontend tests
         working-directory: ./fontend
         run: npm test --if-present
-
-
 
       # Backend steps
       - name: Install backend dependencies
@@ -45,4 +43,3 @@ jobs:
       - name: Run backend tests
         working-directory: ./backend
         run: npm test --if-present
-
