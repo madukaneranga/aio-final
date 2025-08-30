@@ -8,9 +8,7 @@
     "start": "react-scripts start",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "server": "node ./server/index.js",
-    "server:dev": "nodemon ./server/index.js"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@react-three/fiber": "^8.15.19",
