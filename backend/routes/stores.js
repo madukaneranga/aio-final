@@ -6,12 +6,83 @@ import Store from "../models/Store.js";
 import Product from "../models/Product.js";
 import Service from "../models/Service.js";
 import User from "../models/User.js";
+import Order from "../models/Order.js";
+import Booking from "../models/Booking.js";
 import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+// Helper function to calculate completion rate for a store
+const calculateCompletionRate = async (storeId, storeType) => {
+  try {
+    let completedCount = 0;
+    let cancelledCount = 0;
+
+    if (storeType === "product") {
+      // For product stores: completed = delivered, cancelled = cancelled
+      const orderStats = await Order.aggregate([
+        { $match: { storeId: storeId } },
+        {
+          $group: {
+            _id: null,
+            completed: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "delivered"] }, 1, 0]
+              }
+            },
+            cancelled: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0]
+              }
+            }
+          }
+        }
+      ]);
+
+      if (orderStats.length > 0) {
+        completedCount = orderStats[0].completed;
+        cancelledCount = orderStats[0].cancelled;
+      }
+    } else if (storeType === "service") {
+      // For service stores: completed = completed, cancelled = cancelled
+      const bookingStats = await Booking.aggregate([
+        { $match: { storeId: storeId } },
+        {
+          $group: {
+            _id: null,
+            completed: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "completed"] }, 1, 0]
+              }
+            },
+            cancelled: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0]
+              }
+            }
+          }
+        }
+      ]);
+
+      if (bookingStats.length > 0) {
+        completedCount = bookingStats[0].completed;
+        cancelledCount = bookingStats[0].cancelled;
+      }
+    }
+
+    // Calculate completion rate: (completed / (completed + cancelled)) * 100
+    const total = completedCount + cancelledCount;
+    const completionRate = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+    return completionRate;
+  } catch (error) {
+    console.error("Error calculating completion rate:", error);
+    return 0;
+  }
+};
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -52,7 +123,32 @@ router.get("/", async (req, res) => {
       .populate("ownerId", "name")
       .sort({ rating: -1, totalSales: -1 });
 
-    res.json(stores);
+    // Calculate completion rates and dynamic stats for all stores
+    const storesWithDynamicStats = await Promise.all(
+      stores.map(async (store) => {
+        const completionRate = await calculateCompletionRate(store._id, store.type);
+        store._completionRate = completionRate;
+        
+        // Calculate dynamic orders/bookings count
+        let totalOrdersOrBookings = 0;
+        if (store.type === "product") {
+          totalOrdersOrBookings = await Order.countDocuments({ storeId: store._id });
+        } else if (store.type === "service") {
+          totalOrdersOrBookings = await Booking.countDocuments({ storeId: store._id });
+        }
+        
+        // Add dynamic stats to store object
+        const storeWithStats = store.toObject();
+        storeWithStats.stats = {
+          ...storeWithStats.stats,
+          totalOrdersOrBookings: totalOrdersOrBookings
+        };
+        
+        return storeWithStats;
+      })
+    );
+
+    res.json(storesWithDynamicStats);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -75,7 +171,32 @@ router.post("/listing", async (req, res) => {
       .populate("ownerId", "name type")
       .sort({ createdAt: -1 });
 
-    res.json(stores);
+    // Calculate completion rates and dynamic stats for all stores
+    const storesWithDynamicStats = await Promise.all(
+      stores.map(async (store) => {
+        const completionRate = await calculateCompletionRate(store._id, store.type);
+        store._completionRate = completionRate;
+        
+        // Calculate dynamic orders/bookings count
+        let totalOrdersOrBookings = 0;
+        if (store.type === "product") {
+          totalOrdersOrBookings = await Order.countDocuments({ storeId: store._id });
+        } else if (store.type === "service") {
+          totalOrdersOrBookings = await Booking.countDocuments({ storeId: store._id });
+        }
+        
+        // Add dynamic stats to store object
+        const storeWithStats = store.toObject();
+        storeWithStats.stats = {
+          ...storeWithStats.stats,
+          totalOrdersOrBookings: totalOrdersOrBookings
+        };
+        
+        return storeWithStats;
+      })
+    );
+
+    res.json(storesWithDynamicStats);
   } catch (error) {
     console.error("Search error:", error);
     res.status(500).json({ error: error.message });
@@ -90,7 +211,32 @@ router.get("/featured/list", async (req, res) => {
       .sort({ rating: -1, totalSales: -1 })
       .limit(6);
 
-    res.json(stores);
+    // Calculate completion rates and dynamic stats for all stores
+    const storesWithDynamicStats = await Promise.all(
+      stores.map(async (store) => {
+        const completionRate = await calculateCompletionRate(store._id, store.type);
+        store._completionRate = completionRate;
+        
+        // Calculate dynamic orders/bookings count
+        let totalOrdersOrBookings = 0;
+        if (store.type === "product") {
+          totalOrdersOrBookings = await Order.countDocuments({ storeId: store._id });
+        } else if (store.type === "service") {
+          totalOrdersOrBookings = await Booking.countDocuments({ storeId: store._id });
+        }
+        
+        // Add dynamic stats to store object
+        const storeWithStats = store.toObject();
+        storeWithStats.stats = {
+          ...storeWithStats.stats,
+          totalOrdersOrBookings: totalOrdersOrBookings
+        };
+        
+        return storeWithStats;
+      })
+    );
+
+    res.json(storesWithDynamicStats);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -168,6 +314,18 @@ router.get("/:id", async (req, res) => {
 
     console.log("Store found:", store.name, "Type:", store.type);
 
+    // Calculate completion rate for this store
+    const completionRate = await calculateCompletionRate(store._id, store.type);
+    store._completionRate = completionRate;
+
+    // Calculate dynamic orders/bookings count
+    let totalOrdersOrBookings = 0;
+    if (store.type === "product") {
+      totalOrdersOrBookings = await Order.countDocuments({ storeId: store._id });
+    } else if (store.type === "service") {
+      totalOrdersOrBookings = await Booking.countDocuments({ storeId: store._id });
+    }
+
     // Get store products or services
     let listings = [];
     if (store.type === "product") {
@@ -178,10 +336,17 @@ router.get("/:id", async (req, res) => {
       console.log("Found services:", listings.length);
     }
 
+    // Create store object with dynamic stats
+    const storeWithDynamicStats = {
+      ...store.toObject(),
+      stats: {
+        ...store.stats,
+        totalOrdersOrBookings: totalOrdersOrBookings
+      }
+    };
+
     res.json({
-      store: {
-        ...store.toObject(),
-      },
+      store: storeWithDynamicStats,
       listings,
     });
   } catch (error) {

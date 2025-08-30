@@ -682,7 +682,7 @@ const StoreInfo = ({
                       className="text-lg font-semibold"
                       style={{ color: colors.primary }}
                     >
-                      {storeData.stats.totalOrdersOrBookings.toLocaleString()}
+                      {(storeData.stats?.totalOrdersOrBookings || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500">
                       {storeData.type === "product" ? "Orders" : "Bookings"}

@@ -29,7 +29,12 @@ function getOrderNotificationContent(status) {
     case "delivered":
       return {
         title: "🎉 Order Delivered",
-        body: "Your order has been delivered. We hope you enjoy your purchase!",
+        body: "Your order has been delivered. Please confirm receipt within 14 days or it will be auto-confirmed.",
+      };
+    case "completed":
+      return {
+        title: "✅ Order Completed",
+        body: "Your order has been completed. Thank you for your purchase!",
       };
     case "cancelled":
       return {
@@ -201,6 +206,16 @@ router.put(
       if (trackingNumber) updates.trackingNumber = trackingNumber;
       if (notes) updates.notes = notes;
 
+      // If status is being set to delivered, set delivery tracking dates
+      if (status === "delivered") {
+        const deliveredAt = new Date();
+        const confirmationDeadline = new Date();
+        confirmationDeadline.setDate(confirmationDeadline.getDate() + 14); // 14 days from now
+        
+        updates.deliveredAt = deliveredAt;
+        updates.customerConfirmationDeadline = confirmationDeadline;
+      }
+
       const updatedOrder = await Order.findByIdAndUpdate(
         req.params.id,
         updates,
@@ -330,6 +345,73 @@ router.put("/:id/mark-delivered", authenticate, async (req, res) => {
   }
 });
 
+// Customer marks bank transfer payment as sent
+router.put("/:id/mark-payment-sent", authenticate, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).populate("storeId", "name ownerId");
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Check if user owns this order
+    if (order.customerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Check if this is a bank transfer order
+    if (order.paymentDetails?.paymentMethod !== "bank_transfer") {
+      return res.status(400).json({ 
+        error: "Only bank transfer orders can be marked as payment sent" 
+      });
+    }
+
+    // Check if payment is still pending
+    if (order.paymentDetails?.paymentStatus !== "pending_bank_transfer") {
+      return res.status(400).json({ 
+        error: "Payment has already been processed or is not pending" 
+      });
+    }
+
+    // Update payment status
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id,
+      {
+        "paymentDetails.paymentStatus": "customer_paid_pending_confirmation",
+        "paymentDetails.updatedAt": new Date(),
+        "paymentDetails.updatedBy": "customer",
+      },
+      { new: true }
+    );
+
+    // Notify store owner
+    const storeNotification = await Notification.create({
+      userId: order.storeId.ownerId,
+      title: "💰 Customer Payment Claimed",
+      userType: "store_owner",
+      body: `Customer claims payment sent for order #${order._id.toString().slice(-8)}. Please verify and confirm.`,
+      type: "payment_update",
+      link: "/orders",
+    });
+
+    // Emit notification to store owner
+    try {
+      emitNotification(order.storeId.ownerId.toString(), storeNotification);
+    } catch (emitError) {
+      console.error("Failed to emit notification:", emitError);
+    }
+
+    res.json({
+      success: true,
+      message: "Payment marked as sent. Awaiting store confirmation.",
+      order: updatedOrder,
+    });
+
+  } catch (error) {
+    console.error("Error marking payment as sent:", error);
+    res.status(500).json({ error: "Failed to mark payment as sent" });
+  }
+});
+
 // Store owner updates payment status for bank transfer and COD orders
 router.put("/:id/update-payment-status", 
   authenticate, 
@@ -402,6 +484,17 @@ router.put("/:id/update-payment-status",
         });
       }
 
+      // Validate status transitions for bank transfers
+      if (currentPaymentMethod === "bank_transfer") {
+        const validStatuses = ["pending_bank_transfer", "customer_paid_pending_confirmation"];
+        if (!validStatuses.includes(currentPaymentStatus)) {
+          return res.status(400).json({ 
+            error: "Invalid payment status for bank transfer update",
+            currentStatus: currentPaymentStatus
+          });
+        }
+      }
+
       console.log("Validation passed, updating payment status...");
 
       // Update order payment status
@@ -448,15 +541,31 @@ router.put("/:id/update-payment-status",
         });
       }
 
-      // Notify customer
+      // Notify customer with contextual messaging
+      let notificationTitle, notificationBody;
+      
+      if (paymentStatus === "paid") {
+        notificationTitle = "💰 Payment Confirmed";
+        if (currentPaymentStatus === "customer_paid_pending_confirmation") {
+          notificationBody = `Your claimed ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment for order #${order._id.toString().slice(-8)} has been confirmed by the seller.`;
+        } else {
+          notificationBody = `Your ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment for order #${order._id.toString().slice(-8)} has been confirmed by the seller.`;
+        }
+      } else {
+        notificationTitle = "❌ Payment Issue";
+        if (currentPaymentStatus === "customer_paid_pending_confirmation") {
+          notificationBody = `Your claimed payment for order #${order._id.toString().slice(-8)} was rejected. Please verify your ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment.`;
+        } else {
+          notificationBody = `There was an issue with your ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment for order #${order._id.toString().slice(-8)}.`;
+        }
+      }
+
       const notification = await Notification.create({
         userId: order.customerId,
-        title: paymentStatus === "paid" ? "💰 Payment Confirmed" : "❌ Payment Issue",
+        title: notificationTitle,
         userType: "customer",
-        body: paymentStatus === "paid" 
-          ? `Your ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment for order #${order._id.toString().slice(-8)} has been confirmed.`
-          : `There was an issue with your ${currentPaymentMethod === "bank_transfer" ? "bank transfer" : "COD"} payment for order #${order._id.toString().slice(-8)}.`,
-        type: "order_update",
+        body: notificationBody,
+        type: "payment_update",
         link: "/orders",
       });
 
@@ -481,5 +590,112 @@ router.put("/:id/update-payment-status",
     }
   }
 );
+
+// Customer confirms order delivery
+router.put("/:id/confirm-delivery", authenticate, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).populate("storeId", "name ownerId");
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Check if user owns this order
+    if (order.customerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Check if order is in delivered status
+    if (order.status !== "delivered") {
+      return res.status(400).json({ 
+        error: "Order must be delivered before it can be confirmed" 
+      });
+    }
+
+    // Check if confirmation deadline has passed
+    if (order.customerConfirmationDeadline && new Date() > order.customerConfirmationDeadline) {
+      return res.status(400).json({ 
+        error: "Confirmation deadline has passed. Order has been auto-confirmed." 
+      });
+    }
+
+    // Check if already confirmed
+    if (order.status === "completed") {
+      return res.status(400).json({ 
+        error: "Order has already been confirmed" 
+      });
+    }
+
+    // Update order to completed status
+    const updatedOrder = await Order.findByIdAndUpdate(
+      req.params.id,
+      {
+        status: "completed",
+        confirmedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    // Complete the wallet transaction if exists
+    await WalletTransaction.updateMany(
+      { 
+        transactionId: order.combinedId || order._id.toString(),
+        status: "pending" 
+      },
+      { 
+        status: "completed",
+        description: "Order completed - confirmed by customer"
+      }
+    );
+
+    // Update store total sales if not already updated
+    await Store.findByIdAndUpdate(order.storeId, {
+      $inc: { totalSales: order.storeAmount },
+    });
+
+    // Notify store owner
+    const storeNotification = await Notification.create({
+      userId: order.storeId.ownerId,
+      title: "✅ Order Confirmed",
+      userType: "store_owner",
+      body: `Customer confirmed delivery for order #${order._id.toString().slice(-8)}. Thank you for your service!`,
+      type: "order_update",
+      link: "/orders",
+    });
+
+    // Emit notification to store owner
+    try {
+      emitNotification(order.storeId.ownerId.toString(), storeNotification);
+    } catch (emitError) {
+      console.error("Failed to emit notification:", emitError);
+    }
+
+    // Notify customer of successful confirmation
+    const customerNotification = await Notification.create({
+      userId: order.customerId,
+      title: "🎉 Order Confirmed",
+      userType: "customer", 
+      body: `Thank you for confirming delivery of order #${order._id.toString().slice(-8)}. Your order is now complete!`,
+      type: "order_update",
+      link: "/orders",
+    });
+
+    // Emit notification to customer
+    try {
+      emitNotification(order.customerId.toString(), customerNotification);
+    } catch (emitError) {
+      console.error("Failed to emit notification:", emitError);
+    }
+
+    res.json({
+      success: true,
+      message: "Order confirmed successfully",
+      order: updatedOrder,
+    });
+
+  } catch (error) {
+    console.error("Error confirming order delivery:", error);
+    res.status(500).json({ error: "Failed to confirm order delivery" });
+  }
+});
 
 export default router;

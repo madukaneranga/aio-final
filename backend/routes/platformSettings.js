@@ -98,7 +98,7 @@ router.get('/:category', authenticate, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Settings not found' });
     }
 
-    const validCategories = ['commissionRates', 'subscriptionSettings', 'paymentSettings', 'platformConfig', 'features'];
+    const validCategories = ['subscriptionSettings', 'paymentSettings', 'platformConfig', 'features'];
     
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
@@ -116,7 +116,7 @@ router.put('/:category', authenticate, requireAdmin, async (req, res) => {
     const { category } = req.params;
     const updates = req.body;
 
-    const validCategories = ['commissionRates', 'subscriptionSettings', 'paymentSettings', 'platformConfig', 'features'];
+    const validCategories = ['subscriptionSettings', 'paymentSettings', 'platformConfig', 'features'];
     
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });

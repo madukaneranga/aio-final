@@ -91,6 +91,21 @@ const walletTransactionSchema = new Schema(
       // When true, this transaction will not affect wallet balance calculations
       // Used for bank transfers and COD payments where money never comes to platform
     },
+    // Fields for storing pending PayHere order/booking data
+    orderData: {
+      type: Schema.Types.Mixed,
+      // Stores order information for pending PayHere payments
+      // Structure: { items: [...], totalAmount: number, storeId: string, shippingAddress: {...} }
+    },
+    bookingData: {
+      type: Schema.Types.Mixed,
+      // Stores booking information for pending PayHere payments
+      // Structure: { serviceId: string, bookingDetails: {...}, totalAmount: number, storeId: string }
+    },
+    shippingAddress: {
+      type: Schema.Types.Mixed,
+      // Stores shipping address for pending PayHere orders
+    },
   },
   {
     timestamps: true,

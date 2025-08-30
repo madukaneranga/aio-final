@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 import Service from "../models/Service.js";
 import Store from "../models/Store.js";
 import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
-import { getUserPackage } from "../utils/getUserPackage.js";
 import SearchHistory from "../models/SearchHistory.js";
 import User from "../models/User.js";
 
@@ -204,6 +203,69 @@ router.post("/listing", optionalAuth, async (req, res) => {
   }
 });
 
+// Get service recommendations
+router.get("/recommendations", async (req, res) => {
+  try {
+    const { category, exclude, storeId, limit = 8, sort = "recent" } = req.query;
+    let query = { isActive: true };
+
+    console.log("Received service recommendations request:", {
+      category,
+      exclude,
+      storeId,
+      limit,
+      sort,
+    });
+
+    // Handle category filter
+    if (category) {
+      query.category = category;
+    }
+
+    // Handle store filter
+    if (storeId) {
+      query.storeId = storeId;
+    }
+
+    // Handle exclusions (comma-separated IDs)
+    if (exclude) {
+      const excludeIds = exclude.split(",").map(id => id.trim()).filter(Boolean);
+      if (excludeIds.length > 0) {
+        query._id = { $nin: excludeIds };
+      }
+    }
+
+    // Build sort options
+    let sortOptions = { createdAt: -1 }; // Default: newest first
+    if (sort === "popular") {
+      sortOptions = { orderCount: -1, rating: -1, createdAt: -1 };
+    } else if (sort === "rating") {
+      sortOptions = { rating: -1, createdAt: -1 };
+    } else if (sort === "price_low") {
+      sortOptions = { price: 1 };
+    } else if (sort === "price_high") {
+      sortOptions = { price: -1 };
+    }
+
+    console.log("Executing service recommendations query:", JSON.stringify(query, null, 2));
+    console.log("Sort options:", sortOptions);
+
+    const recommendations = await Service.find(query)
+      .populate("storeId", "name type")
+      .sort(sortOptions)
+      .limit(parseInt(limit))
+      .lean();
+
+    console.log("Found service recommendations:", recommendations.length);
+
+    // Return array directly as expected by frontend
+    res.json(recommendations);
+  } catch (error) {
+    console.error("Service recommendations error:", error);
+    res.status(500).json({ error: "Failed to fetch service recommendations" });
+  }
+});
+
 // Get service by ID
 router.get("/:id", async (req, res) => {
   try {
@@ -251,21 +313,6 @@ router.post("/", authenticate, authorize("store_owner"), async (req, res) => {
       return res.status(403).json({
         error:
           "Service store not found. You need a service store to create services.",
-      });
-    }
-
-    //Check Limits
-    const userId = req.user._id;
-    const userPackage = await getUserPackage(userId);
-
-    const currentItemCount = await Service.countDocuments({
-      ownerId: userId,
-      isActive: true,
-    });
-
-    if (currentItemCount >= userPackage.items) {
-      return res.status(403).json({
-        error: `Item limit reached for your ${userPackage.name} plan`,
       });
     }
 

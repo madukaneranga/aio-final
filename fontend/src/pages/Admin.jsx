@@ -902,23 +902,6 @@ const Admin = () => {
         canEdit: true,
         canDelete: false
       },
-      'commissions': {
-        collection: 'all-commissions',
-        title: 'Commission Management',
-        columns: [
-          { key: 'storeId.name', label: 'Store', type: 'object' },
-          { key: 'totalAmount', label: 'Order Amount', type: 'currency' },
-          { key: 'commissionAmount', label: 'Commission', type: 'currency' },
-          { key: 'storeAmount', label: 'Store Amount', type: 'currency' },
-          { key: 'status', label: 'Status', type: 'status' },
-          { key: 'createdAt', label: 'Created', type: 'date' }
-        ],
-        searchFields: [],
-        filterField: 'status',
-        canCreate: false,
-        canEdit: true,
-        canDelete: false
-      },
       'packages': {
         collection: 'all-packages',
         title: 'Package Management',
@@ -1220,7 +1203,6 @@ const Admin = () => {
     // Financial & Transactions
     { id: 'withdrawals', name: 'Withdrawals', icon: DollarSign, description: 'Withdrawal requests' },
     { id: 'wallets', name: 'Wallets', icon: Wallet, description: 'User wallets' },
-    { id: 'commissions', name: 'Commissions', icon: CreditCard, description: 'Commission tracking' },
     { id: 'pending-transactions', name: 'Pending Transactions', icon: Clock, description: 'Pending payments' },
     
     // Communication & Social

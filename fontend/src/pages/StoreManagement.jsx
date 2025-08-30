@@ -66,6 +66,7 @@ const StoreManagement = () => {
       email: "",
       phone: "",
       address: "",
+      whatsapp: "",
     },
     serviceSettings: {
       workingHours: {
@@ -144,6 +145,7 @@ const StoreManagement = () => {
             email: "",
             phone: "",
             address: "",
+            whatsapp: "",
           },
           serviceSettings: data.store.serviceSettings || {
             workingHours: { start: "09:00", end: "17:00" },
@@ -1094,6 +1096,19 @@ const StoreManagement = () => {
                       value={formData.contactInfo.phone}
                       onChange={handleChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      WhatsApp
+                    </label>
+                    <input
+                      type="tel"
+                      name="contactInfo.whatsapp"
+                      value={formData.contactInfo.whatsapp}
+                      onChange={handleChange}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                      placeholder="+94 77 123 4567"
                     />
                   </div>
                 </div>

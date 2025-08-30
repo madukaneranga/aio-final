@@ -7,13 +7,13 @@ import Booking from "../models/Booking.js";
 import Product from "../models/Product.js";
 import Service from "../models/Service.js";
 import Store from "../models/Store.js";
-import Commission from "../models/Commission.js";
 import Notification from "../models/Notification.js";
 import BankDetails from "../models/BankDetails.js";
 import { authenticate } from "../middleware/auth.js";
 import { emitNotification } from "../utils/socketUtils.js";
 import { v4 as uuidv4 } from "uuid";
 import WalletTransaction from "../models/WalletTransaction.js";
+import { createPurchaseNotification } from "./notifications.js";
 
 const router = express.Router();
 
@@ -45,14 +45,11 @@ router.post("/payhere-intent", authenticate, async (req, res) => {
 
     const combinedId = generateTransactionId("SALE", req.user._id);
     let totalAmount = 0;
-    let totalTransactionAmount = 0;
 
-    const createdEntities = {
-      order: [],
-      bookings: [],
-    };
+    const pendingOrdersData = [];
+    const pendingBookingsData = [];
 
-    // --- Handle Orders ---
+    // --- Validate and Process Orders ---
     if (orderItems.length > 0) {
       // Group order items by storeId
       const storeOrderMap = new Map();
@@ -94,77 +91,25 @@ router.post("/payhere-intent", authenticate, async (req, res) => {
         storeData.totalAmount += product.price * item.quantity;
       }
 
-      // Create one Order per store group
+      // Store order data for each store
       for (const [storeId, storeData] of storeOrderMap.entries()) {
-        const commissionRate = 0.05;
-        const commissionAmount = storeData.totalAmount * commissionRate;
-        const storeAmount = storeData.totalAmount - commissionAmount;
+        const payhereRate = 0.03; // 3% PayHere processing fee
+        const payhereFee = storeData.totalAmount * payhereRate;
+        const storeAmount = storeData.totalAmount - payhereFee; // 97% goes to seller
 
-        const order = new Order({
-          customerId: req.user._id,
+        pendingOrdersData.push({
           storeId,
           items: storeData.items,
           totalAmount: storeData.totalAmount,
-          platformFee: commissionAmount.toFixed(2),
           storeAmount,
           shippingAddress,
-          status: "pending",
-          combinedId,
-          paymentDetails: {
-            paymentMethod: "payhere",
-            paymentStatus: "pending_payhere",
-          },
         });
 
-        await order.save();
-
-        // Increment product orderCount
-        for (const item of storeData.items) {
-          await Product.findByIdAndUpdate(
-            item.productId,
-            { $inc: { "stats.orderCount": item.quantity } } // increment by qty
-          );
-        }
-
-        const store = await Store.findById(storeId);
-
-        if (order) {
-          // Create sales transaction
-          const transaction = new WalletTransaction({
-            userId: store.ownerId,
-            transactionId: combinedId,
-            type: "sale",
-            amount: storeAmount.toFixed(2),
-            status: "pending",
-            description: `Product payment of ${combinedId}`,
-            withdrawalDetails: {
-              processedAt: new Date(),
-            },
-          });
-
-          await transaction.save();
-
-          // Notify store owner about the order creation
-          const storeNotification = await Notification.create({
-            userId: store.ownerId,
-            title: `New order received`,
-            userType: "store_owner",
-            body: `You have a new order with ID #${order._id
-              .toString()
-              .slice(-8)}`,
-            type: "order_update",
-            link: `/orders`,
-          });
-
-          emitNotification(store.ownerId.toString(), storeNotification);
-        }
-
-        createdEntities.order.push(order);
         totalAmount += storeData.totalAmount;
       }
     }
 
-    // --- Handle Bookings ---
+    // --- Validate and Process Bookings ---
     if (bookingItems.length > 0) {
       for (const item of bookingItems) {
         const service = await Service.findById(item.serviceId);
@@ -175,68 +120,18 @@ router.post("/payhere-intent", authenticate, async (req, res) => {
         }
 
         const serviceAmount = service.price;
-        const commissionRate = 0.07;
-        const commissionAmount = serviceAmount * commissionRate;
-        const storeAmount = serviceAmount - commissionAmount;
+        const payhereRate = 0.03; // 3% PayHere processing fee
+        const payhereFee = serviceAmount * payhereRate;
+        const storeAmount = serviceAmount - payhereFee; // 97% goes to seller
 
-        const booking = new Booking({
-          customerId: req.user._id,
+        pendingBookingsData.push({
           storeId: service.storeId,
           serviceId: service._id,
           bookingDetails: item.bookingDetails,
-          totalAmount: serviceAmount.toFixed(2),
-          platformFee: commissionAmount.toFixed(2),
+          totalAmount: serviceAmount,
           storeAmount,
-          status: "pending",
-          combinedId,
-          paymentDetails: {
-            paymentMethod: "payhere",
-            paymentStatus: "pending_payhere",
-          },
         });
 
-        await booking.save();
-
-        
-        // Increment service bookingCount
-        await Service.findByIdAndUpdate(service._id, {
-          $inc: { "stats.bookingCount": 1 },
-        });
-
-        const store = await Store.findById(service.storeId);
-
-        if (booking) {
-          // Create sales transaction
-          const transaction = new WalletTransaction({
-            userId: store.ownerId,
-            transactionId: combinedId,
-            type: "sale",
-            amount: storeAmount.toFixed(2),
-            status: "pending",
-            description: `Product payment of ${combinedId}`,
-            withdrawalDetails: {
-              processedAt: new Date(),
-            },
-          });
-
-          await transaction.save();
-
-          // Notify store owner about the order creation
-          const storeNotification = await Notification.create({
-            userId: store.ownerId,
-            title: `New Booking received`,
-            userType: "store_owner",
-            body: `You have a new booking with ID #${booking._id
-              .toString()
-              .slice(-8)}`,
-            type: "booking_update",
-            link: `/bookings`,
-          });
-
-          emitNotification(store.ownerId.toString(), storeNotification);
-        }
-
-        createdEntities.bookings.push(booking);
         totalAmount += serviceAmount;
       }
     }
@@ -245,6 +140,52 @@ router.post("/payhere-intent", authenticate, async (req, res) => {
       return res
         .status(400)
         .json({ error: "Total amount must be greater than zero" });
+    }
+
+    // --- Create Pending WalletTransaction Records ---
+    const storeIds = [
+      ...pendingOrdersData.map(order => order.storeId),
+      ...pendingBookingsData.map(booking => booking.storeId)
+    ];
+
+    // Get unique store owner IDs
+    const storeOwnerIds = await Store.find({ _id: { $in: storeIds } })
+      .select('ownerId')
+      .distinct('ownerId');
+
+    // Create one pending transaction per store owner
+    for (const ownerId of storeOwnerIds) {
+      const ownerStores = await Store.find({ ownerId }).select('_id');
+      const ownerStoreIds = ownerStores.map(store => store._id.toString());
+
+      const ownerOrders = pendingOrdersData.filter(order => 
+        ownerStoreIds.includes(order.storeId)
+      );
+      const ownerBookings = pendingBookingsData.filter(booking => 
+        ownerStoreIds.includes(booking.storeId.toString())
+      );
+
+      const ownerAmount = [
+        ...ownerOrders.map(order => order.storeAmount),
+        ...ownerBookings.map(booking => booking.storeAmount)
+      ].reduce((sum, amount) => sum + amount, 0);
+
+      const transaction = new WalletTransaction({
+        userId: ownerId,
+        transactionId: combinedId,
+        type: "sale",
+        amount: ownerAmount.toFixed(2),
+        status: "pending",
+        description: `PayHere payment pending: ${combinedId}`,
+        orderData: ownerOrders,
+        bookingData: ownerBookings,
+        shippingAddress: shippingAddress,
+        metadata: {
+          paymentMethod: "payhere",
+        },
+      });
+
+      await transaction.save();
     }
 
     // --- Prepare PayHere Payment ---
@@ -281,10 +222,88 @@ router.post("/payhere-intent", authenticate, async (req, res) => {
 
     console.log("Payment Params generated for PayHere:", paymentParams);
 
-    res.json({ success: true, paymentParams, combinedId, createdEntities });
+    res.json({ 
+      success: true, 
+      paymentParams, 
+      combinedId,
+      transactionId: transaction._id, // Add transaction ID for thank you page
+      message: "Payment intent created. Orders and bookings will be created after successful payment." 
+    });
   } catch (error) {
-    console.error("Combined payment intent error:", error);
+    console.error("PayHere payment intent error:", error);
     res.status(500).json({ error: "Failed to create payment intent" });
+  }
+});
+
+// Bank Transfer Preview - Get bank details without creating orders
+router.post("/bank-transfer-preview", authenticate, async (req, res) => {
+  try {
+    const {
+      orderItems = [],
+      bookingItems = [],
+    } = req.body;
+
+    if (!req.user || req.user.role !== "customer") {
+      return res.status(403).json({ error: "Only customers can preview bank transfer details" });
+    }
+
+    let storeOwners = new Set();
+
+    // Collect store owners from order items
+    if (orderItems.length > 0) {
+      for (const item of orderItems) {
+        const product = await Product.findById(item.productId).populate("storeId");
+        if (product && product.storeId) {
+          storeOwners.add(product.storeId._id.toString());
+        }
+      }
+    }
+
+    // Collect store owners from booking items
+    if (bookingItems.length > 0) {
+      for (const item of bookingItems) {
+        const service = await Service.findById(item.serviceId).populate("storeId");
+        if (service && service.storeId) {
+          storeOwners.add(service.storeId._id.toString());
+        }
+      }
+    }
+
+    // Get bank details for all store owners
+    const bankDetails = [];
+    for (const storeId of storeOwners) {
+      const store = await Store.findById(storeId);
+      if (!store) continue;
+      
+      const bankDetail = await BankDetails.findOne({ userId: store.ownerId });
+      if (bankDetail) {
+        bankDetails.push({
+          storeId,
+          storeName: store.name,
+          bankDetails: {
+            bankName: bankDetail.bankName,
+            accountHolderName: bankDetail.accountHolderName,
+            accountNumber: bankDetail.accountNumber,
+            branchName: bankDetail.branchName,
+            routingNumber: bankDetail.routingNumber,
+          },
+          contactInfo: {
+            whatsapp: store.contactInfo?.whatsapp || null,
+            email: store.contactInfo?.email || null,
+          }
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      bankDetails,
+      message: "Bank transfer details retrieved successfully"
+    });
+
+  } catch (error) {
+    console.error("Bank transfer preview error:", error);
+    res.status(500).json({ error: "Failed to get bank transfer details" });
   }
 });
 
@@ -341,16 +360,13 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
 
       // Create orders
       for (const [storeId, storeData] of storeOrderMap.entries()) {
-        const commissionRate = 0.05;
-        const commissionAmount = storeData.totalAmount * commissionRate;
-        const storeAmount = storeData.totalAmount - commissionAmount;
+        const storeAmount = storeData.totalAmount; // 100% goes to seller
 
         const order = new Order({
           customerId: req.user._id,
           storeId,
           items: storeData.items,
           totalAmount: storeData.totalAmount,
-          platformFee: commissionAmount.toFixed(2),
           storeAmount,
           shippingAddress,
           status: "pending",
@@ -363,6 +379,9 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
         });
 
         await order.save();
+
+        // Create purchase confirmation notification
+        await createPurchaseNotification(req.user._id, 'order', order);
 
         // Create wallet transaction (excluded from balance - bank transfer money never comes to platform)
         const transaction = new WalletTransaction({
@@ -390,9 +409,7 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
         }
 
         const serviceAmount = service.price;
-        const commissionRate = 0.07;
-        const commissionAmount = serviceAmount * commissionRate;
-        const storeAmount = serviceAmount - commissionAmount;
+        const storeAmount = serviceAmount; // 100% goes to seller
 
         storeOwners.add(service.storeId.toString());
 
@@ -402,7 +419,6 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
           serviceId: service._id,
           bookingDetails: item.bookingDetails,
           totalAmount: serviceAmount.toFixed(2),
-          platformFee: commissionAmount.toFixed(2),
           storeAmount,
           status: "pending",
           combinedId,
@@ -414,6 +430,9 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
         });
 
         await booking.save();
+
+        // Create purchase confirmation notification
+        await createPurchaseNotification(req.user._id, 'booking', booking);
 
         // Create wallet transaction (excluded from balance - bank transfer money never comes to platform)
         const transaction = new WalletTransaction({
@@ -462,6 +481,7 @@ router.post("/bank-transfer-intent", authenticate, async (req, res) => {
     res.json({
       success: true,
       combinedId,
+      transactionId: createdEntities.order.length > 0 ? createdEntities.order[0]._id : createdEntities.bookings[0]._id, // Add transaction ID for thank you page
       totalAmount,
       bankDetails,
       instructions: "Please transfer the amount to the bank account(s) above and contact the store via WhatsApp or email with your transfer receipt.",
@@ -532,16 +552,13 @@ router.post("/cod-intent", authenticate, async (req, res) => {
 
       // Create orders
       for (const [storeId, storeData] of storeOrderMap.entries()) {
-        const commissionRate = 0.05;
-        const commissionAmount = storeData.totalAmount * commissionRate;
-        const storeAmount = storeData.totalAmount - commissionAmount;
+        const storeAmount = storeData.totalAmount; // 100% goes to seller
 
         const order = new Order({
           customerId: req.user._id,
           storeId,
           items: storeData.items,
           totalAmount: storeData.totalAmount,
-          platformFee: commissionAmount.toFixed(2),
           storeAmount,
           shippingAddress,
           status: "pending",
@@ -554,6 +571,9 @@ router.post("/cod-intent", authenticate, async (req, res) => {
         });
 
         await order.save();
+
+        // Create purchase confirmation notification
+        await createPurchaseNotification(req.user._id, 'order', order);
 
         // Create wallet transaction (excluded from balance - COD money never comes to platform)
         const transaction = new WalletTransaction({
@@ -581,9 +601,7 @@ router.post("/cod-intent", authenticate, async (req, res) => {
         }
 
         const serviceAmount = service.price;
-        const commissionRate = 0.07;
-        const commissionAmount = serviceAmount * commissionRate;
-        const storeAmount = serviceAmount - commissionAmount;
+        const storeAmount = serviceAmount; // 100% goes to seller
 
         const booking = new Booking({
           customerId: req.user._id,
@@ -591,7 +609,6 @@ router.post("/cod-intent", authenticate, async (req, res) => {
           serviceId: service._id,
           bookingDetails: item.bookingDetails,
           totalAmount: serviceAmount.toFixed(2),
-          platformFee: commissionAmount.toFixed(2),
           storeAmount,
           status: "pending",
           combinedId,
@@ -603,6 +620,9 @@ router.post("/cod-intent", authenticate, async (req, res) => {
         });
 
         await booking.save();
+
+        // Create purchase confirmation notification
+        await createPurchaseNotification(req.user._id, 'booking', booking);
 
         // Create wallet transaction (excluded from balance - COD money never comes to platform)
         const transaction = new WalletTransaction({
@@ -630,6 +650,7 @@ router.post("/cod-intent", authenticate, async (req, res) => {
     res.json({
       success: true,
       combinedId,
+      transactionId: createdEntities.order.length > 0 ? createdEntities.order[0]._id : createdEntities.bookings[0]._id, // Add transaction ID for thank you page
       totalAmount,
       message: "COD order created successfully. You can mark it as delivered once you receive your order/service.",
       createdEntities,
@@ -741,132 +762,158 @@ router.post(
       }
 
       if (data.status_code === "2") {
-        // Find PayHere orders pending payment for this combinedId
-        const orders = await Order.find({
-          combinedId: data.order_id,
-          "paymentDetails.paymentMethod": "payhere",
-          "paymentDetails.paymentStatus": "pending_payhere",
-        });
-
-        // Find PayHere bookings pending payment for this combinedId
-        const bookings = await Booking.find({
-          combinedId: data.order_id,
-          "paymentDetails.paymentMethod": "payhere", 
-          "paymentDetails.paymentStatus": "pending_payhere",
-        });
-
-        const sales = await WalletTransaction.find({
+        // Find pending PayHere transactions for this transactionId
+        const pendingTransactions = await WalletTransaction.find({
           transactionId: data.order_id,
           type: "sale",
           status: "pending",
+          "metadata.paymentMethod": "payhere",
         }).populate("userId");
 
-        if (sales.length === 0) {
+        if (pendingTransactions.length === 0) {
           return res.status(404).json({
             success: false,
             message: "Payment not found or already completed",
           });
         }
 
-        // Bulk update for better performance
-        const salesIds = sales.map((item) => item._id);
-        await WalletTransaction.updateMany(
-          { _id: { $in: salesIds } },
-          {
-            status: "completed",
-          }
-        );
+        const createdOrders = [];
+        const createdBookings = [];
 
-        if (orders.length > 0) {
-          // Process all orders
-          for (const order of orders) {
-            // Deduct stock for normal products only (skip preorder products)
-            for (const item of order.items) {
-              const product = await Product.findById(item.productId);
-              if (product && !product.isPreorder) {
-                await Product.findByIdAndUpdate(item.productId, {
-                  $inc: { stock: -item.quantity },
-                });
+        // Process each pending transaction
+        for (const transaction of pendingTransactions) {
+          const customerId = transaction.userId._id;
+
+          // Create Orders from orderData
+          if (transaction.orderData && transaction.orderData.length > 0) {
+            for (const orderInfo of transaction.orderData) {
+              const order = new Order({
+                customerId: customerId,
+                storeId: orderInfo.storeId,
+                items: orderInfo.items,
+                totalAmount: orderInfo.totalAmount,
+                storeAmount: orderInfo.storeAmount,
+                shippingAddress: transaction.shippingAddress,
+                status: "pending",
+                combinedId: data.order_id,
+                paymentDetails: {
+                  paymentMethod: "payhere",
+                  paymentStatus: "paid",
+                  paidAt: new Date(),
+                  transactionId: data.payment_id,
+                },
+              });
+
+              await order.save();
+              createdOrders.push(order);
+
+              // Create purchase confirmation notification
+              await createPurchaseNotification(customerId, 'order', order);
+
+              // Deduct stock and increment orderCount
+              for (const item of orderInfo.items) {
+                const product = await Product.findById(item.productId);
+                if (product) {
+                  // Deduct stock only for non-preorder products
+                  if (!product.isPreorder) {
+                    await Product.findByIdAndUpdate(item.productId, {
+                      $inc: { stock: -item.quantity },
+                    });
+                  }
+                  // Always increment orderCount
+                  await Product.findByIdAndUpdate(item.productId, {
+                    $inc: { "stats.orderCount": item.quantity },
+                  });
+                }
               }
+
+              // Update store total sales
+              await Store.findByIdAndUpdate(orderInfo.storeId, {
+                $inc: {
+                  totalSales: orderInfo.storeAmount,
+                  "stats.totalOrdersOrBookings": 1,
+                },
+              });
+
+              // Notify store owner
+              const store = await Store.findById(orderInfo.storeId);
+              const storeNotification = await Notification.create({
+                userId: store.ownerId,
+                title: `New order received`,
+                userType: "store_owner",
+                body: `You have a new order with ID #${order._id
+                  .toString()
+                  .slice(-8)}`,
+                type: "order_update",
+                link: `/orders`,
+              });
+              emitNotification(store.ownerId.toString(), storeNotification);
             }
-
-            // Update store total sales
-            await Store.findByIdAndUpdate(order.storeId, {
-              $inc: {
-                totalSales: order.storeAmount,
-                "stats.totalOrdersOrBookings": 1,
-              },
-            });
-
-            // Save commission record
-            const commission = new Commission({
-              orderId: order._id,
-              storeId: order.storeId,
-              totalAmount: order.totalAmount,
-              commissionRate: 0.05,
-              commissionAmount: order.platformFee,
-              storeAmount: order.storeAmount,
-              currency: "LKR",
-              type: "order",
-              status: "paid",
-              createdAt: Date.now(),
-            });
-            await commission.save();
-
-            // Mark order as paid
-            order.paymentDetails = {
-              paymentStatus: "paid",
-              paidAt: new Date(),
-              paymentMethod: "payhere",
-              transactionId: data.payment_id,
-            };
-            await order.save();
-
-            // PayHere order payment completed - receipt available on-demand
           }
-        } else if (bookings.length > 0) {
-          // Process all bookings
-          for (const booking of bookings) {
-            // Update store total sales
-            await Store.findByIdAndUpdate(booking.storeId, {
-              $inc: {
-                totalSales: booking.storeAmount,
-                "stats.totalOrdersOrBookings": 1,
-              },
-            });
 
-            // Save commission record
-            const commission = new Commission({
-              bookingId: booking._id,
-              storeId: booking.storeId,
-              totalAmount: booking.totalAmount,
-              commissionRate: 0.05,
-              commissionAmount: booking.platformFee,
-              storeAmount: booking.storeAmount,
-              currency: "LKR",
-              type: "booking",
-              status: "paid",
-              createdAt: Date.now(),
-            });
-            await commission.save();
+          // Create Bookings from bookingData
+          if (transaction.bookingData && transaction.bookingData.length > 0) {
+            for (const bookingInfo of transaction.bookingData) {
+              const booking = new Booking({
+                customerId: customerId,
+                storeId: bookingInfo.storeId,
+                serviceId: bookingInfo.serviceId,
+                bookingDetails: bookingInfo.bookingDetails,
+                totalAmount: bookingInfo.totalAmount,
+                storeAmount: bookingInfo.storeAmount,
+                status: "pending",
+                combinedId: data.order_id,
+                paymentDetails: {
+                  paymentMethod: "payhere",
+                  paymentStatus: "paid",
+                  paidAt: new Date(),
+                  transactionId: data.payment_id,
+                },
+              });
 
-            // Mark booking as paid
-            booking.paymentDetails = {
-              paymentStatus: "paid",
-              paidAt: new Date(),
-              paymentMethod: "payhere",
-              transactionId: data.payment_id,
-            };
-            await booking.save();
+              await booking.save();
+              createdBookings.push(booking);
 
-            // PayHere booking payment completed - receipt available on-demand
+              // Create purchase confirmation notification
+              await createPurchaseNotification(customerId, 'booking', booking);
+
+              // Increment service bookingCount
+              await Service.findByIdAndUpdate(bookingInfo.serviceId, {
+                $inc: { "stats.bookingCount": 1 },
+              });
+
+              // Update store total sales
+              await Store.findByIdAndUpdate(bookingInfo.storeId, {
+                $inc: {
+                  totalSales: bookingInfo.storeAmount,
+                  "stats.totalOrdersOrBookings": 1,
+                },
+              });
+
+              // Notify store owner
+              const store = await Store.findById(bookingInfo.storeId);
+              const storeNotification = await Notification.create({
+                userId: store.ownerId,
+                title: `New booking received`,
+                userType: "store_owner",
+                body: `You have a new booking with ID #${booking._id
+                  .toString()
+                  .slice(-8)}`,
+                type: "booking_update",
+                link: `/bookings`,
+              });
+              emitNotification(store.ownerId.toString(), storeNotification);
+            }
           }
-        } else {
-          console.warn(
-            "No unpaid orders or bookings found for combinedId:",
-            data.order_id
-          );
+
+          // Mark transaction as completed
+          transaction.status = "completed";
+          await transaction.save();
         }
+
+        console.log(`PayHere payment successful for transaction ${data.order_id}:`);
+        console.log(`- Created ${createdOrders.length} orders`);
+        console.log(`- Created ${createdBookings.length} bookings`);
 
         return res.status(200).send("OK");
       } else {
@@ -942,11 +989,6 @@ router.get("/payment-methods", (req, res) => {
   res.json(paymentMethods);
 });
 
-// Receipt generation removed - receipts are now generated on-demand in frontend
-
-// Test receipt generation removed - receipts are now generated on-demand in frontend
-
-// Receipt download removed - receipts are now generated on-demand in frontend
 
 // Main Cancel Route
 router.put("/:id/cancel", authenticate, async (req, res) => {

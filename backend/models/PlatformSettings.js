@@ -1,19 +1,17 @@
 import mongoose from 'mongoose';
 
 const platformSettingsSchema = new mongoose.Schema({
-  // Commission Settings
-  commissionRates: {
-    productSales: {
+  // PayHere Processing Fee Settings
+  paymentProcessing: {
+    payhereProcessingFee: {
       type: Number,
-      default: 0.07, // 7%
-      min: 0,
-      max: 1
+      default: 0.04, // Fixed 4% PayHere processing fee
+      min: 0.04,
+      max: 0.04 // Fixed rate, not configurable
     },
-    serviceBookings: {
-      type: Number,
-      default: 0.07, // 7%
-      min: 0,
-      max: 1
+    description: {
+      type: String,
+      default: "PayHere processing fee - 4% of total transaction amount"
     }
   },
 
@@ -118,10 +116,6 @@ const platformSettingsSchema = new mongoose.Schema({
       default: true
     },
     enableSubscriptions: {
-      type: Boolean,
-      default: true
-    },
-    enableCommissions: {
       type: Boolean,
       default: true
     },

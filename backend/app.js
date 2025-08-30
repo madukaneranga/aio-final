@@ -77,7 +77,6 @@ import bookingRoutes from "./routes/bookings.js";
 import paymentRoutes from "./routes/payments.js";
 import reviewRoutes from "./routes/reviews.js";
 import subscriptionRoutes from "./routes/subscriptions.js";
-import commissionRoutes from "./routes/commissions.js";
 import notificationsRoutes from "./routes/notifications.js";
 import platformSettingsRoutes from "./routes/platformSettings.js";
 import packageRoutes from "./routes/packages.js";
@@ -91,6 +90,10 @@ import postRoutes from "./routes/posts.js";
 import flashDealRoutes from "./routes/flashDeals.js";
 import chatRoutes from "./routes/chats.js";
 import contactRevealRoutes from "./routes/contactReveal.js";
+import cartRoutes from "./routes/cart.js";
+import wishlistRoutes from "./routes/wishlist.js";
+import impressionRoutes from "./routes/impressions.js";
+import thankYouRoutes from "./routes/thankYou.js";
 
 // Route Registration
 if (process.env.NODE_ENV !== "test") {
@@ -108,7 +111,6 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
-app.use("/api/commissions", commissionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
@@ -121,6 +123,10 @@ app.use("/api/posts", postRoutes);
 app.use("/api/flash-deals", flashDealRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api", contactRevealRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/impressions", impressionRoutes);
+app.use("/api/thank-you", thankYouRoutes);
 
 // Special routes
 app.use("/sitemap.xml", sitemapRoutes);

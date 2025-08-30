@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
+import { useWishlist } from "../contexts/WishlistContext";
 import { useNotifications } from "../contexts/NotificationContext";
 import { useGlobalChat } from "../contexts/ChatContext";
 import RoleSwitching from "./RoleSwitching";
@@ -10,6 +11,7 @@ import MegaMenu from "./Category/MegaMenu";
 import {
   Search,
   ShoppingCart,
+  Heart,
   Bell,
   User,
   Menu,
@@ -27,6 +29,7 @@ import { use } from "react";
 const Header = () => {
   const { user, logout, refreshUser } = useAuth();
   const { orderItems, bookingItems } = useCart();
+  const { wishlistItems } = useWishlist();
   const { unreadCount } = useNotifications();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -285,17 +288,30 @@ const Header = () => {
             <div className="flex items-center space-x-2">
               {/* Action Icons */}
               {user?.role === "customer" && (
-                <Link
-                  to="/cart"
-                  className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  {totalItems > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-black text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
-                      {totalItems}
-                    </span>
-                  )}
-                </Link>
+                <>
+                  <Link
+                    to="/cart"
+                    className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    {totalItems > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 bg-black text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                        {totalItems}
+                      </span>
+                    )}
+                  </Link>
+                  <Link
+                    to="/wishlist"
+                    className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
+                  >
+                    <Heart className="w-5 h-5" />
+                    {wishlistItems && wishlistItems.length > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 bg-black text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
+                        {wishlistItems.length}
+                      </span>
+                    )}
+                  </Link>
+                </>
               )}
 
               {user?.role === "store_owner" && (
@@ -400,6 +416,13 @@ const Header = () => {
                             onClick={() => setIsUserMenuOpen(false)}
                           >
                             My Bookings
+                          </Link>
+                          <Link
+                            to="/wishlist"
+                            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            My Wishlist
                           </Link>
                         </>
                       )}

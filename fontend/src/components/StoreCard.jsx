@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Star,
   Store,
@@ -10,12 +10,15 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import useImpression from "../hooks/useImpression";
 
 const StoreCard = ({ store }) => {
+  const cardRef = useRef(null);
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [productCount, setProductCount] = useState(0);
   const { user } = useAuth();
+  const { trackStoreImpression, createImpressionObserver } = useImpression();
 
   useEffect(() => {
     const fetchCount = async () => {
@@ -32,6 +35,23 @@ const StoreCard = ({ store }) => {
 
     fetchCount();
   }, [store._id]);
+
+  // Impression tracking
+  useEffect(() => {
+    const observer = createImpressionObserver((target) => {
+      // Track store impression using our new system
+      trackStoreImpression(store);
+    }, { 
+      threshold: 0.5, // 50% of the card visible = impression
+      rootMargin: '0px'
+    });
+
+    if (cardRef.current) observer.observe(cardRef.current);
+
+    return () => {
+      if (cardRef.current) observer.unobserve(cardRef.current);
+    };
+  }, [store._id, trackStoreImpression, createImpressionObserver]);
 
   const isNew = () => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -55,7 +75,7 @@ const StoreCard = ({ store }) => {
       <Link to={`/store/${store._id}`} className="block">
         <div className="relative w-full">
           {/* Store Card */}
-          <div className="group relative bg-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full">
+          <div ref={cardRef} className="group relative bg-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full">
             {/* Badges */}
             <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 flex flex-col gap-1 sm:gap-2">
               {isNew() && (

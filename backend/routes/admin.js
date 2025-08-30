@@ -11,13 +11,11 @@ import Order from "../models/Order.js";
 import Booking from "../models/Booking.js";
 import Chat from "../models/Chat.js";
 import ChatAnalytics from "../models/ChatAnalytics.js";
-import Commission from "../models/Commission.js";
 import ContactReveal from "../models/ContactReveal.js";
 import EmailSubscription from "../models/EmailSubscription.js";
 import FlashDeal from "../models/FlashDeal.js";
 import Notification from "../models/Notification.js";
 import Package from "../models/Package.js";
-import PendingTransaction from "../models/PendingTransaction.js";
 import PlatformSettings from "../models/PlatformSettings.js";
 import Post from "../models/Post.js";
 import PostComment from "../models/PostComment.js";
@@ -777,13 +775,11 @@ createCRUDRoutes('all-orders', Order, [], 'status', 'customerId storeId');
 createCRUDRoutes('all-bookings', Booking, [], 'status', 'customerId storeId serviceId');
 createCRUDRoutes('all-chats', Chat, [], 'status', 'participants.userId');
 createCRUDRoutes('all-chat-analytics', ChatAnalytics, [], '', 'chatId storeId');
-createCRUDRoutes('all-commissions', Commission, [], 'status', 'storeId orderId bookingId');
 createCRUDRoutes('all-contact-reveals', ContactReveal, [], '', 'customerId storeId');
 createCRUDRoutes('all-email-subscriptions', EmailSubscription, ['email'], 'isActive', '');
 createCRUDRoutes('all-flash-deals', FlashDeal, ['saleName', 'saleSubtitle'], 'isActive', '');
 createCRUDRoutes('all-notifications', Notification, ['title', 'body'], '', 'userId');
 createCRUDRoutes('all-packages', Package, ['name', 'description'], 'isActive', '');
-createCRUDRoutes('all-pending-transactions', PendingTransaction, [], 'status', 'userId orderId');
 createCRUDRoutes('all-platform-settings', PlatformSettings, ['key'], '', '');
 createCRUDRoutes('all-posts', Post, ['content'], 'isActive', 'userId storeId');
 createCRUDRoutes('all-post-comments', PostComment, ['content'], '', 'userId postId');
@@ -1113,5 +1109,399 @@ const logAction = (action, target) => {
     next();
   };
 };
+
+// ===================================================================================
+// COMPREHENSIVE COLLECTION MANAGEMENT ROUTES
+// ===================================================================================
+
+// Generic function to create collection routes
+const createCollectionRoutes = (collectionName, Model, options = {}) => {
+  const route = `/all-${collectionName}`;
+  
+  // GET all items
+  router.get(route, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const { page = 1, limit = 50, search, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+      
+      // Build query
+      let query = {};
+      if (search && options.searchFields) {
+        const searchRegex = { $regex: search, $options: 'i' };
+        query.$or = options.searchFields.map(field => ({ [field]: searchRegex }));
+      }
+      
+      // Build sort
+      const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+      
+      const [items, total] = await Promise.all([
+        Model.find(query)
+          .sort(sort)
+          .limit(parseInt(limit))
+          .skip((parseInt(page) - 1) * parseInt(limit))
+          .populate(options.populate || []),
+        Model.countDocuments(query)
+      ]);
+      
+      logAdminAction(req.user._id, 'view', collectionName, { 
+        search, page, limit, total,
+        ip: req.ip 
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          items,
+          pagination: {
+            current: parseInt(page),
+            total,
+            pages: Math.ceil(total / limit),
+            limit: parseInt(limit)
+          }
+        }
+      });
+    } catch (error) {
+      console.error(`Get ${collectionName} error:`, error);
+      res.status(500).json({ success: false, message: `Failed to fetch ${collectionName}` });
+    }
+  });
+  
+  // GET single item
+  router.get(`${route}/:id`, authenticate, authorize('admin'), async (req, res) => {
+    try {
+      const item = await Model.findById(req.params.id).populate(options.populate || []);
+      if (!item) {
+        return res.status(404).json({ success: false, message: `${collectionName} not found` });
+      }
+      
+      logAdminAction(req.user._id, 'view_detail', collectionName, { 
+        itemId: req.params.id,
+        ip: req.ip 
+      });
+      
+      res.json({ success: true, data: item });
+    } catch (error) {
+      console.error(`Get ${collectionName} by ID error:`, error);
+      res.status(500).json({ success: false, message: `Failed to fetch ${collectionName}` });
+    }
+  });
+  
+  // POST create new item (if allowed)
+  if (!options.readOnly) {
+    router.post(route, authenticate, authorize('admin'), async (req, res) => {
+      try {
+        const item = new Model(req.body);
+        await item.save();
+        
+        logAdminAction(req.user._id, 'create', collectionName, { 
+          itemId: item._id,
+          data: req.body,
+          ip: req.ip 
+        });
+        
+        res.status(201).json({ success: true, data: item });
+      } catch (error) {
+        console.error(`Create ${collectionName} error:`, error);
+        res.status(400).json({ success: false, message: error.message });
+      }
+    });
+  }
+  
+  // PUT update item (if allowed)
+  if (!options.readOnly) {
+    router.put(`${route}/:id`, authenticate, authorize('admin'), async (req, res) => {
+      try {
+        const item = await Model.findByIdAndUpdate(
+          req.params.id, 
+          req.body, 
+          { new: true, runValidators: true }
+        );
+        
+        if (!item) {
+          return res.status(404).json({ success: false, message: `${collectionName} not found` });
+        }
+        
+        logAdminAction(req.user._id, 'update', collectionName, { 
+          itemId: req.params.id,
+          changes: req.body,
+          ip: req.ip 
+        });
+        
+        res.json({ success: true, data: item });
+      } catch (error) {
+        console.error(`Update ${collectionName} error:`, error);
+        res.status(400).json({ success: false, message: error.message });
+      }
+    });
+  }
+  
+  // DELETE item (if allowed)
+  if (!options.readOnly) {
+    router.delete(`${route}/:id`, authenticate, authorize('admin'), async (req, res) => {
+      try {
+        const item = await Model.findByIdAndDelete(req.params.id);
+        if (!item) {
+          return res.status(404).json({ success: false, message: `${collectionName} not found` });
+        }
+        
+        logAdminAction(req.user._id, 'delete', collectionName, { 
+          itemId: req.params.id,
+          deletedData: item,
+          ip: req.ip 
+        });
+        
+        res.json({ success: true, message: `${collectionName} deleted successfully` });
+      } catch (error) {
+        console.error(`Delete ${collectionName} error:`, error);
+        res.status(500).json({ success: false, message: `Failed to delete ${collectionName}` });
+      }
+    });
+  }
+  
+  // PATCH toggle status (if status field exists)
+  if (options.hasStatus) {
+    router.patch(`${route}/:id/toggle-status`, authenticate, authorize('admin'), async (req, res) => {
+      try {
+        const item = await Model.findById(req.params.id);
+        if (!item) {
+          return res.status(404).json({ success: false, message: `${collectionName} not found` });
+        }
+        
+        const statusField = options.statusField || 'isActive';
+        item[statusField] = !item[statusField];
+        await item.save();
+        
+        logAdminAction(req.user._id, 'toggle_status', collectionName, { 
+          itemId: req.params.id,
+          newStatus: item[statusField],
+          ip: req.ip 
+        });
+        
+        res.json({ success: true, data: item });
+      } catch (error) {
+        console.error(`Toggle ${collectionName} status error:`, error);
+        res.status(500).json({ success: false, message: `Failed to toggle ${collectionName} status` });
+      }
+    });
+  }
+};
+
+// Bulk operations route
+router.post('/:collection/bulk', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { ids, action, data = {} } = req.body;
+    const collectionName = req.params.collection; // Extract collection from params
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Valid IDs array required' });
+    }
+    
+    // Map collection names to models
+    const modelMap = {
+      'all-users': User,
+      'all-stores': Store,
+      'all-products': Product,
+      'all-services': Service,
+      'all-orders': Order,
+      'all-bookings': Booking,
+      'all-chats': Chat,
+      'all-chat-analytics': ChatAnalytics,
+      'all-contact-reveals': ContactReveal,
+      'all-email-subscriptions': EmailSubscription,
+      'all-flash-deals': FlashDeal,
+      'all-notifications': Notification,
+      'all-packages': Package,
+      'all-platform-settings': PlatformSettings,
+      'all-posts': Post,
+      'all-post-comments': PostComment,
+      'all-post-likes': PostLike,
+      'all-reviews': Review,
+      'all-search-history': SearchHistory,
+      'all-subscriptions': Subscription,
+      'all-time-slots': TimeSlot,
+      'all-categories': Category,
+      'all-variants': Variant,
+      'all-wallets': Wallet,
+      'all-addons': Addon,
+      'all-comment-likes': CommentLike,
+      'all-comment-reactions': CommentReaction,
+      'all-marketing': Marketing,
+    };
+    
+    const Model = modelMap[collectionName];
+    if (!Model) {
+      return res.status(400).json({ success: false, message: 'Invalid collection' });
+    }
+    
+    let result;
+    switch (action) {
+      case 'delete':
+        result = await Model.deleteMany({ _id: { $in: ids } });
+        break;
+      case 'activate':
+        result = await Model.updateMany({ _id: { $in: ids } }, { isActive: true });
+        break;
+      case 'deactivate':
+        result = await Model.updateMany({ _id: { $in: ids } }, { isActive: false });
+        break;
+      case 'update':
+        result = await Model.updateMany({ _id: { $in: ids } }, data);
+        break;
+      default:
+        return res.status(400).json({ success: false, message: 'Invalid action' });
+    }
+    
+    logAdminAction(req.user._id, `bulk_${action}`, collectionName, { 
+      ids,
+      count: result.modifiedCount || result.deletedCount,
+      data,
+      ip: req.ip 
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Bulk ${action} completed`,
+      affected: result.modifiedCount || result.deletedCount || 0
+    });
+  } catch (error) {
+    console.error('Bulk operation error:', error);
+    res.status(500).json({ success: false, message: 'Bulk operation failed' });
+  }
+});
+
+// Create routes for all collections
+createCollectionRoutes('users', User, { 
+  searchFields: ['name', 'email'], 
+  hasStatus: true,
+  populate: ['storeId']
+});
+
+createCollectionRoutes('stores', Store, { 
+  searchFields: ['name', 'description', 'email'], 
+  hasStatus: true,
+  populate: ['ownerId', 'category']
+});
+
+createCollectionRoutes('products', Product, { 
+  searchFields: ['name', 'description'], 
+  hasStatus: true,
+  populate: ['storeId', 'category']
+});
+
+createCollectionRoutes('services', Service, { 
+  searchFields: ['name', 'description'], 
+  hasStatus: true,
+  populate: ['storeId', 'category']
+});
+
+createCollectionRoutes('orders', Order, { 
+  searchFields: ['orderNumber'], 
+  populate: ['customerId', 'storeId', 'items.productId']
+});
+
+createCollectionRoutes('bookings', Booking, { 
+  populate: ['customerId', 'storeId', 'serviceId']
+});
+
+createCollectionRoutes('chats', Chat, { 
+  populate: ['participants', 'storeId']
+});
+
+createCollectionRoutes('chat-analytics', ChatAnalytics, { 
+  populate: ['storeId']
+});
+
+createCollectionRoutes('contact-reveals', ContactReveal, { 
+  populate: ['userId', 'storeId']
+});
+
+createCollectionRoutes('email-subscriptions', EmailSubscription, { 
+  searchFields: ['email']
+});
+
+createCollectionRoutes('flash-deals', FlashDeal, { 
+  searchFields: ['title'], 
+  hasStatus: true,
+  populate: ['productIds', 'storeIds']
+});
+
+createCollectionRoutes('notifications', Notification, { 
+  searchFields: ['title', 'message'], 
+  populate: ['userId']
+});
+
+createCollectionRoutes('packages', Package, { 
+  searchFields: ['name', 'description'], 
+  hasStatus: true
+});
+
+createCollectionRoutes('platform-settings', PlatformSettings, { 
+  searchFields: ['key', 'description']
+});
+
+createCollectionRoutes('posts', Post, { 
+  searchFields: ['content'], 
+  hasStatus: true,
+  populate: ['authorId', 'storeId']
+});
+
+createCollectionRoutes('post-comments', PostComment, { 
+  populate: ['postId', 'authorId']
+});
+
+createCollectionRoutes('post-likes', PostLike, { 
+  populate: ['postId', 'userId']
+});
+
+createCollectionRoutes('reviews', Review, { 
+  searchFields: ['comment'], 
+  populate: ['customerId', 'storeId', 'productId', 'serviceId']
+});
+
+createCollectionRoutes('search-history', SearchHistory, { 
+  searchFields: ['query'], 
+  populate: ['userId']
+});
+
+createCollectionRoutes('subscriptions', Subscription, { 
+  populate: ['userId', 'packageId']
+});
+
+createCollectionRoutes('time-slots', TimeSlot, { 
+  populate: ['serviceId']
+});
+
+createCollectionRoutes('categories', Category, { 
+  searchFields: ['name', 'description'], 
+  hasStatus: true
+});
+
+createCollectionRoutes('variants', Variant, { 
+  searchFields: ['name'], 
+  populate: ['productId']
+});
+
+createCollectionRoutes('wallets', Wallet, { 
+  populate: ['userId']
+});
+
+createCollectionRoutes('addons', Addon, { 
+  searchFields: ['name', 'description'], 
+  hasStatus: true,
+  populate: ['serviceId']
+});
+
+createCollectionRoutes('comment-likes', CommentLike, { 
+  populate: ['commentId', 'userId']
+});
+
+createCollectionRoutes('comment-reactions', CommentReaction, { 
+  populate: ['commentId', 'userId']
+});
+
+createCollectionRoutes('marketing', Marketing, { 
+  searchFields: ['title', 'description'], 
+  hasStatus: true,
+  populate: ['targetStores']
+});
 
 export default router;

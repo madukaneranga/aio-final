@@ -127,12 +127,6 @@ const storeSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  completionRate: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 100,
-  },
   badges: [
     {
       type: String,
@@ -186,10 +180,6 @@ const storeSchema = new mongoose.Schema({
       type: Number,
       default: 0,
     },
-    completionRate: {
-      type: Number,
-      default: 0,
-    },
     views: {
       type: Number,
       default: 98,
@@ -216,6 +206,19 @@ storeSchema.virtual("stats.avgPurchaseAmount").get(function () {
   return (
     Math.round((this.totalSales / this.stats.totalOrdersOrBookings) * 100) / 100
   );
+});
+
+// Virtual field for completionRate - calculated from actual orders/bookings
+// Note: This is a placeholder that will be populated by the route handlers
+// since we need to perform database aggregation queries
+storeSchema.virtual("completionRate").get(function () {
+  // This will be populated by route handlers using aggregation
+  return this._completionRate || 0;
+});
+
+storeSchema.virtual("stats.completionRate").get(function () {
+  // This will be populated by route handlers using aggregation  
+  return this._completionRate || 0;
 });
 
 // Ensure virtuals are included when converting to JSON/Object

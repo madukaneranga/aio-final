@@ -46,8 +46,7 @@ const Checkout = () => {
     country: "Sri Lanka",
   });
   const [payhereReady, setPayhereReady] = useState(false);
-  const [bankTransferData, setBankTransferData] = useState(null);
-  const [showBankTransfer, setShowBankTransfer] = useState(false);
+  const [bankDetailsForSelection, setBankDetailsForSelection] = useState(null);
 
   const totalItems =
     orderItems.reduce((sum, item) => sum + item.quantity, 0) +
@@ -78,6 +77,49 @@ const Checkout = () => {
       setPayhereReady(true);
     }
   }, [orderItems, bookingItems, user]);
+
+  // Fetch bank details when bank transfer is selected
+  useEffect(() => {
+    if (selectedPaymentMethod === "bank_transfer" && (orderItems.length > 0 || bookingItems.length > 0)) {
+      fetchBankDetailsForPreview();
+    }
+  }, [selectedPaymentMethod, orderItems, bookingItems, grandTotal]);
+
+  // Fetch bank details for preview when bank transfer is selected
+  const fetchBankDetailsForPreview = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/payments/bank-transfer-preview`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            orderItems: orderItems.map(item => ({
+              productId: item.id,
+              quantity: item.quantity,
+              price: item.price
+            })),
+            bookingItems: bookingItems.map(item => ({
+              serviceId: item.id,
+              selectedDate: item.selectedDate,
+              selectedTime: item.selectedTime,
+              price: item.price
+            })),
+            shippingAddress,
+            totalAmount: grandTotal
+          })
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setBankDetailsForSelection(data);
+      }
+    } catch (error) {
+      console.error("Error fetching bank details preview:", error);
+    }
+  };
 
   const fetchPaymentMethods = async () => {
     try {
@@ -149,11 +191,11 @@ const Checkout = () => {
 
       window.payhere.onCompleted = function (orderId) {
         console.log("Payment completed. OrderID:", orderId);
-        resolve(orderId);
+        resolve({ success: true, orderId });
       };
 
       window.payhere.onDismissed = function () {
-        alert("Payment was cancelled.");
+        console.log("Payment was cancelled by user");
         reject(new Error("Payment cancelled"));
       };
 
@@ -279,32 +321,48 @@ const Checkout = () => {
         }
 
         // Start PayHere payment
-        await startPayHerePayment(paymentParams);
-        clearOrder();
-        clearBookings();
-        alert("Payment successful!");
+        try {
+          const paymentResult = await startPayHerePayment(paymentParams);
+          
+          if (paymentResult.success) {
+            // Only clear cart if payment was successful
+            clearOrder();
+            clearBookings();
+            
+            // Navigate to thank you page with transaction ID
+            const transactionId = responseData.transactionId || responseData._id;
+            const type = bookingItems.length > 0 ? "booking" : "order";
+            console.log(`Checkout - PayHere success. Navigating with transactionId: ${transactionId}, type: ${type}`);
+            console.log(`Checkout - Full responseData:`, responseData);
+            navigate(`/thank-you?transactionId=${transactionId}&type=${type}&paymentMethod=payhere`);
+          }
+        } catch (paymentError) {
+          console.log("PayHere payment failed or cancelled:", paymentError.message);
+          // Don't clear cart or navigate - user stays on checkout page
+          setLoading(false);
+          return;
+        }
+        
       } else if (selectedPaymentMethod === "bank_transfer") {
-        // Store bank transfer data for display
-        setBankTransferData(responseData);
+        // Clear cart and navigate directly to thank you page
         clearOrder();
         clearBookings();
-        setShowBankTransfer(true);
-        return; // Don't navigate yet, show bank details first
+        
+        // Navigate to thank you page with transaction ID
+        const transactionId = responseData.transactionId || responseData._id;
+        const type = bookingItems.length > 0 ? "booking" : "order";
+        console.log(`Checkout - Bank Transfer success. Navigating with transactionId: ${transactionId}, type: ${type}`);
+        navigate(`/thank-you?transactionId=${transactionId}&type=${type}&paymentMethod=bank_transfer`);
       } else if (selectedPaymentMethod === "cod") {
         clearOrder();
         clearBookings();
-        alert("COD order created successfully! You can mark it as delivered once you receive your order/service.");
-      }
-
-      // Navigate to appropriate page
-      if (orderItems.length > 0 && bookingItems.length > 0) {
-        navigate("/orders");
-      } else if (orderItems.length > 0) {
-        navigate("/orders");
-      } else if (bookingItems.length > 0) {
-        navigate("/bookings");
-      } else {
-        navigate("/");
+        
+        // Navigate to thank you page with transaction ID
+        const transactionId = responseData.transactionId || responseData._id;
+        const type = bookingItems.length > 0 ? "booking" : "order";
+        console.log(`Checkout - COD success. Navigating with transactionId: ${transactionId}, type: ${type}`);
+        console.log(`Checkout - Full responseData:`, responseData);
+        navigate(`/thank-you?transactionId=${transactionId}&type=${type}&paymentMethod=cod`);
       }
     } catch (error) {
       console.error("Checkout error:", error);
@@ -490,7 +548,7 @@ const Checkout = () => {
                       >
                         {method.name}
                         {method.id === "cod" && !method.available && (
-                          <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                          <span className="ml-2 text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">
                             Verification Required
                           </span>
                         )}
@@ -504,7 +562,7 @@ const Checkout = () => {
                       >
                         {method.description}
                         {method.id === "cod" && !method.available && (
-                          <span className="block text-xs mt-1 text-red-600">
+                          <span className="block text-xs mt-1 text-gray-600">
                             Upload ID/Passport in profile to enable COD
                           </span>
                         )}
@@ -513,15 +571,96 @@ const Checkout = () => {
                   </label>
                 ))}
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
                   <div className="flex items-center space-x-2">
-                    <Lock className="w-5 h-5 text-blue-600" />
-                    <p className="text-sm text-blue-800">
+                    <Lock className="w-5 h-5 text-gray-600" />
+                    <p className="text-sm text-gray-800">
                       Your payment information is secure and processed locally
                       in Sri Lanka
                     </p>
                   </div>
                 </div>
+
+                {/* Bank Transfer Details - Show when selected */}
+                {selectedPaymentMethod === "bank_transfer" && bankDetailsForSelection && (
+                  <div className="mt-6 p-6 bg-white border-2 border-gray-300 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Bank Transfer Instructions
+                    </h3>
+                    
+                    <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-800 font-medium mb-2">
+                        Please transfer LKR {formatLKR(grandTotal)} to the bank account(s) below:
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Bank details will also be available in your Orders section after checkout.
+                      </p>
+                    </div>
+
+                    {bankDetailsForSelection.bankDetails?.map((bank, index) => (
+                      <div key={index} className="mb-4 p-4 border border-gray-300 rounded-lg bg-white">
+                        <h4 className="text-md font-semibold text-gray-900 mb-3">
+                          {bank.storeName}
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-sm">
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bank Name</label>
+                            <p className="text-gray-900 font-medium">{bank.bankDetails.bankName}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Account Holder</label>
+                            <p className="text-gray-900 font-medium">{bank.bankDetails.accountHolderName}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Account Number</label>
+                            <p className="text-gray-900 font-mono font-bold">{bank.bankDetails.accountNumber}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Branch</label>
+                            <p className="text-gray-900 font-medium">{bank.bankDetails.branchName}</p>
+                          </div>
+                          {bank.bankDetails.routingNumber && (
+                            <div className="md:col-span-2">
+                              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Routing Number</label>
+                              <p className="text-gray-900 font-mono font-bold">{bank.bankDetails.routingNumber}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="bg-gray-100 p-3 rounded-lg border border-gray-200">
+                          <p className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Contact Store After Transfer:</p>
+                          <div className="flex flex-wrap gap-3">
+                            {bank.contactInfo.whatsapp && (
+                              <a
+                                href={`https://wa.me/${bank.contactInfo.whatsapp.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-900 hover:text-black font-medium text-sm"
+                              >
+                                WhatsApp: {bank.contactInfo.whatsapp}
+                              </a>
+                            )}
+                            {bank.contactInfo.email && (
+                              <a
+                                href={`mailto:${bank.contactInfo.email}`}
+                                className="text-gray-900 hover:text-black font-medium text-sm"
+                              >
+                                Email: {bank.contactInfo.email}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+                      <p className="text-gray-800 text-sm">
+                        <strong>Important:</strong> Please contact the store via WhatsApp or email after making the transfer with your payment receipt for order confirmation.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -634,106 +773,6 @@ const Checkout = () => {
         </div>
       </div>
 
-      {/* Bank Transfer Details Modal */}
-      {showBankTransfer && bankTransferData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-90vh overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Bank Transfer Details</h2>
-                <button
-                  onClick={() => {
-                    setShowBankTransfer(false);
-                    navigate("/orders");
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                <p className="text-blue-800 font-medium">
-                  Please transfer LKR {formatLKR(bankTransferData.totalAmount)} to the bank account(s) below and contact the store with your transfer receipt.
-                </p>
-              </div>
-
-              {bankTransferData.bankDetails.map((bank, index) => (
-                <div key={index} className="mb-6 p-4 border border-gray-200 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                    {bank.storeName}
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Bank Name</label>
-                      <p className="text-gray-900">{bank.bankDetails.bankName}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Account Holder</label>
-                      <p className="text-gray-900">{bank.bankDetails.accountHolderName}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Account Number</label>
-                      <p className="text-gray-900 font-mono">{bank.bankDetails.accountNumber}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Branch</label>
-                      <p className="text-gray-900">{bank.bankDetails.branchName}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Routing Number</label>
-                      <p className="text-gray-900 font-mono">{bank.bankDetails.routingNumber}</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Contact Store:</p>
-                    <div className="flex flex-wrap gap-4">
-                      {bank.contactInfo.whatsapp && (
-                        <a
-                          href={`https://wa.me/${bank.contactInfo.whatsapp.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-600 hover:text-green-700 font-medium"
-                        >
-                          WhatsApp: {bank.contactInfo.whatsapp}
-                        </a>
-                      )}
-                      {bank.contactInfo.email && (
-                        <a
-                          href={`mailto:${bank.contactInfo.email}`}
-                          className="text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          Email: {bank.contactInfo.email}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <div className="bg-yellow-50 p-4 rounded-lg mb-6">
-                <p className="text-yellow-800 text-sm">
-                  <strong>Important:</strong> Please contact the store via WhatsApp or email after making the transfer with your payment receipt for order confirmation.
-                </p>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={() => {
-                    setShowBankTransfer(false);
-                    navigate("/orders");
-                  }}
-                  className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  Go to My Orders
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

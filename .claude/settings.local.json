@@ -3,7 +3,13 @@
     "allow": [
       "Bash(node:*)",
       "Bash(npm install:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm test)",
+      "Bash(grep:*)",
+      "Bash(npm start)",
+      "Bash(npx:*)"
     ],
     "deny": [],
     "ask": []

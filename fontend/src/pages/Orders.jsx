@@ -36,6 +36,8 @@ const Orders = () => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [markingDelivered, setMarkingDelivered] = useState(null);
   const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(null);
+  const [markingPaymentSent, setMarkingPaymentSent] = useState(null);
+  const [confirmingDelivery, setConfirmingDelivery] = useState(null);
   const [expandedOrders, setExpandedOrders] = useState(new Set());
 
   useEffect(() => {
@@ -181,6 +183,8 @@ const Orders = () => {
         return "bg-orange-100 text-orange-800";
       case "delivered":
         return "bg-green-100 text-green-800";
+      case "completed":
+        return "bg-emerald-100 text-emerald-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
       default:
@@ -201,6 +205,8 @@ const Orders = () => {
       case "shipped":
         return <Truck className="w-4 h-4" />;
       case "delivered":
+        return <CheckCircle className="w-4 h-4" />;
+      case "completed":
         return <CheckCircle className="w-4 h-4" />;
       case "cancelled":
         return <XCircle className="w-4 h-4" />;
@@ -261,6 +267,37 @@ const Orders = () => {
     }
   };
 
+  // Customer marks bank transfer payment as sent
+  const markPaymentAsSent = async (orderId) => {
+    if (!confirm("Have you completed the bank transfer? The seller will need to verify your payment.")) {
+      return;
+    }
+
+    try {
+      setMarkingPaymentSent(orderId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/mark-payment-sent`,
+        {
+          method: "PUT",
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        alert("Payment marked as sent! The seller will verify and confirm your payment.");
+        fetchOrders(); // Refresh orders
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error marking payment as sent:", error);
+      alert("Error marking payment as sent. Please try again.");
+    } finally {
+      setMarkingPaymentSent(null);
+    }
+  };
+
   // Store owner updates payment status to paid
   const updatePaymentStatus = async (orderId, paymentStatus) => {
     if (!confirm(`Are you sure you want to mark this payment as ${paymentStatus}?`)) {
@@ -293,6 +330,37 @@ const Orders = () => {
       alert("Error updating payment status. Please try again.");
     } finally {
       setUpdatingPaymentStatus(null);
+    }
+  };
+
+  // Customer confirms order delivery
+  const confirmOrderDelivery = async (orderId) => {
+    if (!confirm("Are you sure you want to confirm that you received this order?")) {
+      return;
+    }
+
+    try {
+      setConfirmingDelivery(orderId);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/confirm-delivery`,
+        {
+          method: "PUT",
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        alert("Order confirmed successfully! Thank you for your confirmation.");
+        fetchOrders(); // Refresh orders
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error confirming order:", error);
+      alert("Error confirming order. Please try again.");
+    } finally {
+      setConfirmingDelivery(null);
     }
   };
 
@@ -355,6 +423,7 @@ const Orders = () => {
               { key: "ready", label: "Ready" },
               { key: "shipped", label: "Shipped" },
               { key: "delivered", label: "Delivered" },
+              { key: "completed", label: "Completed" },
               { key: "cancelled", label: "Cancelled" },
             ].map(({ key, label }) => (
               <button
@@ -415,7 +484,12 @@ const Orders = () => {
                             LKR {order.totalAmount}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {order.paymentDetails?.paymentStatus === "paid" ? "Paid" : "Pending"}
+                            {order.paymentDetails?.paymentStatus === "paid" 
+                              ? "Paid" 
+                              : order.paymentDetails?.paymentStatus === "customer_paid_pending_confirmation"
+                              ? "Awaiting Confirmation"
+                              : "Pending"
+                            }
                           </p>
                         </div>
                         
@@ -478,6 +552,32 @@ const Orders = () => {
                                 {updatingPaymentStatus === order._id ? "..." : "Mark Paid"}
                               </button>
                             )}
+
+                            {order.paymentDetails?.paymentMethod === "bank_transfer" && 
+                             order.paymentDetails?.paymentStatus === "customer_paid_pending_confirmation" && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updatePaymentStatus(order._id, "paid");
+                                  }}
+                                  disabled={updatingPaymentStatus === order._id}
+                                  className="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 min-h-[36px]"
+                                >
+                                  {updatingPaymentStatus === order._id ? "..." : "Confirm"}
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updatePaymentStatus(order._id, "failed");
+                                  }}
+                                  disabled={updatingPaymentStatus === order._id}
+                                  className="bg-red-600 text-white px-3 py-1.5 rounded text-sm hover:bg-red-700 transition-colors disabled:opacity-50 min-h-[36px]"
+                                >
+                                  {updatingPaymentStatus === order._id ? "..." : "Reject"}
+                                </button>
+                              </>
+                            )}
                             
                             {order.paymentDetails?.paymentMethod === "cod" && 
                              order.paymentDetails?.paymentStatus === "cod_pending" && (
@@ -495,6 +595,23 @@ const Orders = () => {
                           </>
                         )}
 
+                        {/* Bank Transfer Mark as Sent for Customers */}
+                        {user.role === "customer" && 
+                         order.status !== "cancelled" &&
+                         order.paymentDetails?.paymentMethod === "bank_transfer" && 
+                         order.paymentDetails?.paymentStatus === "pending_bank_transfer" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markPaymentAsSent(order._id);
+                            }}
+                            disabled={markingPaymentSent === order._id}
+                            className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 min-h-[36px]"
+                          >
+                            {markingPaymentSent === order._id ? "..." : "Mark as Paid"}
+                          </button>
+                        )}
+
                         {/* COD Mark as Delivered for Customers */}
                         {user.role === "customer" && 
                          order.status !== "cancelled" &&
@@ -510,6 +627,21 @@ const Orders = () => {
                             className="bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 min-h-[36px]"
                           >
                             {markingDelivered === order._id ? "..." : "Mark Delivered"}
+                          </button>
+                        )}
+
+                        {/* Confirm Delivery for Customers */}
+                        {user.role === "customer" && 
+                         order.status === "delivered" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              confirmOrderDelivery(order._id);
+                            }}
+                            disabled={confirmingDelivery === order._id}
+                            className="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 min-h-[36px]"
+                          >
+                            {confirmingDelivery === order._id ? "..." : "Confirm Delivery"}
                           </button>
                         )}
                       </div>
@@ -533,6 +665,32 @@ const Orders = () => {
                               {updatingPaymentStatus === order._id ? "Updating Payment..." : "Mark Payment as Paid"}
                             </button>
                           )}
+
+                          {order.paymentDetails?.paymentMethod === "bank_transfer" && 
+                           order.paymentDetails?.paymentStatus === "customer_paid_pending_confirmation" && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updatePaymentStatus(order._id, "paid");
+                                }}
+                                disabled={updatingPaymentStatus === order._id}
+                                className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm hover:bg-green-700 transition-colors disabled:opacity-50 font-medium"
+                              >
+                                {updatingPaymentStatus === order._id ? "Confirming Payment..." : "Confirm Customer Payment"}
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updatePaymentStatus(order._id, "failed");
+                                }}
+                                disabled={updatingPaymentStatus === order._id}
+                                className="w-full bg-red-600 text-white py-2.5 rounded-lg text-sm hover:bg-red-700 transition-colors disabled:opacity-50 font-medium"
+                              >
+                                {updatingPaymentStatus === order._id ? "Rejecting Payment..." : "Reject Customer Payment"}
+                              </button>
+                            </>
+                          )}
                           
                           {order.paymentDetails?.paymentMethod === "cod" && 
                            order.paymentDetails?.paymentStatus === "cod_pending" && (
@@ -547,6 +705,25 @@ const Orders = () => {
                               {updatingPaymentStatus === order._id ? "Updating Payment..." : "Mark COD Payment as Paid"}
                             </button>
                           )}
+                        </div>
+                      )}
+
+                      {/* Bank Transfer Mark as Sent for Customers */}
+                      {user.role === "customer" && 
+                       order.status !== "cancelled" &&
+                       order.paymentDetails?.paymentMethod === "bank_transfer" && 
+                       order.paymentDetails?.paymentStatus === "pending_bank_transfer" && (
+                        <div className="mt-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markPaymentAsSent(order._id);
+                            }}
+                            disabled={markingPaymentSent === order._id}
+                            className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
+                          >
+                            {markingPaymentSent === order._id ? "Marking Payment as Sent..." : "Mark Payment as Sent"}
+                          </button>
                         </div>
                       )}
 
@@ -566,6 +743,23 @@ const Orders = () => {
                             className="w-full bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 font-medium"
                           >
                             {markingDelivered === order._id ? "Marking as Delivered..." : "Mark Order as Delivered"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Confirm Delivery for Customers */}
+                      {user.role === "customer" && 
+                       order.status === "delivered" && (
+                        <div className="mt-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              confirmOrderDelivery(order._id);
+                            }}
+                            disabled={confirmingDelivery === order._id}
+                            className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm hover:bg-green-700 transition-colors disabled:opacity-50 font-medium"
+                          >
+                            {confirmingDelivery === order._id ? "Confirming Delivery..." : "Confirm I Received This Order"}
                           </button>
                         </div>
                       )}
@@ -600,9 +794,16 @@ const Orders = () => {
                               <p className={`font-medium ${
                                 order.paymentDetails?.paymentStatus?.toLowerCase() === "paid"
                                   ? "text-green-600"
+                                  : order.paymentDetails?.paymentStatus === "customer_paid_pending_confirmation"
+                                  ? "text-yellow-600"
                                   : "text-red-600"
                               }`}>
-                                {order.paymentDetails?.paymentStatus?.toLowerCase() === "paid" ? "Paid" : "Pending"}
+                                {order.paymentDetails?.paymentStatus?.toLowerCase() === "paid" 
+                                  ? "Paid" 
+                                  : order.paymentDetails?.paymentStatus === "customer_paid_pending_confirmation"
+                                  ? "Awaiting Confirmation"
+                                  : "Pending"
+                                }
                               </p>
                             </div>
                             <div>
@@ -678,8 +879,37 @@ const Orders = () => {
                           </div>
                         )}
 
-                        {/* Compact Review Section */}
+                        {/* Delivery Confirmation Section - Customer View */}
                         {order.status === "delivered" && user.role === "customer" && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium text-blue-900 text-sm">📦 Order Delivered - Confirmation Required</h4>
+                                {order.customerConfirmationDeadline ? (
+                                  <p className="text-xs text-blue-700">
+                                    Please confirm receipt by {new Date(order.customerConfirmationDeadline).toLocaleDateString()} 
+                                    {(() => {
+                                      const daysLeft = Math.ceil((new Date(order.customerConfirmationDeadline) - new Date()) / (1000 * 60 * 60 * 24));
+                                      return daysLeft > 0 ? ` (${daysLeft} days left)` : ' (Auto-confirmed)';
+                                    })()}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-blue-700">Auto-confirmation in 14 days from delivery</p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => confirmOrderDelivery(order._id)}
+                                disabled={confirmingDelivery === order._id}
+                                className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-700 transition-colors disabled:opacity-50"
+                              >
+                                {confirmingDelivery === order._id ? "Confirming..." : "Confirm"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Compact Review Section */}
+                        {order.status === "completed" && user.role === "customer" && (
                           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                             <div className="flex items-center justify-between">
                               <div>
@@ -823,6 +1053,21 @@ const Orders = () => {
                               </div>
                             )}
 
+                            {/* Bank Transfer - Customer Awaiting Confirmation */}
+                            {order.paymentDetails.paymentMethod === "bank_transfer" && 
+                             user.role === "customer" && 
+                             order.paymentDetails.paymentStatus === "customer_paid_pending_confirmation" && (
+                              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                <div className="flex items-center space-x-2">
+                                  <Building2 className="w-4 h-4 text-yellow-600" />
+                                  <div>
+                                    <h4 className="font-medium text-yellow-900 text-sm">⏳ Payment Confirmation Pending</h4>
+                                    <p className="text-xs text-yellow-700">Waiting for seller to verify your bank transfer of LKR {order.totalAmount}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Bank Transfer - Store Owner View */}
                             {order.paymentDetails.paymentMethod === "bank_transfer" && 
                              user.role === "store_owner" && 
@@ -843,6 +1088,39 @@ const Orders = () => {
                                   >
                                     {updatingPaymentStatus === order._id ? "Updating..." : "Mark Paid"}
                                   </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Bank Transfer - Store Owner Customer Claimed */}
+                            {order.paymentDetails.paymentMethod === "bank_transfer" && 
+                             user.role === "store_owner" && 
+                             order.paymentDetails.paymentStatus === "customer_paid_pending_confirmation" && (
+                              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <Building2 className="w-4 h-4 text-purple-600" />
+                                    <div>
+                                      <h4 className="font-medium text-purple-900 text-sm">💰 Customer Claims Payment Sent</h4>
+                                      <p className="text-xs text-purple-700">Customer says they transferred LKR {order.totalAmount} - please verify</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex space-x-2">
+                                    <button
+                                      onClick={() => updatePaymentStatus(order._id, "paid")}
+                                      disabled={updatingPaymentStatus === order._id}
+                                      className="bg-green-600 text-white px-3 py-1.5 rounded text-xs hover:bg-green-700 transition-colors disabled:opacity-50"
+                                    >
+                                      {updatingPaymentStatus === order._id ? "..." : "Confirm"}
+                                    </button>
+                                    <button
+                                      onClick={() => updatePaymentStatus(order._id, "failed")}
+                                      disabled={updatingPaymentStatus === order._id}
+                                      className="bg-red-600 text-white px-3 py-1.5 rounded text-xs hover:bg-red-700 transition-colors disabled:opacity-50"
+                                    >
+                                      {updatingPaymentStatus === order._id ? "..." : "Reject"}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             )}
@@ -967,6 +1245,7 @@ const Orders = () => {
                                   Delivered
                                 </button>
                               )}
+                              {/* Note: completed status is handled by customer confirmation or auto-confirmation */}
                               {order.status === "pending" && (
                                 <button
                                   onClick={() => updateOrderStatus(order._id, "cancelled")}

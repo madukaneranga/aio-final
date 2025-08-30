@@ -65,10 +65,6 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  platformFee: {
-    type: Number,
-    required: true,
-  },
   combinedId: { type: String, index: true }, // optional index for quick lookup
 
   storeAmount: {
@@ -77,7 +73,7 @@ const bookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["paid", "pending", "confirmed", "completed", "cancelled"],
+    enum: ["pending", "confirmed", "completed", "cancelled"],
     default: "pending",
   },
 
