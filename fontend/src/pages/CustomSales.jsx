@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
-import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
+import { Search, X, ChevronDown, Sparkles } from "lucide-react";
 import CustomListing from "../components/CustomListing";
-import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
 import FlashDealsBanner from "../components/FlashDealSection";
+import { customSalesAPI } from "../utils/api";
 
 // Custom debounce hook
 const useDebounce = (value, delay) => {
@@ -180,42 +180,26 @@ const CustomSales = () => {
         limit: PRODUCTS_PER_PAGE,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/sale-listing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(apiFilters),
-        }
+      const data = await customSalesAPI.getSalesProducts(apiFilters);
+      console.log(
+        "Products fetched:",
+        data.products.length,
+        "items",
+        "Total:",
+        data.total
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(
-          "Products fetched:",
-          data.products.length,
-          "items",
-          "Total:",
-          data.total
-        );
-
-        if (append) {
-          setProducts((prev) => [...prev, ...data.products]);
-        } else {
-          setProducts(data.products);
-        }
-
-        setTotalProducts(data.total);
-        setHasMoreProducts(
-          data.products.length === PRODUCTS_PER_PAGE && data.hasMore
-        );
-        setCurrentPage(page);
+      if (append) {
+        setProducts((prev) => [...prev, ...data.products]);
       } else {
-        setError("Failed to fetch products");
-        console.error("API Error:", response.status, response.statusText);
+        setProducts(data.products);
       }
+
+      setTotalProducts(data.total);
+      setHasMoreProducts(
+        data.products.length === PRODUCTS_PER_PAGE && data.hasMore
+      );
+      setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching products:", error);
       setError("Network error. Please try again.");
@@ -259,9 +243,7 @@ const CustomSales = () => {
   // Load categories
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
+      const data = await customSalesAPI.getSalesCategories();
       setCategories(data);
     } catch (err) {
       console.error("Error loading categories:", err);
@@ -275,19 +257,9 @@ const CustomSales = () => {
 
   const fetchFlashDeal = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/flash-deals/current`
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setFlashDeal(result.data);
-          setShowFlashDeal(true);
-        }
-      } else {
-        setShowFlashDeal(false);
-      }
+      const data = await customSalesAPI.getCurrentFlashDeals();
+      setFlashDeal(data);
+      setShowFlashDeal(true);
     } catch (error) {
       console.error("Error fetching flash deal:", error);
       setShowFlashDeal(false);

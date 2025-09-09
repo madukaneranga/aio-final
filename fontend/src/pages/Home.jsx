@@ -1,27 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import HeroSection from "../components/HeroSection";
 import ProductCard from "../components/ProductCard";
-import ServiceCard from "../components/ServiceCard";
 import StoreCard from "../components/StoreCard";
-import LuxuryHeroSection from "../components/LuxuryHeroSection";
 import EnhancedCategorySection from "../components/EnhancedCategorySection";
 import FlashDealsBanner from "../components/FlashDealSection";
 import HeroBanner from "../components/HeroBanner";
+import { productsAPI, storesAPI, categoriesAPI, flashDealsAPI } from "../utils/api";
 import {
   ArrowRight,
   Package,
-  Calendar,
-  Star,
-  TrendingUp,
-  Users,
-  Shield,
+
   Store,
 } from "lucide-react";
 
 const Home = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [featuredServices, setFeaturedServices] = useState([]);
   const [featuredStores, setFeaturedStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
@@ -29,14 +22,7 @@ const Home = () => {
   const [showFlashDeal, setShowFlashDeal] = useState(false);
 
   const shopNowRef = useRef(null);
-  const handlePrimaryButtonClick = () => {
-    shopNowRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
 
-    console.log("Explore button clicked");
-  };
 
   useEffect(() => {
     fetchFeaturedContent();
@@ -46,45 +32,16 @@ const Home = () => {
 
   const fetchFeaturedContent = async () => {
     try {
-      const [productsRes, servicesRes, storesRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/products`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/services`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/stores/featured/list`),
+      const [products, stores] = await Promise.all([
+        productsAPI.getAll(),
+        storesAPI.getFeatured(),
       ]);
 
-      if (productsRes.ok) {
-        try {
-          const products = await productsRes.json();
-          setFeaturedProducts(products.slice(0, 12));
-        } catch (error) {
-          console.error("Error parsing products JSON:", error);
-          setFeaturedProducts([]);
-        }
-      }
-
-      if (servicesRes.ok) {
-        try {
-          const services = await servicesRes.json();
-          setFeaturedServices(services.slice(0, 8));
-        } catch (error) {
-          console.error("Error parsing services JSON:", error);
-          setFeaturedServices([]);
-        }
-      }
-
-      if (storesRes.ok) {
-        try {
-          const stores = await storesRes.json();
-          setFeaturedStores(stores);
-        } catch (error) {
-          console.error("Error parsing stores JSON:", error);
-          setFeaturedStores([]);
-        }
-      }
+      setFeaturedProducts(products.slice(0, 12));
+      setFeaturedStores(stores);
     } catch (error) {
       console.error("Error fetching featured content:", error);
       setFeaturedProducts([]);
-      setFeaturedServices([]);
       setFeaturedStores([]);
     } finally {
       setLoading(false);
@@ -93,23 +50,11 @@ const Home = () => {
 
   const fetchFlashDeal = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/flash-deals/current`
-      );
-
-      if (!response.ok) {
-        console.error("Failed to fetch flash deal:", response.statusText);
-        setShowFlashDeal(false);
-        return;
-      }
-
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        setFlashDeal(result.data);
+      const dealData = await flashDealsAPI.getCurrent();
+      if (dealData) {
+        setFlashDeal(dealData);
         setShowFlashDeal(true);
       } else {
-        // No deal available
         setFlashDeal(null);
         setShowFlashDeal(false);
       }
@@ -122,12 +67,7 @@ const Home = () => {
 
   const trackFlashDealClick = async (flashDealId) => {
     try {
-      await fetch(
-        `${import.meta.env.VITE_API_URL}/api/flash-deals/${flashDealId}/click`,
-        {
-          method: "POST",
-        }
-      );
+      await flashDealsAPI.trackClick(flashDealId);
     } catch (error) {
       console.error("Error tracking click:", error);
     }
@@ -135,10 +75,8 @@ const Home = () => {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
-      setCategories(data);
+      const categories = await categoriesAPI.getAll();
+      setCategories(categories);
     } catch (err) {
       console.error("Error loading categories:", err);
     }
@@ -217,8 +155,6 @@ const Home = () => {
         </section>
       ) : (
         <HeroBanner
-          apiEndpoint={`${import.meta.env.VITE_API_URL}/api/products/trending`}
-          handlePrimaryButtonClick={handlePrimaryButtonClick}
         />
       )}
 
@@ -261,41 +197,6 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Featured Services */}
-      <section className="py-5 bg-white">
-        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight font-sans">
-              Featured Services
-            </h2>
-          </div>
-
-          {featuredServices.length > 0 ? (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
-                {featuredServices.map((service) => (
-                  <ServiceCard key={service._id} service={service} />
-                ))}
-              </div>
-              <div className="text-center mt-12">
-                <Link
-                  to="/services"
-                  className="inline-flex items-center space-x-2 bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
-                >
-                  <span>View All Services</span>
-                  <ArrowRight className="w-5 h-5" />
-                </Link>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No services available yet</p>
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* Call to Action */}
       <section className="py-10 bg-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -313,13 +214,6 @@ const Home = () => {
             >
               <Package className="w-5 h-5" />
               <span>Sell Products</span>
-            </Link>
-            <Link
-              to="/register"
-              className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white hover:text-black transition-colors flex items-center justify-center space-x-2"
-            >
-              <Calendar className="w-5 h-5" />
-              <span>Offer Services</span>
             </Link>
           </div>
         </div>

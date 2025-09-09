@@ -20,7 +20,6 @@ const palette = {
 
 const typeColors = {
   order_update: palette.purple3,
-  booking_update: palette.purple3,
   review_update: palette.purple5,
   promotion: palette.purple5,
   warning: palette.purple4,

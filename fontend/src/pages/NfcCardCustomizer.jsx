@@ -1181,7 +1181,6 @@ const NfcCardCustomizer = () => {
             <option value="Food & Beverage">Food & Beverage</option>
             <option value="Health & Beauty">Health & Beauty</option>
             <option value="Home & Garden">Home & Garden</option>
-            <option value="Services">Services</option>
             <option value="Other">Other</option>
           </select>
         </div>

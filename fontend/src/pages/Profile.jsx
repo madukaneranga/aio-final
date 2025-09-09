@@ -6,6 +6,7 @@ import imageCompression from 'browser-image-compression';
 
 //  ADDED: Firebase storage imports
 import { uploadIdDocument } from "../utils/firebaseUpload";
+import { profileAPI } from "../utils/api";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -40,29 +41,20 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/users/profile`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-        setFormData({
-          name: data.name || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          address: data.address || {
-            street: "",
-            city: "",
-            state: "",
-            zipCode: "",
-            country: "",
-          },
-        });
-      }
+      const data = await profileAPI.getProfile();
+      setProfile(data);
+      setFormData({
+        name: data.name || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        address: data.address || {
+          street: "",
+          city: "",
+          state: "",
+          zipCode: "",
+          country: "",
+        },
+      });
     } catch (error) {
       console.error("Error fetching profile:", error);
     } finally {
@@ -72,17 +64,8 @@ const Profile = () => {
 
   const fetchVerificationStatus = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/users/verification-status`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setVerificationStatus(data);
-      }
+      const data = await profileAPI.getVerificationStatus();
+      setVerificationStatus(data);
     } catch (error) {
       console.error("Error fetching verification status:", error);
     }
@@ -107,32 +90,16 @@ const Profile = () => {
       }
 
       // Send Firebase URL to backend
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/users/upload-verification`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            idDocumentUrl: uploadResult.url,
-            originalName: uploadResult.originalName,
-            size: uploadResult.size,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setSuccess("Verification document uploaded successfully! Your request is under review.");
-        setVerificationDocument(null);
-        await fetchVerificationStatus(); // Refresh status
-        await fetchProfile(); // Refresh profile
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to upload verification document");
-      }
+      const data = await profileAPI.uploadVerification({
+        idDocumentUrl: uploadResult.url,
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+      });
+      
+      setSuccess("Verification document uploaded successfully! Your request is under review.");
+      setVerificationDocument(null);
+      await fetchVerificationStatus(); // Refresh status
+      await fetchProfile(); // Refresh profile
     } catch (error) {
       console.error("Error uploading verification:", error);
       setError("Upload failed. Please try again.");
@@ -184,28 +151,11 @@ const Profile = () => {
         ...(imageUrl && { profileImage: imageUrl }), // only include if uploaded
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/users/profile`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (response.ok) {
-        const updatedProfile = await response.json();
-        setProfile(updatedProfile);
-        setEditing(false);
-        setProfileImage(null);
-        setSuccess("Profile updated successfully!");
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to update profile");
-      }
+      const updatedProfile = await profileAPI.updateProfile(payload);
+      setProfile(updatedProfile);
+      setEditing(false);
+      setProfileImage(null);
+      setSuccess("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
       setError("Network error. Please try again.");

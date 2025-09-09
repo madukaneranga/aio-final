@@ -2,7 +2,6 @@
 import Review from "../models/Review.js";
 import Store from "../models/Store.js";
 import Product from "../models/Product.js";
-import Service from "../models/Service.js";
 
 export async function updateStoreRating(storeId) {
   const reviews = await Review.find({ storeId });
@@ -20,10 +19,3 @@ export async function updateProductRating(productId) {
   await Product.findByIdAndUpdate(productId, { rating: avg });
 }
 
-export async function updateServiceRating(serviceId) {
-  const reviews = await Review.find({ serviceId });
-  const avg = reviews.length
-    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-    : 0;
-  await Service.findByIdAndUpdate(serviceId, { rating: avg });
-}

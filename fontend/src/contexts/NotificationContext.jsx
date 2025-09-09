@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useAuth } from "./AuthContext";
 import { io } from "socket.io-client";
 import { typeIcons } from "../utils/notificationHelpers";
+import { notificationsAPI } from "../utils/api";
 
 const NotificationContext = createContext();
 
@@ -10,31 +11,50 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const socketRef = useRef(null);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (pageNum = 1, append = false) => {
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/notifications`,
-        {
-          credentials: "include", // Already correct
+      setLoading(true);
+      const response = await notificationsAPI._getAll({ page: pageNum, limit: 20 });
+      if (response.success) {
+        const newNotifications = response.data.notifications || [];
+        
+        if (append) {
+          setNotifications(prev => [...prev, ...newNotifications]);
+        } else {
+          setNotifications(newNotifications);
         }
-      );
 
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications);
-
-        const unread = data.notifications.filter(
+        setTotal(response.data.total || 0);
+        
+        const unread = newNotifications.filter(
           (n) => !n.isRead && !n.isDeleted
         ).length;
-        setUnreadCount(unread);
+        
+        if (!append) {
+          setUnreadCount(unread);
+        }
       }
+      setIsLoaded(true);
     } catch (err) {
       console.error("Failed to fetch notifications:", err);
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Handle page changes for pagination
+  useEffect(() => {
+    if (page > 1) {
+      fetchNotifications(page, true); // append = true for pagination
+    }
+  }, [page]);
 
   useEffect(() => {
     if (!user) return; // Remove token dependency
@@ -71,14 +91,8 @@ export const NotificationProvider = ({ children }) => {
 
   const markAsRead = async (id) => {
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`,
-        {
-          method: "PATCH",
-          credentials: "include", // Already correct
-        }
-      );
-      if (res.ok) {
+      const response = await notificationsAPI._markAsRead(id);
+      if (response.success) {
         setNotifications((prev) =>
           prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
         );
@@ -91,14 +105,8 @@ export const NotificationProvider = ({ children }) => {
 
   const markAllRead = async () => {
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/notifications/mark-all-read`,
-        {
-          method: "PATCH",
-          credentials: "include", // Already correct
-        }
-      );
-      if (res.ok) {
+      const response = await notificationsAPI._markAllAsRead();
+      if (response.success) {
         setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
         setUnreadCount(0);
       }
@@ -109,14 +117,8 @@ export const NotificationProvider = ({ children }) => {
 
   const softDelete = async (id) => {
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/notifications/${id}/delete`,
-        {
-          method: "PATCH",
-          credentials: "include", // Already correct
-        }
-      );
-      if (res.ok) {
+      const response = await notificationsAPI._softDelete(id);
+      if (response.success) {
         setNotifications((prev) =>
           prev.map((n) => (n._id === id ? { ...n, isDeleted: true } : n))
         );
@@ -190,6 +192,11 @@ export const NotificationProvider = ({ children }) => {
         value={{
           notifications,
           unreadCount,
+          loading,
+          isLoaded,
+          page,
+          setPage,
+          total,
           fetchNotifications,
           markAsRead,
           markAllRead,

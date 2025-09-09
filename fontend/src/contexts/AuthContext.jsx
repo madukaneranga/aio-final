@@ -1,10 +1,12 @@
-﻿﻿import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth as firebaseAuth } from "../utils/firebase";
+import { authAPI } from "../utils/api";
+import logger from "../utils/logger.js";
 
 const AuthContext = createContext();
 
@@ -28,23 +30,10 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/auth/me`,
-        {
-          method: "GET",
-          credentials: "include", // Include cookies in the request
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      } else {
-        // Token is invalid or expired, user will remain null
-        setUser(null);
-      }
+      const result = await authAPI._getMe();
+      setUser(result.data);
     } catch (error) {
-      console.error("Error fetching user:", error);
+      logger.error("Error fetching user", error);
       setUser(null);
     } finally {
       setLoading(false);
@@ -61,29 +50,11 @@ export const AuthProvider = ({ children }) => {
       }
 
       // Then proceed with backend login
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/auth/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include", // Include cookies
-          body: JSON.stringify({ email, password }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return { success: false, error: data.error };
-      }
-
-      // Cookie is automatically set by the server
-      setUser(data.user);
+      const result = await authAPI._login(email, password);
+      setUser(result.data);
       return { success: true };
     } catch (error) {
-      return { success: false, error: "Network error" };
+      return { success: false, error: error.message || "Network error" };
     }
   };
 
@@ -104,54 +75,27 @@ export const AuthProvider = ({ children }) => {
       );
 
       // Then register user in your backend
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/auth/register`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include", // Include cookies
-          body: JSON.stringify(userData),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Cookie is automatically set by the server
-        setUser(data.user);
-        return { success: true };
-      } else {
-        // Clean up Firebase user if backend registration fails
-        const currentUser = firebaseAuth.currentUser;
-        if (currentUser) {
-          await currentUser.delete();
-        }
-        return { success: false, error: data.error };
-      }
+      const result = await authAPI._register(userData);
+      setUser(result.data);
+      return { success: true };
     } catch (error) {
-      return { success: false, error: "Registration failed: " + error.message };
+      // Clean up Firebase user if backend registration fails
+      const currentUser = firebaseAuth.currentUser;
+      if (currentUser) {
+        try {
+          await currentUser.delete();
+        } catch (deleteError) {
+          console.error('Error deleting Firebase user:', deleteError);
+        }
+      }
+      return { success: false, error: error.message || "Registration failed" };
     }
   };
 
   const refreshUser = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/auth/me`,
-        {
-          method: "GET",
-          credentials: "include", // Include cookies
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      } else {
-        // Token is invalid or expired
-        setUser(null);
-      }
+      const result = await authAPI._getMe();
+      setUser(result.data);
     } catch (error) {
       console.error("Error refreshing user:", error);
       setUser(null);
@@ -161,10 +105,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       // Call backend logout to clear the cookie
-      await fetch(`${import.meta.env.VITE_API_URL}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include", // Include cookies
-      });
+      await authAPI._logout();
     } catch (error) {
       console.error("Error during logout:", error);
     } finally {
@@ -178,28 +119,15 @@ export const AuthProvider = ({ children }) => {
   // Switch role function (if needed)
   const switchRole = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/auth/switch-role`,
-        {
-          method: "PUT",
-          credentials: "include", // Include cookies
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        // Update user with new role
-        setUser((prevUser) => ({
-          ...prevUser,
-          role: data.role,
-        }));
-        return { success: true, role: data.role };
-      } else {
-        const data = await response.json();
-        return { success: false, error: data.error };
-      }
+      const result = await authAPI._switchRole();
+      // Update user with new role
+      setUser((prevUser) => ({
+        ...prevUser,
+        role: result.data.role,
+      }));
+      return { success: true, role: result.data.role };
     } catch (error) {
-      return { success: false, error: "Network error" };
+      return { success: false, error: error.message || "Network error" };
     }
   };
 

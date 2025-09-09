@@ -446,9 +446,7 @@ const PremiumHeroSection = ({
                     <span className="relative z-10 flex items-center justify-center space-x-3">
                       <Store className="w-6 h-6" />
                       <span className="tracking-wide">
-                        {storeData.type === 'product' ? 
-                          (storeData.customCTA?.primary || 'SHOP NOW') : 
-                          (storeData.customCTA?.primary || 'BOOK SERVICE')}
+                        {storeData.customCTA?.primary || 'SHOP NOW'}
                       </span>
                       <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
                     </span>

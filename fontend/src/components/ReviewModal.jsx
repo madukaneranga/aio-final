@@ -5,8 +5,7 @@ const ReviewModal = ({
   isOpen, 
   onClose, 
   onSubmit, 
-  orderOrBooking, 
-  type = 'order' // 'order' or 'booking'
+  order
 }) => {
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -41,16 +40,13 @@ const ReviewModal = ({
           </button>
         </div>
 
-        {orderOrBooking && (
+        {order && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600">
-              Reviewing {type === 'order' ? 'order' : 'service booking'}:
+              Reviewing order:
             </p>
             <p className="font-medium text-gray-900">
-              {type === 'order' 
-                ? `Order #${orderOrBooking._id?.slice(-8)}` 
-                : orderOrBooking.serviceId?.title || 'Service'
-              }
+              Order #{order._id?.slice(-8)}
             </p>
           </div>
         )}
@@ -94,7 +90,7 @@ const ReviewModal = ({
               onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
               rows={4}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-              placeholder={`Share your experience with this ${type}...`}
+              placeholder="Share your experience with this order..."
               required
               minLength={10}
               maxLength={500}

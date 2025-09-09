@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Send, MoreHorizontal } from "lucide-react";
+import { socialAPI } from "../utils/api";
 
 // CommentSidebar Component
 const CommentSidebar = ({
@@ -76,22 +77,8 @@ const CommentSidebar = ({
 
       console.log("Loading comments for post:", targetPostId, "page:", pageNum);
 
-      const response = await fetch(
-        `/api/posts/${targetPostId}/comments?page=${pageNum}&limit=20`,
-        {
-          credentials: "include",
-        }
-      );
-
-      console.log("Comments response status:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Comments API error:", response.status, errorData);
-        throw new Error(`Failed to load comments (${response.status})`);
-      }
-
-      const data = await response.json();
+      console.log("Loading comments API call");
+      const data = await socialAPI.getComments(targetPostId, { page: pageNum, limit: 20 });
       console.log("Comments data:", data);
 
       // Process comments
@@ -142,25 +129,8 @@ const CommentSidebar = ({
         )
       );
 
-      const response = await fetch(
-        `/api/posts/comments/${commentId}/replies?page=1&limit=10`,
-        {
-          credentials: "include",
-        }
-      );
-      console.log(`Response status: ${response.status}`);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log(
-          `❌ Failed to load replies. Status: ${response.status}, Error: ${errorText}`
-        );
-        throw new Error(
-          `Failed to load replies (${response.status}): ${errorText}`
-        );
-      }
-
-      const data = await response.json();
+      console.log("Loading replies API call");
+      const data = await socialAPI.getReplies(commentId, { page: 1, limit: 10 });
       console.log("Raw API Response:", data);
 
       const replies = data.replies || [];
@@ -221,27 +191,11 @@ const CommentSidebar = ({
         parentComment: replyingTo,
       });
 
-      const response = await fetch(`/api/posts/${currentPostId}/comment`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          text: newComment.trim(),
-          parentComment: replyingTo,
-        }),
+      console.log("Submitting comment API call");
+      const data = await socialAPI.addComment(currentPostId, {
+        text: newComment.trim(),
+        parentComment: replyingTo,
       });
-
-      console.log("Comment submit response status:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Comment submit error:", response.status, errorData);
-        throw new Error("Failed to add comment");
-      }
-
-      const data = await response.json();
       console.log("Comment submit success:", data);
 
       if (replyingTo) {
@@ -292,16 +246,7 @@ const CommentSidebar = ({
 
   const likeComment = async (commentId, isReply = false, parentId = null) => {
     try {
-      const response = await fetch(`/api/posts/comments/${commentId}/like`, {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to like comment");
-      }
-
-      const data = await response.json();
+      const data = await socialAPI.likeComment(commentId);
 
       if (isReply && parentId) {
         // Update reply like status
@@ -353,23 +298,7 @@ const CommentSidebar = ({
     parentId = null
   ) => {
     try {
-      const response = await fetch(
-        `/api/posts/comments/${commentId}/reaction`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ reactionType }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to add reaction");
-      }
-
-      const data = await response.json();
+      const data = await socialAPI.addReaction(commentId, { reactionType });
 
       if (isReply && parentId) {
         setComments((prev) =>

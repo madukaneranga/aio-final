@@ -16,7 +16,7 @@ const notificationSchema = new mongoose.Schema({
   link: String, // optional navigation link
   type: {
     type: String,
-    enum: ["order_update", "booking_update", "review_update", "announcement","withdrawal_update"],
+    enum: ["order_update", "review_update", "announcement", "withdrawal_update", "wallet_update", "credit_update", "payment_update"],
     required: true,
   },
   isRead: {

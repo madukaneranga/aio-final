@@ -1,7 +1,7 @@
 import React from "react";
 import { X, Star } from "lucide-react";
 
-const ServicesFiltersSidebar = ({
+const ProductFiltersSidebar = ({
   showFilters,
   setShowFilters,
   categorySet,
@@ -213,4 +213,4 @@ const ServicesFiltersSidebar = ({
   );
 };
 
-export default ServicesFiltersSidebar;
+export default ProductFiltersSidebar;

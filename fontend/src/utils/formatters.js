@@ -1,9 +1,14 @@
 export const formatCurrency = (amount) => {
+  // Handle undefined, null, or NaN values
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    amount = 0;
+  }
+  
   return new Intl.NumberFormat('en-LK', {
     style: 'currency',
     currency: 'LKR',
     minimumFractionDigits: 2
-  }).format(amount);
+  }).format(Number(amount));
 };
 
 export const formatDate = (date) => {

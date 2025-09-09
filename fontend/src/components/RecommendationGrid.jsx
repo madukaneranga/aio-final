@@ -10,14 +10,12 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "./LoadingSpinner";
 import ProductCard from "./ProductCard";
-import ServiceCard from "./ServiceCard";
 
 const RecommendationGrid = ({ 
   purchaseData, 
-  type = "order", 
   className = "" 
 }) => {
-  const { addToOrder, addToBookings } = useCart();
+  const { addToOrder } = useCart();
   const { user } = useAuth();
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,34 +48,27 @@ const RecommendationGrid = ({
 
       if (selectedTab === "related") {
         // Get items related to what they just purchased
-        if (type === "order" && purchaseData.items?.length > 0) {
+        if (purchaseData.items?.length > 0) {
           // Get related products based on categories of purchased items
           const categories = [...new Set(purchaseData.items.map(item => item.productId?.category).filter(Boolean))];
           endpoint = "/api/products/recommendations";
           params.append("categories", categories.join(","));
           params.append("exclude", purchaseData.items.map(item => item.productId?._id).filter(Boolean).join(","));
-        } else if (type === "booking" && purchaseData.serviceId) {
-          // Get related services based on category
-          endpoint = "/api/services/recommendations";
-          params.append("category", purchaseData.serviceId.category);
-          params.append("exclude", purchaseData.serviceId._id);
         }
       } else if (selectedTab === "store") {
         // Get more items from the same store
         const storeId = purchaseData.storeId?._id;
         if (storeId) {
-          endpoint = type === "order" ? "/api/products" : "/api/services";
+          endpoint = "/api/products";
           params.append("storeId", storeId);
           params.append("limit", "8");
-          if (type === "order" && purchaseData.items?.length > 0) {
+          if (purchaseData.items?.length > 0) {
             params.append("exclude", purchaseData.items.map(item => item.productId?._id).filter(Boolean).join(","));
-          } else if (type === "booking" && purchaseData.serviceId) {
-            params.append("exclude", purchaseData.serviceId._id);
           }
         }
       } else if (selectedTab === "popular") {
         // Get popular items
-        endpoint = type === "order" ? "/api/products" : "/api/services";
+        endpoint = "/api/products";
         params.append("sort", "popular");
         params.append("limit", "8");
       }
@@ -106,8 +97,6 @@ const RecommendationGrid = ({
               setRecommendations(data.slice(0, 8));
             } else if (data.products) {
               setRecommendations(data.products.slice(0, 8));
-            } else if (data.services) {
-              setRecommendations(data.services.slice(0, 8));
             } else if (data.data) {
               setRecommendations(data.data.slice(0, 8));
             } else {
@@ -140,7 +129,7 @@ const RecommendationGrid = ({
         setLoading(false);
       }
     }
-  }, [selectedTab, purchaseData, type]);
+  }, [selectedTab, purchaseData]);
   
   // Debounced fetch function
   const debouncedFetchRecommendations = useCallback(() => {
@@ -200,7 +189,6 @@ const RecommendationGrid = ({
 
   if (!purchaseData) return null;
 
-  const isProduct = type === "order";
   const tabs = ["related", "store", "popular"];
 
   return (
@@ -210,7 +198,7 @@ const RecommendationGrid = ({
           You Might Also Like ✨
         </h3>
         <p className="text-gray-600">
-          Discover more amazing {isProduct ? "products" : "services"} just for you
+          Discover more amazing products just for you
         </p>
       </div>
 
@@ -250,17 +238,10 @@ const RecommendationGrid = ({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {recommendations.map((item) => (
-            isProduct ? (
-              <ProductCard
-                key={item._id}
-                product={item}
-              />
-            ) : (
-              <ServiceCard
-                key={item._id}
-                service={item}
-              />
-            )
+            <ProductCard
+              key={item._id}
+              product={item}
+            />
           ))}
         </div>
       )}
@@ -269,10 +250,10 @@ const RecommendationGrid = ({
       {recommendations.length > 0 && (
         <div className="text-center">
           <Link
-            to={isProduct ? "/products" : "/services"}
+            to="/products"
             className="inline-flex items-center space-x-2 text-black hover:text-gray-700 font-medium transition-colors"
           >
-            <span>Explore More {isProduct ? "Products" : "Services"}</span>
+            <span>Explore More Products</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

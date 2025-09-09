@@ -93,7 +93,7 @@ subscriptionSchema.index({ status: 1, endDate: 1 });
 subscriptionSchema.index({ lastUpgradeAt: 1 });
 subscriptionSchema.index({ upgradeAttemptId: 1 });
 subscriptionSchema.index({ upgradeInitiatedAt: 1 });
-subscriptionSchema.index({ status: 1, upgradeInitiatedAt: 1 }); // For cleanup jobs
+subscriptionSchema.index({ status: 1, upgradeInitiatedAt: 1 });
 
 // Helper methods for upgrade management
 subscriptionSchema.methods.initiateUpgrade = function(newPackage, upgradeAttemptId) {

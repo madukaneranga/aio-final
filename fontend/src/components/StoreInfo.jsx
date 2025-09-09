@@ -13,9 +13,7 @@ import {
   Facebook,
   Crown,
   CheckCircle,
-  Clock,
   Truck,
-  Calendar,
   TrendingUp,
   Heart,
   Share2,
@@ -39,6 +37,7 @@ import {
   FaTwitter,
   FaGlobe,
 } from "react-icons/fa";
+import { storesAPI } from "../utils/api";
 
 const StoreInfo = ({
   store = {},
@@ -75,33 +74,21 @@ const StoreInfo = ({
     try {
       setFollowLoading(true);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/${storeData._id}/follow`,
-        {
-          method: "POST",
-          credentials: "include",
-        }
-      );
+      const data = await storesAPI.followStore(storeData._id);
 
-      const data = await response.json();
+      setFollowData((prev) => ({
+        ...prev,
+        isFollowing: data.isFollowing,
+      }));
+      setFollowersCount(data.followersCount);
 
-      if (response.ok) {
-        setFollowData((prev) => ({
-          ...prev,
-          isFollowing: data.isFollowing,
-        }));
-        setFollowersCount(data.followersCount);
-
-        // Notify parent component
-        if (onFollowChange) {
-          onFollowChange(data.isFollowing, data.followersCount);
-        }
-      } else {
-        alert(data.error || "Something went wrong");
+      // Notify parent component
+      if (onFollowChange) {
+        onFollowChange(data.isFollowing, data.followersCount);
       }
     } catch (error) {
       console.error("Follow error:", error);
-      alert("Something went wrong");
+      alert(error.message || "Something went wrong");
     } finally {
       setFollowLoading(false);
     }
@@ -111,33 +98,21 @@ const StoreInfo = ({
     try {
       setFollowLoading(true);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/${storeData._id}/follow`,
-        {
-          method: "POST",
-          credentials: "include",
-        }
-      );
+      const data = await storesAPI.unfollowStore(storeData._id);
 
-      const data = await response.json();
+      setFollowData((prev) => ({
+        ...prev,
+        isFollowing: data.isFollowing,
+      }));
+      setFollowersCount(data.followersCount);
 
-      if (response.ok) {
-        setFollowData((prev) => ({
-          ...prev,
-          isFollowing: data.isFollowing,
-        }));
-        setFollowersCount(data.followersCount);
-
-        // Notify parent component
-        if (onFollowChange) {
-          onFollowChange(data.isFollowing, data.followersCount);
-        }
-      } else {
-        alert(data.error || "Something went wrong");
+      // Notify parent component
+      if (onFollowChange) {
+        onFollowChange(data.isFollowing, data.followersCount);
       }
     } catch (error) {
       console.error("Unfollow error:", error);
-      alert("Something went wrong");
+      alert(error.message || "Something went wrong");
     } finally {
       setFollowLoading(false);
       setShowUnfollowConfirm(false);
@@ -410,7 +385,8 @@ const StoreInfo = ({
                   {/* Verification and Premium badges */}
                   <div className="absolute -bottom-1 -right-1 flex space-x-1">
                     {storeData.isVerified && (
-                      <div title="Verified"
+                      <div
+                        title="Verified"
                         className="w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-500"
                       >
                         <CheckCircle className="w-3 h-3 text-white" />
@@ -506,11 +482,11 @@ const StoreInfo = ({
                                 followData.isFollowing
                                   ? {
                                       backgroundColor: colors.light,
-                                    color: colors.primary,
+                                      color: colors.primary,
                                     }
                                   : {
                                       backgroundColor: colors.light,
-                                    color: colors.primary,
+                                      color: colors.primary,
                                     }
                               }
                             >
@@ -574,7 +550,7 @@ const StoreInfo = ({
                         backgroundColor: colors.light,
                       }}
                     >
-                      {storeData.type} Collection
+                      Products Collection
                     </span>
 
                     <span
@@ -682,11 +658,9 @@ const StoreInfo = ({
                       className="text-lg font-semibold"
                       style={{ color: colors.primary }}
                     >
-                      {(storeData.stats?.totalOrdersOrBookings || 0).toLocaleString()}
+                      {(storeData.stats?.totalOrders || 0).toLocaleString()}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {storeData.type === "product" ? "Orders" : "Bookings"}
-                    </p>
+                    <p className="text-xs text-gray-500">Orders</p>
                   </div>
                   <div className="text-center">
                     <p
@@ -793,91 +767,6 @@ const StoreInfo = ({
 
               {/* Business Hours & Performance */}
               <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Business Hours */}
-                {storeData.serviceSettings?.workingHours && (
-                  <div>
-                    <h4
-                      className="text-xs font-medium mb-2 flex items-center space-x-1"
-                      style={{ color: themeStyles.color }}
-                    >
-                      <Clock
-                        className="w-3 h-3"
-                        style={{ color: colors.primary }}
-                      />
-                      <span>Hours</span>
-                    </h4>
-                    <div className="text-xs text-gray-600">
-                      {(() => {
-                        const workingDays =
-                          storeData.serviceSettings.workingDays || [];
-                        const { start, end } =
-                          storeData.serviceSettings.workingHours;
-
-                        if (workingDays.length === 0) return "Closed";
-
-                        // Group consecutive days
-                        const dayOrder = [
-                          "monday",
-                          "tuesday",
-                          "wednesday",
-                          "thursday",
-                          "friday",
-                          "saturday",
-                          "sunday",
-                        ];
-                        const dayAbbr = {
-                          monday: "Mon",
-                          tuesday: "Tue",
-                          wednesday: "Wed",
-                          thursday: "Thu",
-                          friday: "Fri",
-                          saturday: "Sat",
-                          sunday: "Sun",
-                        };
-
-                        const sortedDays = workingDays.sort(
-                          (a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b)
-                        );
-
-                        // Simple grouping for common patterns
-                        const isWeekdays =
-                          sortedDays.length === 5 &&
-                          [
-                            "monday",
-                            "tuesday",
-                            "wednesday",
-                            "thursday",
-                            "friday",
-                          ].every((day) => sortedDays.includes(day));
-
-                        if (isWeekdays) {
-                          return (
-                            <div>
-                              <div>Mon-Fri</div>
-                              <div>
-                                {start} - {end}
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // For other patterns, show abbreviated list
-                        const daysList = sortedDays
-                          .map((day) => dayAbbr[day])
-                          .join(", ");
-                        return (
-                          <div>
-                            <div>{daysList}</div>
-                            <div>
-                              {start} - {end}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                )}
-
                 {/* Performance */}
                 <div>
                   <h4
@@ -898,15 +787,13 @@ const StoreInfo = ({
                           : `${storeData.responseTime || 0}h`}
                       </span>
                     </div>
-                    {store.type === "product" && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Avg. delivery:</span>
-                        <span className="font-medium text-green-600">
-                          {storeData.shippingInfo?.deliveryDaysMin || 0} -{" "}
-                          {storeData.shippingInfo?.deliveryDaysMax || 0} days
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Avg. delivery:</span>
+                      <span className="font-medium text-green-600">
+                        {storeData.shippingInfo?.deliveryDaysMin || 0} -{" "}
+                        {storeData.shippingInfo?.deliveryDaysMax || 0} days
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

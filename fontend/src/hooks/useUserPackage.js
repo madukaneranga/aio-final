@@ -16,12 +16,6 @@ const useUserPackage = () => {
       limitReached: data?.usage?.products?.limitReached || false,
       imageLimitReached: data?.usage?.products?.imageLimitReached || false,
     },
-    servicesInfo: {
-      count: data?.usage?.services?.count || 0,
-      images: data?.usage?.services?.images || 0,
-      limitReached: data?.usage?.services?.limitReached || false,
-      imageLimitReached: data?.usage?.services?.imageLimitReached || false,
-    },
     headerImagesInfo: {
       count: data?.usage?.headerImages?.count || 0,
       limitReached: data?.usage?.headerImages?.limitReached || false,
@@ -57,7 +51,6 @@ const useUserPackage = () => {
         planInfo: "none",
         limitsInfo: {},
         productsInfo: { count: 0, images: 0, limitReached: false, imageLimitReached: false },
-        servicesInfo: { count: 0, images: 0, limitReached: false, imageLimitReached: false },
         headerImagesInfo: { count: 0, limitReached: false },
         variantsInfo: { used: false, allowed: false, violated: false },
       };

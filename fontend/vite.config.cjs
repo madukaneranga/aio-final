@@ -1,30 +1,34 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-import vitePrerender from "vite-plugin-prerender";
+const { defineConfig } = require("vite");
+const react = require("@vitejs/plugin-react");
+const path = require("path");
+const vitePrerender = require("vite-plugin-prerender");
 const dotenv = require("dotenv");
 dotenv.config();
 
 async function getDynamicRoutes() {
   try {
-    const products = await fetch(`${process.env.VITE_API_URL}/api/products`).then((res) =>
-      res.json()
-    );
-    const services = await fetch(`${process.env.VITE_API_URL}/api/services`).then((res) =>
+    const response = await fetch(`${process.env.VITE_API_URL}/api/products`).then((res) =>
       res.json()
     );
 
-    const productRoutes = products.filter((p) => p.id).map((p) => `/products/${p.id}`);
-    const serviceRoutes = services.filter((s) => s.id).map((s) => `/services/${s.id}`);
+    // Handle the new response format from our MVC refactoring
+    const products = response.data || response;
 
-    return ["/", ...productRoutes, ...serviceRoutes];
+    // Check if products is an array before using filter
+    if (Array.isArray(products)) {
+      const productRoutes = products.filter((p) => p.id || p._id).map((p) => `/products/${p.id || p._id}`);
+      return ["/", ...productRoutes];
+    } else {
+      console.warn("Products response is not an array:", products);
+      return ["/"]; // fallback to homepage only
+    }
   } catch (error) {
     console.error("Failed to fetch routes:", error);
     return ["/"]; // fallback to homepage only
   }
 }
 
-export default async () => {
+module.exports = async () => {
   const routes = await getDynamicRoutes();
 
   return defineConfig({

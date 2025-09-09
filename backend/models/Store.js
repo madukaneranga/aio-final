@@ -6,11 +6,6 @@ const storeSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  type: {
-    type: String,
-    enum: ["product", "service"],
-    required: true,
-  },
   description: {
     type: String,
   },
@@ -132,20 +127,6 @@ const storeSchema = new mongoose.Schema({
       type: String,
     },
   ],
-  serviceSettings: {
-    workingHours: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "17:00" },
-    },
-    workingDays: {
-      type: [String],
-      default: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-    },
-    excludedDates: { type: [Date], default: [] },
-    timeZone: { type: String, default: "Asia/Colombo" },
-    bookingBuffer: { type: Number, default: 0 },
-    advanceBookingDays: { type: Number, default: 30 },
-  },
   shippingInfo: {
     freeShipping: {
       type: Boolean,
@@ -172,7 +153,7 @@ const storeSchema = new mongoose.Schema({
     },
   ],
   stats: {
-    totalOrdersOrBookings: {
+    totalOrders: {
       type: Number,
       default: 0,
     },
@@ -198,17 +179,17 @@ const storeSchema = new mongoose.Schema({
 // Virtual field for avgPurchaseAmount - automatically calculated
 storeSchema.virtual("stats.avgPurchaseAmount").get(function () {
   if (
-    !this.stats.totalOrdersOrBookings ||
-    this.stats.totalOrdersOrBookings === 0
+    !this.stats.totalOrders ||
+    this.stats.totalOrders === 0
   ) {
     return 0;
   }
   return (
-    Math.round((this.totalSales / this.stats.totalOrdersOrBookings) * 100) / 100
+    Math.round((this.totalSales / this.stats.totalOrders) * 100) / 100
   );
 });
 
-// Virtual field for completionRate - calculated from actual orders/bookings
+// Virtual field for completionRate - calculated from actual orders
 // Note: This is a placeholder that will be populated by the route handlers
 // since we need to perform database aggregation queries
 storeSchema.virtual("completionRate").get(function () {

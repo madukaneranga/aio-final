@@ -42,7 +42,6 @@ const compareVariants = (variants1, variants2) => {
 export const CartProvider = ({ children, showToast }) => {
   const { user } = useAuth();
   const [orderItems, setOrderItems] = useState([]);
-  const [bookingItems, setBookingItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [syncPending, setSyncPending] = useState(false);
@@ -53,14 +52,8 @@ export const CartProvider = ({ children, showToast }) => {
       if (!user) {
         // Load from localStorage for guests
         const savedCart = localStorage.getItem('order');
-        const savedBookings = localStorage.getItem('bookings');
-
         if (savedCart) {
           setOrderItems(JSON.parse(savedCart));
-        }
-
-        if (savedBookings) {
-          setBookingItems(JSON.parse(savedBookings));
         }
         return;
       }
@@ -68,12 +61,11 @@ export const CartProvider = ({ children, showToast }) => {
       // Load from API for authenticated users
       try {
         setIsLoading(true);
-        const response = await cartAPI.getCart();
+        const response = await cartAPI._getCart();
         if (response.success) {
-          const { items } = response.cart;
+          const { items } = response.data.cart;
           
-          const orderItems = items.filter(item => item.itemType === 'product');
-          const bookingItems = items.filter(item => item.itemType === 'service');
+          const orderItems = items;
           
           setOrderItems(orderItems.map(item => ({
             id: item.itemId._id || item.itemId,
@@ -84,30 +76,13 @@ export const CartProvider = ({ children, showToast }) => {
             storeId: item.storeId._id || item.storeId,
             _cartItemId: item._id, // Store cart item ID for updates
           })));
-          
-          setBookingItems(bookingItems.map(item => ({
-            id: item.itemId._id || item.itemId,
-            title: item.title,
-            price: item.price,
-            image: item.image,
-            date: item.bookingDetails?.date,
-            time: item.bookingDetails?.time,
-            storeId: item.storeId._id || item.storeId,
-            _cartItemId: item._id, // Store cart item ID for updates
-          })));
         }
       } catch (error) {
         console.error('Failed to load cart:', error);
         // Fallback to localStorage on error
         const savedCart = localStorage.getItem('order');
-        const savedBookings = localStorage.getItem('bookings');
-
         if (savedCart) {
           setOrderItems(JSON.parse(savedCart));
-        }
-
-        if (savedBookings) {
-          setBookingItems(JSON.parse(savedBookings));
         }
       } finally {
         setIsLoading(false);
@@ -123,12 +98,6 @@ export const CartProvider = ({ children, showToast }) => {
       localStorage.setItem('order', JSON.stringify(orderItems));
     }
   }, [orderItems, user, isOffline]);
-
-  useEffect(() => {
-    if (!user || isOffline) {
-      localStorage.setItem('bookings', JSON.stringify(bookingItems));
-    }
-  }, [bookingItems, user, isOffline]);
 
   // Handle online/offline status
   useEffect(() => {
@@ -165,11 +134,10 @@ export const CartProvider = ({ children, showToast }) => {
     }
   };
 
-  // Add to Order with exclusive cart logic (handled by backend)
+  // Add to Order
   const addToOrder = async (product, quantity = 1, variants = null) => {
     try {
       const itemData = {
-        itemType: 'product',
         itemId: product._id,
         quantity,
         variants,
@@ -177,30 +145,22 @@ export const CartProvider = ({ children, showToast }) => {
 
       if (user && !isOffline) {
         setIsLoading(true);
-        const response = await cartAPI.addToCart(itemData);
+        const response = await cartAPI._addToCart(itemData);
         
         if (response.success) {
-          const { items, cartType } = response.cart;
-          const { warnings, clearedItems, wasTypeSwitch } = response;
+          const { items } = response.data.cart;
+          const { warnings } = response.data;
           
-          // Update cart state based on new cart type
-          if (cartType === 'product') {
-            const orderItems = items.filter(item => item.itemType === 'product');
-            setOrderItems(orderItems.map(item => ({
-              id: item.itemId._id || item.itemId,
-              title: item.title,
-              price: item.price,
-              image: item.image,
-              quantity: item.quantity,
-              storeId: item.storeId._id || item.storeId,
-              _cartItemId: item._id,
-            })));
-            
-            // Clear booking items if type switched
-            if (wasTypeSwitch) {
-              setBookingItems([]);
-            }
-          }
+          const orderItems = items;
+          setOrderItems(orderItems.map(item => ({
+            id: item.itemId._id || item.itemId,
+            title: item.title,
+            price: item.price,
+            image: item.image,
+            quantity: item.quantity,
+            storeId: item.storeId._id || item.storeId,
+            _cartItemId: item._id,
+          })));
           
           // Show appropriate messages
           if (warnings && warnings.length > 0) {
@@ -210,15 +170,7 @@ export const CartProvider = ({ children, showToast }) => {
           }
         }
       } else {
-        // Offline/guest fallback - use original localStorage logic with manual exclusion
-        if (bookingItems.length > 0) {
-          const confirmClear = window.confirm(
-            'You have existing bookings in your cart. Adding a product will clear your bookings. Continue?'
-          );
-          if (!confirmClear) return;
-          setBookingItems([]);
-        }
-
+        // Offline/guest fallback
         setOrderItems(prev => {
           const existingItem = prev.find(item => 
             item.id === product._id && 
@@ -245,7 +197,7 @@ export const CartProvider = ({ children, showToast }) => {
               storeId:
                 typeof product.storeId === 'object'
                   ? product.storeId._id
-                  : product.storeId || product.storeId,
+                  : product.storeId,
             },
           ];
         });
@@ -261,98 +213,17 @@ export const CartProvider = ({ children, showToast }) => {
     }
   };
 
-  // Add to Booking with exclusive cart logic (handled by backend)
-  const addToBooking = async (service, bookingDetails) => {
-    try {
-      const itemData = {
-        itemType: 'service',
-        itemId: service._id,
-        quantity: 1,
-        bookingDetails,
-      };
-
-      if (user && !isOffline) {
-        setIsLoading(true);
-        const response = await cartAPI.addToCart(itemData);
-        
-        if (response.success) {
-          const { items, cartType } = response.cart;
-          const { warnings, clearedItems, wasTypeSwitch } = response;
-          
-          // Update cart state based on new cart type
-          if (cartType === 'service') {
-            const bookingItems = items.filter(item => item.itemType === 'service');
-            setBookingItems(bookingItems.map(item => ({
-              id: item.itemId._id || item.itemId,
-              title: item.title,
-              price: item.price,
-              image: item.image,
-              date: item.bookingDetails?.date,
-              time: item.bookingDetails?.time,
-              storeId: item.storeId._id || item.storeId,
-              _cartItemId: item._id,
-            })));
-            
-            // Clear order items if type switched
-            if (wasTypeSwitch) {
-              setOrderItems([]);
-            }
-          }
-          
-          // Show appropriate messages
-          if (warnings && warnings.length > 0) {
-            if (showToast) showToast(warnings.join('. '));
-          } else {
-            if (showToast) showToast('Service booked successfully!');
-          }
-        }
-      } else {
-        // Offline/guest fallback - use original localStorage logic with manual exclusion
-        if (orderItems.length > 0) {
-          const confirmClear = window.confirm(
-            'You have existing products in your cart. Adding a service will clear your products. Continue?'
-          );
-          if (!confirmClear) return;
-          setOrderItems([]);
-        }
-
-        // For offline services, replace any existing service (single service rule)
-        setBookingItems([{
-          id: service._id,
-          title: service.title,
-          price: service.price,
-          image: service.images?.[0],
-          bookingDetails,
-          date: bookingDetails.date,
-          time: bookingDetails.time,
-          storeId:
-            typeof service.storeId === 'object'
-              ? service.storeId._id
-              : service.storeId || service.storeId,
-        }]);
-        
-        setSyncPending(true);
-        if (showToast) showToast('Service booked successfully!');
-      }
-    } catch (error) {
-      console.error('Failed to add booking:', error);
-      if (showToast) showToast('Failed to book service. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const removeFromOrder = async (productId, variants = null) => {
     try {
       const item = orderItems.find(item => item.id === productId);
       
       if (user && !isOffline && item?._cartItemId) {
         setIsLoading(true);
-        const response = await cartAPI.removeFromCart(item._cartItemId);
+        const response = await cartAPI._removeFromCart(item._cartItemId);
         
         if (response.success) {
-          const { items } = response.cart;
-          const orderItems = items.filter(item => item.itemType === 'product');
+          const { items } = response.data.cart;
+          const orderItems = items;
           
           setOrderItems(orderItems.map(item => ({
             id: item.itemId._id || item.itemId,
@@ -390,11 +261,11 @@ export const CartProvider = ({ children, showToast }) => {
       
       if (user && !isOffline && item?._cartItemId) {
         setIsLoading(true);
-        const response = await cartAPI.updateQuantity(item._cartItemId, quantity);
+        const response = await cartAPI._updateQuantity(item._cartItemId, quantity);
         
         if (response.success) {
-          const { items } = response.cart;
-          const orderItems = items.filter(item => item.itemType === 'product');
+          const { items } = response.data.cart;
+          const orderItems = items;
           
           setOrderItems(orderItems.map(item => ({
             id: item.itemId._id || item.itemId,
@@ -410,15 +281,7 @@ export const CartProvider = ({ children, showToast }) => {
           if (showToast) showToast(response.message || 'Failed to update quantity');
         }
       } else {
-        // Offline/guest fallback - prevent service quantity changes and handle variants
-        const currentItem = orderItems.find(item => 
-          item.id === productId && compareVariants(item.variants, variants)
-        );
-        if (currentItem && currentItem.itemType === 'service' && quantity !== 1) {
-          if (showToast) showToast('Service bookings cannot have quantity changed');
-          return;
-        }
-        
+        // Offline/guest fallback
         setOrderItems(prev =>
           prev.map(item => 
             item.id === productId && compareVariants(item.variants, variants)
@@ -437,47 +300,11 @@ export const CartProvider = ({ children, showToast }) => {
     }
   };
 
-  const removeFromBooking = async (serviceId) => {
-    try {
-      const item = bookingItems.find(item => item.id === serviceId);
-      
-      if (user && !isOffline && item?._cartItemId) {
-        setIsLoading(true);
-        const response = await cartAPI.removeFromCart(item._cartItemId);
-        
-        if (response.success) {
-          const { items } = response.cart;
-          const bookingItems = items.filter(item => item.itemType === 'service');
-          
-          setBookingItems(bookingItems.map(item => ({
-            id: item.itemId._id || item.itemId,
-            title: item.title,
-            price: item.price,
-            image: item.image,
-            date: item.bookingDetails?.date,
-            time: item.bookingDetails?.time,
-            storeId: item.storeId._id || item.storeId,
-            _cartItemId: item._id,
-          })));
-        }
-      } else {
-        // Offline/guest fallback
-        setBookingItems(prev => prev.filter(item => item.id !== serviceId));
-        setSyncPending(true);
-      }
-    } catch (error) {
-      console.error('Failed to remove booking:', error);
-      if (showToast) showToast('Failed to remove booking. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const clearOrder = async () => {
     try {
       if (user && !isOffline) {
         setIsLoading(true);
-        await cartAPI.clearCart();
+        await cartAPI._clearCart();
       }
       setOrderItems([]);
       setSyncPending(true);
@@ -489,41 +316,18 @@ export const CartProvider = ({ children, showToast }) => {
     }
   };
 
-  const clearBookings = async () => {
-    try {
-      if (user && !isOffline) {
-        setIsLoading(true);
-        await cartAPI.clearCart();
-      }
-      setBookingItems([]);
-      setSyncPending(true);
-    } catch (error) {
-      console.error('Failed to clear bookings:', error);
-      setBookingItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const orderTotal = orderItems.reduce(
     (total, item) => total + item.price * item.quantity,
     0
   );
 
-  const bookingTotal = bookingItems.reduce((total, item) => total + item.price, 0);
-
   const value = {
     orderItems,
-    bookingItems,
     addToOrder,
     removeFromOrder,
     updateQuantity,
-    addToBooking,
-    removeFromBooking,
     clearOrder,
-    clearBookings,
     orderTotal,
-    bookingTotal,
     isLoading,
     isOffline,
     syncPending,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Filter, X } from "lucide-react";
 import StoreListing from "../components/StoreListing";
+import { storesAPI } from "../utils/api";
 
 const Stores = () => {
   // Store data state
@@ -25,23 +26,8 @@ const Stores = () => {
         typeof filters === "object" && filters !== null ? filters : {};
 
       console.log("Valid Filters:", validFilters);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/listing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(validFilters),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setStores(data);
-      } else {
-        setError("Failed to fetch stores");
-      }
+      const data = await storesAPI.getListing(validFilters);
+      setStores(data);
     } catch (error) {
       console.error("Error fetching stores:", error);
       setError("Network error. Please try again.");

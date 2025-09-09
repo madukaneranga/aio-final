@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Archive, Star, Send, Paperclip, MoreVertical, Settings, User, ShoppingBag, Clock, CheckCircle2, Circle, MessageSquare, Phone, Mail } from 'lucide-react';
-import useChat from '../hooks/useChat'; // Your existing hook
+// import useChat from '../hooks/useChat'; // Chat functionality removed
 
 // Mock user data - replace with your auth context
 const mockUser = {
@@ -461,19 +461,18 @@ const CustomerInfo = ({ customer, chat }) => {
 
 // Main Dashboard Components
 const CustomerChatDashboard = ({ user }) => {
-  const {
-    conversations,
-    activeChat,
-    messages,
-    loadMessages,
-    sendMessage,
-    markAsRead,
-    joinChatRoom,
-    startTyping,
-    stopTyping,
-    typingUsers,
-    isLoading
-  } = useChat(user);
+  // Chat functionality disabled - useChat hook removed
+  const conversations = [];
+  const activeChat = null;
+  const messages = [];
+  const loadMessages = () => {};
+  const sendMessage = () => {};
+  const markAsRead = () => {};
+  const joinChatRoom = () => {};
+  const startTyping = () => {};
+  const stopTyping = () => {};
+  const typingUsers = [];
+  const isLoading = false;
 
   const [selectedChat, setSelectedChat] = useState(null);
 
@@ -520,19 +519,18 @@ const CustomerChatDashboard = ({ user }) => {
 };
 
 const StoreOwnerChatDashboard = ({ user, storeId }) => {
-  const {
-    conversations,
-    activeChat,
-    messages,
-    loadMessages,
-    sendMessage,
-    markAsRead,
-    joinChatRoom,
-    startTyping,
-    stopTyping,
-    typingUsers,
-    isLoading
-  } = useChat(user);
+  // Chat functionality disabled - useChat hook removed
+  const conversations = [];
+  const activeChat = null;
+  const messages = [];
+  const loadMessages = () => {};
+  const sendMessage = () => {};
+  const markAsRead = () => {};
+  const joinChatRoom = () => {};
+  const startTyping = () => {};
+  const stopTyping = () => {};
+  const typingUsers = [];
+  const isLoading = false;
 
   const [selectedChat, setSelectedChat] = useState(null);
 

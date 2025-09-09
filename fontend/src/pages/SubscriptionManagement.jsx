@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import Pricing from "../components/Pricing";
 import { getUsageViolations } from "../utils/helpers";
 import ViolationSummary from "../components/ViolationSummary";
+import { subscriptionsAPI } from "../utils/api";
 import { set } from "mongoose";
 
 // Main Subscription Management Component
@@ -27,7 +28,6 @@ const SubscriptionManagement = () => {
 
     const usage = {
       products: usageData.usageInfo.productsInfo,
-      services: usageData.usageInfo.servicesInfo,
       headerImages: usageData.usageInfo.headerImagesInfo,
       variants: usageData.usageInfo.variantsInfo,
     };
@@ -48,9 +48,17 @@ const SubscriptionManagement = () => {
       if (response.ok) {
         const data = await response.json();
         setSubscription(data.subscription);
-        setSelectedPackage(data.package.name || "");
+        
+        // Handle new response structure - check if subscription exists and has a package
+        if (data.subscription && data.subscription.package) {
+          setSelectedPackage(data.subscription.package || "");
+        } else {
+          // No active subscription (pending state)
+          setSelectedPackage("");
+        }
       } else {
         setSubscription(null);
+        setSelectedPackage("");
       }
     } catch (error) {
       console.error("Error fetching subscription:", error);
@@ -164,7 +172,6 @@ const SubscriptionManagement = () => {
 
     const usage = {
       products: usageData.usageInfo.productsInfo,
-      services: usageData.usageInfo.servicesInfo,
       headerImages: usageData.usageInfo.headerImagesInfo,
       variants: usageData.usageInfo.variantsInfo,
     };
@@ -194,7 +201,7 @@ const SubscriptionManagement = () => {
       if (!res.ok) throw new Error("Failed to fetch usage summary");
 
       const data = await res.json();
-      //console.log("usage summary", data);
+      console.log("usage summary", data);
       setUsageData(data);
     } catch (error) {
       console.error("Error loading usage data:", e);
@@ -259,31 +266,12 @@ const SubscriptionManagement = () => {
     }
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ packageName: selectedPackage }),
-        }
-      );
-
-      if (response.ok) {
-        const { paymentParams } = await response.json();
-        await loadPayHereSDK();
-        await startPayHerePayment(paymentParams);
-        // Remove immediate fetch since onCompleted handler will do it
-        alert(`Payment initiated. Please wait for confirmation.`);
-        setView("overview");
-      } else {
-        const errorData = await response.json();
-        alert(
-          "Subscription setup failed: " + (errorData?.error || "Unknown error")
-        );
-      }
+      const { paymentParams } = await subscriptionsAPI.subscribe({ packageName: selectedPackage });
+      await loadPayHereSDK();
+      await startPayHerePayment(paymentParams);
+      // Remove immediate fetch since onCompleted handler will do it
+      alert(`Payment initiated. Please wait for confirmation.`);
+      setView("overview");
     } catch (error) {
       console.error("Subscription error:", error);
       alert("Error starting subscription. Please try again.");
@@ -304,17 +292,7 @@ const SubscriptionManagement = () => {
       );
       if (confirmRollback) {
         try {
-          await fetch(
-            `${import.meta.env.VITE_API_URL}/api/subscriptions/rollback-upgrade`,
-            {
-              method: "POST",
-              credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ upgradeAttemptId: subscription.upgradeAttemptId }),
-            }
-          );
+          await subscriptionsAPI.rollbackUpgrade({ upgradeAttemptId: subscription.upgradeAttemptId });
           await fetchSubscription(); // Refresh data
         } catch (error) {
           alert("Failed to cancel previous upgrade. Please try again.");
@@ -326,41 +304,7 @@ const SubscriptionManagement = () => {
     }
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/upgrade`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ packageName: selectedPackage }),
-        }
-      );
-
-      const result = await response.json();
-
-      // Handle upgrade already in progress
-      if (response.status === 409) {
-        alert(result.message);
-        return;
-      }
-
-      if (response.status === 403 && result.nextAvailableDowngradeDate) {
-        const formattedDate = new Date(
-          result.nextAvailableDowngradeDate
-        ).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-        alert(`⛔ You can downgrade only after: ${formattedDate}`);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to upgrade package");
-      }
+      const result = await subscriptionsAPI.upgrade({ packageName: selectedPackage });
 
       // Store upgrade attempt ID for potential rollback
       const upgradeAttemptId = result.upgradeAttemptId;
@@ -418,24 +362,9 @@ const SubscriptionManagement = () => {
   // Helper function to rollback upgrade
   const handleUpgradeRollback = async (upgradeAttemptId) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/rollback-upgrade`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ upgradeAttemptId }),
-        }
-      );
-      
-      if (response.ok) {
-        await fetchSubscription(); // Refresh data
-        alert("✅ Upgrade cancelled. Your original subscription has been restored.");
-      } else {
-        console.error("Rollback failed:", await response.text());
-      }
+      await subscriptionsAPI.rollbackUpgrade({ upgradeAttemptId });
+      await fetchSubscription(); // Refresh data
+      alert("✅ Upgrade cancelled. Your original subscription has been restored.");
     } catch (error) {
       console.error("Rollback error:", error);
     }
@@ -444,29 +373,10 @@ const SubscriptionManagement = () => {
   // Cancel subscription
   const cancelSubscription = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/cancel`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ subscriptionId: subscription?._id }),
-        }
-      );
-
-      if (response.ok) {
-        await fetchSubscription();
-        alert("Subscription cancelled successfully.");
-        setShowCancelModal(false);
-      } else {
-        const errorData = await response.json();
-        alert(
-          "Failed to cancel subscription: " +
-            (errorData?.error || "Unknown error")
-        );
-      }
+      await subscriptionsAPI.cancel({ subscriptionId: subscription?._id });
+      await fetchSubscription();
+      alert("Subscription cancelled successfully.");
+      setShowCancelModal(false);
     } catch (error) {
       console.error("Cancel error:", error);
       alert("Error cancelling subscription. Please try again.");
@@ -520,7 +430,7 @@ const SubscriptionManagement = () => {
       <div className="max-w-6xl mx-auto px-4 py-12">
         {view === "overview" && (
           <div className="space-y-8">
-            {subscription ? (
+            {subscription && subscription.status !== "pending" && subscription.package ? (
               <>
                 {/* Current Subscription */}
                 <div className="bg-gray-50 rounded-2xl p-8">

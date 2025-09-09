@@ -4,8 +4,7 @@ const bankDetailsSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    unique: true
+    required: true
   },
   accountHolderName: {
     type: String,
@@ -24,12 +23,6 @@ const bankDetailsSchema = new mongoose.Schema({
     required: true,
     trim: true,
     maxlength: 20
-  },
-  routingNumber: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 15
   },
   branchName: {
     type: String,
@@ -62,25 +55,30 @@ const bankDetailsSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  // Security and Lock Fields
-  isLocked: {
-    type: Boolean,
-    default: false
-  },
-  lockReason: {
-    type: String,
-    enum: ['auto_lock_after_first_save', 'admin_lock', 'security_lock', 'manual_lock'],
-    default: null
-  },
-  lockedAt: {
-    type: Date,
-    default: null
-  },
-  lockedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-    default: null
-  },
+  // History of previous bank details when changes are requested
+  history: [{
+    accountHolderName: String,
+    bankName: String,
+    accountNumber: String,
+    branchName: String,
+    branchCode: String,
+    accountType: {
+      type: String,
+      enum: ['savings', 'checking', 'business']
+    },
+    archivedAt: {
+      type: Date,
+      default: Date.now
+    },
+    reason: {
+      type: String,
+      default: 'change_request'
+    },
+    wasVerified: {
+      type: Boolean,
+      default: false
+    }
+  }],
   // Change tracking
   lastModifiedAt: {
     type: Date,
@@ -109,6 +107,11 @@ const bankDetailsSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Indexes for performance optimization
+bankDetailsSchema.index({ userId: 1 });
+bankDetailsSchema.index({ userId: 1, isActive: 1 });
+bankDetailsSchema.index({ isVerified: 1 });
+
 // Method to mask account number for display
 bankDetailsSchema.methods.getMaskedAccountNumber = function() {
   const accountNumber = this.accountNumber;
@@ -116,49 +119,22 @@ bankDetailsSchema.methods.getMaskedAccountNumber = function() {
   return '****' + accountNumber.slice(-4);
 };
 
-// Method to lock bank details
-bankDetailsSchema.methods.lockDetails = function(reason = 'manual_lock', lockedBy = null) {
-  this.isLocked = true;
-  this.lockReason = reason;
-  this.lockedAt = new Date();
-  if (lockedBy) {
-    this.lockedBy = lockedBy;
-  }
-  return this.save();
-};
-
-// Method to unlock bank details (admin only)
-bankDetailsSchema.methods.unlockDetails = function(unlockedBy) {
-  this.isLocked = false;
-  this.lockReason = null;
-  this.lockedAt = null;
-  this.lockedBy = null;
-  
-  // Add to modification history
-  this.modificationHistory.push({
-    modifiedAt: new Date(),
-    modifiedBy: unlockedBy,
-    changes: { action: 'unlocked' },
-    reason: 'Admin unlocked bank details'
+// Method to archive current details before making changes
+bankDetailsSchema.methods.archiveCurrentDetails = function(reason = 'change_request') {
+  // Archive current details to history
+  this.history.push({
+    accountHolderName: this.accountHolderName,
+    bankName: this.bankName,
+    accountNumber: this.accountNumber,
+    branchName: this.branchName,
+    branchCode: this.branchCode,
+    accountType: this.accountType,
+    archivedAt: new Date(),
+    reason: reason,
+    wasVerified: this.isVerified
   });
   
-  return this.save();
-};
-
-// Method to check if details can be modified
-bankDetailsSchema.methods.canModify = function() {
-  return !this.isLocked;
-};
-
-// Method to get lock status info
-bankDetailsSchema.methods.getLockInfo = function() {
-  return {
-    isLocked: this.isLocked,
-    lockReason: this.lockReason,
-    lockedAt: this.lockedAt,
-    lockedBy: this.lockedBy,
-    canModify: this.canModify()
-  };
+  return this;
 };
 
 // Method to track modifications
@@ -177,15 +153,19 @@ bankDetailsSchema.methods.trackModification = function(userId, changes, reason, 
   return this;
 };
 
-// Pre-save middleware to auto-lock after first save
-bankDetailsSchema.pre('save', function(next) {
-  // If this is a new document (first save) and not already locked
-  if (this.isNew && !this.isLocked) {
-    this.isLocked = true;
-    this.lockReason = 'auto_lock_after_first_save';
-    this.lockedAt = new Date();
-  }
-  next();
-});
+// Method to check if details can be modified (always true now since we removed locking)
+bankDetailsSchema.methods.canModify = function() {
+  return true;
+};
+
+// Method to get verification status info
+bankDetailsSchema.methods.getVerificationInfo = function() {
+  return {
+    isVerified: this.isVerified,
+    verifiedAt: this.verifiedAt,
+    verifiedBy: this.verifiedBy,
+    canModify: this.canModify()
+  };
+};
 
 export default mongoose.model('BankDetails', bankDetailsSchema);

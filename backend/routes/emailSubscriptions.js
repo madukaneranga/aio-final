@@ -99,5 +99,28 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.delete("/", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) return res.status(400).json({ message: "Email is required" });
+
+  try {
+    const result = await EmailSubscription.findOneAndDelete({ email });
+
+    if (!result) {
+      return res.status(404).json({ message: "Email subscription not found" });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "Email unsubscribed successfully" 
+    });
+
+  } catch (err) {
+    console.error("Email unsubscription error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 export default router;

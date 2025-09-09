@@ -5,9 +5,7 @@ import { formatLKR } from "../utils/currency";
 import {
   Plus,
   Package,
-  Calendar,
   DollarSign,
-  Users,
   TrendingUp,
   Settings,
   Store,
@@ -19,18 +17,16 @@ import {
 } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import UpdateProduct from "../components/UpdateProduct";
-import UpdateService from "../components/UpdateService";
 import useUserPackage from "../hooks/useUserPackage";
 import { useWallet } from "../hooks/useWallet";
+import { storesAPI, productsAPI, ordersAPI, subscriptionsAPI } from "../utils/api";
 
 const StoreDashboard = () => {
   const { user } = useAuth();
   const [store, setStore] = useState(null);
   const [stats, setStats] = useState({
     totalProducts: 0,
-    totalServices: 0,
     totalOrders: 0,
-    totalBookings: 0,
     totalEarnings: 0,
   });
   const {
@@ -40,7 +36,6 @@ const StoreDashboard = () => {
     planInfo,
     limitsInfo,
     productsInfo,
-    servicesInfo,
     headerImagesInfo,
     variantsInfo,
   } = useUserPackage();
@@ -53,13 +48,10 @@ const StoreDashboard = () => {
   } = useWallet();
 
   const [recentOrders, setRecentOrders] = useState([]);
-  const [recentBookings, setRecentBookings] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [products, setProducts] = useState([]);
-  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [editingService, setEditingService] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const navigate = useNavigate();
 
@@ -76,52 +68,24 @@ const StoreDashboard = () => {
     try {
       // --- Store ---
       if (user.storeId) {
-        const storeResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`,
-          { credentials: "include" }
-        );
-
-        if (storeResponse.ok) {
-          const storeData = await storeResponse.json();
+        try {
+          const storeData = await storesAPI.getById(user.storeId);
           setStore(storeData.store);
 
-          // --- Products or Services ---
-          if (storeData.store?.type === "product") {
-            const productsResponse = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/products?storeId=${
-                user.storeId
-              }`,
-              { credentials: "include" }
-            );
-            if (productsResponse.ok) {
-              const productsData = await productsResponse.json();
-              setProducts(productsData);
-              setStats((prev) => ({
-                ...prev,
-                totalProducts: productsData.length,
-              }));
-            } else {
-              setProducts([]);
-            }
-          } else if (storeData.store?.type === "service") {
-            const servicesResponse = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/services?storeId=${
-                user.storeId
-              }`,
-              { credentials: "include" }
-            );
-            if (servicesResponse.ok) {
-              const servicesData = await servicesResponse.json();
-              setServices(servicesData);
-              setStats((prev) => ({
-                ...prev,
-                totalServices: servicesData.length,
-              }));
-            } else {
-              setServices([]);
-            }
+          // --- Products ---
+          try {
+            const productsData = await productsAPI.getAll({ storeId: user.storeId });
+            setProducts(productsData);
+            setStats((prev) => ({
+              ...prev,
+              totalProducts: productsData.length,
+            }));
+          } catch (productsError) {
+            console.error("Error fetching products:", productsError);
+            setProducts([]);
           }
-        } else {
+        } catch (storeError) {
+          console.error("Error fetching store:", storeError);
           setStore(null);
         }
       } else {
@@ -129,41 +93,23 @@ const StoreDashboard = () => {
       }
 
       // --- Orders ---
-      const ordersResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/orders/store`,
-        { credentials: "include" }
-      );
-      if (ordersResponse.ok) {
-        const orders = await ordersResponse.json();
+      try {
+        const orders = await ordersAPI.getOrdersByStore(user.storeId);
         setRecentOrders(orders.slice(0, 5));
         setStats((prev) => ({ ...prev, totalOrders: orders.length }));
-      } else {
+      } catch (ordersError) {
+        console.error("Error fetching orders:", ordersError);
         setRecentOrders([]);
       }
 
-      // --- Bookings ---
-      const bookingsResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/bookings/store`,
-        { credentials: "include" }
-      );
-      if (bookingsResponse.ok) {
-        const bookings = await bookingsResponse.json();
-        setRecentBookings(bookings.slice(0, 5));
-        setStats((prev) => ({ ...prev, totalBookings: bookings.length }));
-      } else {
-        setRecentBookings([]);
-      }
-
       // --- Subscription ---
-      const subscriptionResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
-        { credentials: "include" }
-      );
-      if (subscriptionResponse.ok) {
-        const data = await subscriptionResponse.json();
-        setSubscription(data.subscription);
-      } else {
-        setSubscription(null);
+      try {
+        const subscriptionData = await subscriptionsAPI.getMySubscription();
+        setSubscription(subscriptionData.subscription);
+      } catch (subscriptionError) {
+        console.error("Error fetching subscription:", subscriptionError);
+        // Set a default pending subscription object instead of null
+        setSubscription({ status: "pending", package: null });
       }
     } catch (error) {
       console.error("Unexpected error fetching dashboard data:", error);
@@ -177,19 +123,13 @@ const StoreDashboard = () => {
     setEditingProduct(product);
   };
 
-  const handleEditService = (service) => {
-    setEditingService(service);
-  };
-
   const handleUpdateComplete = () => {
     fetchDashboardData();
     setEditingProduct(null);
-    setEditingService(null);
   };
 
   const handleUpdateCancel = () => {
     setEditingProduct(null);
-    setEditingService(null);
   };
 
   const handleDelete = async (itemId, type) => {
@@ -197,32 +137,12 @@ const StoreDashboard = () => {
 
     setDeleting(itemId);
     try {
-      const endpoint = type === "product" ? "products" : "services";
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/${endpoint}/${itemId}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        if (type === "product") {
-          setProducts(products.filter((p) => p._id !== itemId));
-        } else {
-          setServices(services.filter((s) => s._id !== itemId));
-        }
-        alert(
-          `${
-            type.charAt(0).toUpperCase() + type.slice(1)
-          } deleted successfully!`
-        );
-      } else {
-        alert(`Failed to delete ${type}`);
-      }
+      await productsAPI.delete(itemId);
+      setProducts(products.filter((p) => p._id !== itemId));
+      alert("Product deleted successfully!");
     } catch (error) {
-      console.error(`Error deleting ${type}:`, error);
-      alert(`Error deleting ${type}`);
+      console.error("Error deleting product:", error);
+      alert("Error deleting product");
     } finally {
       setDeleting(null);
     }
@@ -284,63 +204,30 @@ const StoreDashboard = () => {
             </Link>
           )}
 
-          {store?.type === "product" && (
-            <>
-              <Link
-                to="/create-product"
-                className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
-              >
-                <Plus className="w-8 h-8 text-black" />
-                <div>
-                  <p className="font-semibold text-gray-900">Add Product</p>
-                  {productsInfo.limitReached ? (
-                    <p className="text-sm text-red-500">Reched max products</p>
-                  ) : (
-                    <p className="text-sm text-gray-500">Create new product</p>
-                  )}
-                </div>
-              </Link>
-              <Link
-                to="/orders"
-                className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
-              >
-                <Package className="w-8 h-8 text-black" />
-                <div>
-                  <p className="font-semibold text-gray-900">View Orders</p>
-                  <p className="text-sm text-gray-500">Manage orders</p>
-                </div>
-              </Link>
-            </>
-          )}
-
-          {store?.type === "service" && (
-            <>
-              <Link
-                to="/create-service"
-                className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
-              >
-                <Calendar className="w-8 h-8 text-black" />
-                <div>
-                  <p className="font-semibold text-gray-900">Add Service</p>
-                  {servicesInfo.limitReached ? (
-                    <p className="text-sm text-red-500">Reched max services</p>
-                  ) : (
-                    <p className="text-sm text-gray-500">Create new service</p>
-                  )}
-                </div>
-              </Link>
-              <Link
-                to="/bookings"
-                className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
-              >
-                <Users className="w-8 h-8 text-black" />
-                <div>
-                  <p className="font-semibold text-gray-900">View Bookings</p>
-                  <p className="text-sm text-gray-500">Manage bookings</p>
-                </div>
-              </Link>
-            </>
-          )}
+          <Link
+            to="/create-product"
+            className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
+          >
+            <Plus className="w-8 h-8 text-black" />
+            <div>
+              <p className="font-semibold text-gray-900">Add Product</p>
+              {productsInfo?.limitReached ? (
+                <p className="text-sm text-red-500">Reached max products</p>
+              ) : (
+                <p className="text-sm text-gray-500">Create new product</p>
+              )}
+            </div>
+          </Link>
+          <Link
+            to="/orders"
+            className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
+          >
+            <Package className="w-8 h-8 text-black" />
+            <div>
+              <p className="font-semibold text-gray-900">View Orders</p>
+              <p className="text-sm text-gray-500">Manage orders</p>
+            </div>
+          </Link>
 
           <Link
             to="/wallet-dashboard"
@@ -367,16 +254,18 @@ const StoreDashboard = () => {
             </div>
           </Link>
 
-          <Link
-            to={`/store/${store._id}`}
-            className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
-          >
-            <Store className="w-8 h-8 text-black" />
-            <div>
-              <p className="font-semibold text-gray-900">View My Store</p>
-              <p className="text-sm text-gray-500">{store.name}</p>
-            </div>
-          </Link>
+          {store && (
+            <Link
+              to={`/store/${store._id}`}
+              className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 flex items-center space-x-3"
+            >
+              <Store className="w-8 h-8 text-black" />
+              <div>
+                <p className="font-semibold text-gray-900">View My Store</p>
+                <p className="text-sm text-gray-500">{store.name}</p>
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* Subscription Management Card */}
@@ -400,7 +289,7 @@ const StoreDashboard = () => {
               </div>
 
               <div className="space-y-2 text-gray-700">
-                {subscription ? (
+                {subscription.package && subscription.status === "active" ? (
                   <>
                     <p className="flex items-center gap-2">
                       <span className="text-gray-600 font-light">
@@ -453,8 +342,7 @@ const StoreDashboard = () => {
                     </p>
 
                     <p className="text-gray-600 font-light leading-relaxed max-w-md">
-                      A subscription is required to sell your products or
-                      services on AIO.
+                      A subscription is required to sell your products on AIO.
                     </p>
                   </>
                 )}
@@ -491,34 +379,18 @@ const StoreDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {store?.type === "product" && (
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total Orders</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {stats.totalOrders}
-                  </p>
-                </div>
-                <Package className="w-8 h-8 text-blue-500" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Orders</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats.totalOrders}
+                </p>
               </div>
+              <Package className="w-8 h-8 text-blue-500" />
             </div>
-          )}
-          {store?.type === "service" && (
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total Bookings</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {stats.totalBookings}
-                  </p>
-                </div>
-                <Calendar className="w-8 h-8 text-green-500" />
-              </div>
-            </div>
-          )}
+          </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
@@ -551,199 +423,100 @@ const StoreDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Product Management for Product Stores */}
-          {store?.type === "product" && (
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Manage Products
-                </h2>
+          {/* Product Management */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Manage Products
+              </h2>
+              <Link
+                to="/create-product"
+                className="text-black hover:text-gray-700 text-sm"
+              >
+                Add New
+              </Link>
+            </div>
+
+            {products.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No products yet</p>
                 <Link
                   to="/create-product"
                   className="text-black hover:text-gray-700 text-sm"
                 >
-                  Add New
+                  Create your first product
                 </Link>
               </div>
-
-              {products.length === 0 ? (
-                <div className="text-center py-8">
-                  <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No products yet</p>
-                  <Link
-                    to="/create-product"
-                    className="text-black hover:text-gray-700 text-sm"
+            ) : (
+              <div className="space-y-4">
+                {products.slice(0, 5).map((product) => (
+                  <div
+                    key={product._id}
+                    className="border border-gray-200 rounded-lg p-4"
                   >
-                    Create your first product
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {products.slice(0, 5).map((product) => (
-                    <div
-                      key={product._id}
-                      className="border border-gray-200 rounded-lg p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <img
-                            src={
-                              product.images?.[0]
-                                ? product.images[0].startsWith("http")
-                                  ? product.images[0]
-                                  : `${import.meta.env.VITE_API_URL}${
-                                      product.images[0]
-                                    }`
-                                : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
-                            }
-                            alt={product.title}
-                            className="w-12 h-12 object-cover rounded"
-                          />
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {product.title}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {formatLKR(product.price)} • {product.stock} in
-                              stock
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Link
-                            to={`/product/${product._id}`}
-                            className="text-blue-600 hover:text-blue-800 p-1"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleEditProduct(product)}
-                            className="text-green-600 hover:text-green-800 p-1"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(product._id, "product")}
-                            disabled={deleting === product._id}
-                            className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <img
+                          src={
+                            product.images?.[0]
+                              ? product.images[0].startsWith("http")
+                                ? product.images[0]
+                                : `${import.meta.env.VITE_API_URL}${
+                                    product.images[0]
+                                  }`
+                              : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
+                          }
+                          alt={product.title}
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {product.title}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {formatLKR(product.price)} • {product.stock} in
+                            stock
+                          </p>
                         </div>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <Link
+                          to={`/product/${product._id}`}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => handleEditProduct(product)}
+                          className="text-green-600 hover:text-green-800 p-1"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product._id, "product")}
+                          disabled={deleting === product._id}
+                          className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                  {products.length > 5 && (
-                    <div className="text-center">
-                      <Link
-                        to="/manage-products"
-                        className="text-black hover:text-gray-700 text-sm"
-                      >
-                        View all {products.length} products
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Service Management for Service Stores */}
-          {store?.type === "service" && (
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Manage Services
-                </h2>
-                <Link
-                  to="/create-service"
-                  className="text-black hover:text-gray-700 text-sm"
-                >
-                  Add New
-                </Link>
+                  </div>
+                ))}
+                {products.length > 5 && (
+                  <div className="text-center">
+                    <Link
+                      to="/manage-products"
+                      className="text-black hover:text-gray-700 text-sm"
+                    >
+                      View all {products.length} products
+                    </Link>
+                  </div>
+                )}
               </div>
-
-              {services.length === 0 ? (
-                <div className="text-center py-8">
-                  <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No services yet</p>
-                  <Link
-                    to="/create-service"
-                    className="text-black hover:text-gray-700 text-sm"
-                  >
-                    Create your first service
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {services.slice(0, 5).map((service) => (
-                    <div
-                      key={service._id}
-                      className="border border-gray-200 rounded-lg p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <img
-                            src={
-                              service.images?.[0]
-                                ? service.images[0].startsWith("http")
-                                  ? service.images[0]
-                                  : `${import.meta.env.VITE_API_URL}${
-                                      service.images[0]
-                                    }`
-                                : "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop"
-                            }
-                            alt={service.title}
-                            className="w-12 h-12 object-cover rounded"
-                          />
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {service.title}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {formatLKR(service.price)} • {service.duration}{" "}
-                              min
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Link
-                            to={`/service/${service._id}`}
-                            className="text-blue-600 hover:text-blue-800 p-1"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleEditService(service)}
-                            className="text-green-600 hover:text-green-800 p-1"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(service._id, "service")}
-                            disabled={deleting === service._id}
-                            className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {services.length > 5 && (
-                    <div className="text-center">
-                      <Link
-                        to="/manage-services"
-                        className="text-black hover:text-gray-700 text-sm"
-                      >
-                        View all {services.length} services
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Recent Activity */}
           <div className="bg-white rounded-lg shadow-sm p-6">
@@ -752,24 +525,20 @@ const StoreDashboard = () => {
                 Recent Activity
               </h2>
               <Link
-                to={store?.type === "product" ? "/orders" : "/bookings"}
+                to="/orders"
                 className="text-black hover:text-gray-700 text-sm"
               >
                 View All
               </Link>
             </div>
 
-            {(store?.type === "product" ? recentOrders : recentBookings)
-              .length === 0 ? (
+            {recentOrders.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 No recent activity
               </p>
             ) : (
               <div className="space-y-4">
-                {(store?.type === "product"
-                  ? recentOrders
-                  : recentBookings
-                ).map((item) => (
+                {recentOrders.map((item) => (
                   <div
                     key={item._id}
                     className="border border-gray-200 rounded-lg p-4"
@@ -777,9 +546,7 @@ const StoreDashboard = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-gray-900">
-                          {store?.type === "product"
-                            ? `Order #${item._id.slice(-6)}`
-                            : item.serviceId?.title || "Service"}
+                          Order #{item._id.slice(-6)}
                         </p>
                         <p className="text-sm text-gray-500">
                           {item.customerId?.name || "Customer"}
@@ -823,14 +590,6 @@ const StoreDashboard = () => {
             onUpdate={handleUpdateComplete}
             onCancel={handleUpdateCancel}
             limitsInfo={limitsInfo}
-          />
-        )}
-
-        {editingService && (
-          <UpdateService
-            service={editingService}
-            onUpdate={handleUpdateComplete}
-            onCancel={handleUpdateCancel}
           />
         )}
       </div>

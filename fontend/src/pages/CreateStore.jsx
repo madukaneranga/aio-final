@@ -5,15 +5,15 @@ import ImageUpload from "../components/ImageUpload";
 import imageCompression from "browser-image-compression";
 
 import LoadingSpinner from "../components/LoadingSpinner";
-import { Store, Package, Calendar, MapPin, Phone, Mail, MessageCircle } from "lucide-react";
+import { Store, Package, MapPin, Phone, Mail, MessageCircle } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase";
 import Pricing from "../components/Pricing";
+import { storesAPI, subscriptionsAPI } from "../utils/api";
 
 const CreateStore = () => {
   const [formData, setFormData] = useState({
     name: "",
-    type: "product",
     description: "",
     themeColor: "#000000",
     contactInfo: {
@@ -25,7 +25,6 @@ const CreateStore = () => {
   });
   const [idImages, setIdImages] = useState([]);
   const [addressImages, setAddressImages] = useState([]);
-  const [timeSlots, setTimeSlots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [checkingStore, setCheckingStore] = useState(true);
@@ -121,57 +120,29 @@ const CreateStore = () => {
       // 🏪 Prepare store payload
       const payload = {
         name: formData.name,
-        type: formData.type,
         description: formData.description,
         themeColor: formData.themeColor,
         contactInfo: formData.contactInfo,
-        timeSlots,
         idImages: idImageUrls,
         addressVerificationImages: addressImageUrls,
       };
-
       // 📤 Create store
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      await storesAPI.create(payload);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to create store");
-      }
+      
 
       // 💳 Start subscription
-      const subResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/create-subscription`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            packageName: selectedPackage,
-          }),
-        }
-      );
-
-      if (!subResponse.ok) {
+      let paymentParams;
+      try {
+        const response = await subscriptionsAPI.initiatePayment(selectedPackage);
+        paymentParams = response.paymentParams;
+      } catch (error) {
         alert(
           "Store created, but failed to start subscription. Please contact support."
         );
         await refreshUser();
         return navigate("/dashboard");
       }
-
-      const { paymentParams } = await subResponse.json();
       await startPayHerePayment(paymentParams);
 
       alert("Subscription payment successful!");
@@ -306,54 +277,6 @@ const CreateStore = () => {
                 </div>
               )}
 
-              {/* Store Type Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-4">
-                  What type of store do you want to create?
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, type: "product" })
-                    }
-                    className={`p-6 rounded-xl border-2 text-left transition-all hover:shadow-md ${
-                      formData.type === "product"
-                        ? "border-black bg-black text-white"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <Package className="w-8 h-8 mb-3" />
-                    <h3 className="font-semibold text-lg mb-2">
-                      Product Store
-                    </h3>
-                    <p className="text-sm opacity-80">
-                      Sell physical products with inventory management and
-                      shipping
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, type: "service" })
-                    }
-                    className={`p-6 rounded-xl border-2 text-left transition-all hover:shadow-md ${
-                      formData.type === "service"
-                        ? "border-black bg-black text-white"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <Calendar className="w-8 h-8 mb-3" />
-                    <h3 className="font-semibold text-lg mb-2">
-                      Service Store
-                    </h3>
-                    <p className="text-sm opacity-80">
-                      Offer services with booking, scheduling, and appointment
-                      management
-                    </p>
-                  </button>
-                </div>
-              </div>
 
               {/* Store Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

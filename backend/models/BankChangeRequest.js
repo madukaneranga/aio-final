@@ -210,10 +210,11 @@ bankChangeRequestSchema.methods.approve = async function(adminId, adminNotes = '
       // Update with new details
       Object.assign(bankDetails, this.requestedDetails);
       
-      // Temporarily unlock for user to make edits after approval
-      bankDetails.isLocked = false;
-      bankDetails.lockReason = null;
-      bankDetails.lockedAt = null;
+      // Keep locked for security after approval - admin will need to manually unlock if needed
+      // This prevents immediate further changes without proper oversight
+      bankDetails.isLocked = true;
+      bankDetails.lockReason = 'admin_approval_lock';
+      bankDetails.lockedAt = new Date();
       
       // Mark as unverified for security (will require re-verification)
       bankDetails.isVerified = false;

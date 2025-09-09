@@ -5,6 +5,7 @@ import { Download, Printer, ArrowLeft } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { ordersAPI } from "../utils/api";
 
 const Receipt = () => {
   const { id } = useParams();
@@ -15,36 +16,21 @@ const Receipt = () => {
   const [error, setError] = useState(null);
   const receiptRef = useRef();
 
-  // Get type from URL search params
-  const searchParams = new URLSearchParams(location.search);
-  const type = searchParams.get("type"); // 'order' or 'booking'
-
   useEffect(() => {
-    if (!user || !id || !type) return;
+    if (!user || !id) return;
     fetchData();
-  }, [user, id, type]);
+  }, [user, id]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const endpoint = type === "order" ? `/api/orders/${id}` : `/api/bookings/${id}`;
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}${endpoint}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setData(data);
-      } else {
-        setError(`${type} not found`);
-      }
+      const data = await ordersAPI.getById(id);
+      setData(data);
     } catch (error) {
       console.error("Error fetching data:", error);
-      setError("Failed to load data");
+      setError(error.message === "Resource not found: The requested item was not found" 
+        ? "Order not found" 
+        : "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -123,17 +109,6 @@ const Receipt = () => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
-  }
-
-  if (!type || !["order", "booking"].includes(type)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Invalid Receipt Type</h2>
-          <p className="text-gray-600">The receipt type must be 'order' or 'booking'</p>
-        </div>
-      </div>
-    );
   }
 
   if (loading) {
@@ -233,7 +208,7 @@ const Receipt = () => {
                   <span className="font-medium">{formatDate(new Date())}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{type === "order" ? "Order" : "Booking"} ID:</span>
+                  <span className="text-gray-600">Order ID:</span>
                   <span className="font-medium">{data.combinedId || data._id}</span>
                 </div>
                 <div className="flex justify-between">
@@ -273,7 +248,7 @@ const Receipt = () => {
           </div>
 
           {/* Items Section */}
-          {type === "order" && data.items && (
+          {data.items && (
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-4">Order Items</h3>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -319,31 +294,9 @@ const Receipt = () => {
             </div>
           )}
 
-          {/* Service Section for Bookings */}
-          {type === "booking" && data.serviceId && (
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Service Information</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{data.serviceId.title || "Service"}</h4>
-                    <p className="text-sm text-gray-600">
-                      Date: {data.bookingDetails?.date ? formatDate(data.bookingDetails.date) : "N/A"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Time: {data.bookingDetails?.startTime || data.startTime} - {data.bookingDetails?.endTime || data.endTime}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">LKR {data.totalAmount}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Shipping Address for Orders */}
-          {type === "order" && data.shippingAddress && (
+          {/* Shipping Address */}
+          {data.shippingAddress && (
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Shipping Address</h3>
               <div className="bg-gray-50 p-4 rounded-lg text-sm">
@@ -383,7 +336,7 @@ const Receipt = () => {
       </div>
 
       {/* Print Styles */}
-      <style jsx>{`
+      <style jsx="true">{`
         @media print {
           @page {
             margin: 0.5in;

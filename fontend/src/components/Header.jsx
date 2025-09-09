@@ -4,9 +4,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { useWishlist } from "../contexts/WishlistContext";
 import { useNotifications } from "../contexts/NotificationContext";
-import { useGlobalChat } from "../contexts/ChatContext";
 import RoleSwitching from "./RoleSwitching";
 import MegaMenu from "./Category/MegaMenu";
+import { categoriesAPI, authAPI } from "../utils/api";
 
 import {
   Search,
@@ -22,13 +22,12 @@ import {
   Calendar,
   TrendingUp,
   Wallet,
-  MessageCircle,
 } from "lucide-react";
 import { use } from "react";
 
 const Header = () => {
   const { user, logout, refreshUser } = useAuth();
-  const { orderItems, bookingItems } = useCart();
+  const { orderItems } = useCart();
   const { wishlistItems } = useWishlist();
   const { unreadCount } = useNotifications();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -40,20 +39,7 @@ const Header = () => {
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const navigate = useNavigate();
 
-  const { globalUnreadCount: chatUnreadCount = 0, isConnected: isChatConnected, initializeSocket } = useGlobalChat();
 
-  // Initialize global chat socket when user is available
-  useEffect(() => {
-    if (user?.id) {
-      console.log('📱 Header: Initializing chat socket for user:', user.id);
-      initializeSocket(user);
-    }
-  }, [user?.id, initializeSocket]);
-
-  // Debug: Log unread count changes
-  useEffect(() => {
-    console.log('📱 Header: Chat unread count changed:', chatUnreadCount, 'Connected:', isChatConnected);
-  }, [chatUnreadCount, isChatConnected]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -71,15 +57,34 @@ const Header = () => {
   };
 
   const handleCategoryNavigation = (category, subcategory, childCategory) => {
-    // Handle navigation logic here
-    console.log("Navigate to:", {
-      category: category.name,
+    console.log("MegaMenu navigation triggered:", {
+      category: category?.name,
       subcategory: subcategory?.name,
-      childCategory,
+      childCategory
     });
 
-    // Example: You could use react-router here
-    // navigate(`/category/${category._id}${subcategory ? `/${subcategory.name}` : ''}${childCategory ? `/${childCategory}` : ''}`);
+    // Build query parameters for filtering
+    const params = new URLSearchParams();
+    
+    if (category?.name) {
+      params.set('category', category.name);
+    }
+    
+    if (subcategory?.name) {
+      params.set('subcategory', subcategory.name);
+    }
+    
+    if (childCategory) {
+      params.set('childCategory', childCategory);
+    }
+    
+    // Navigate to products page with filters
+    const url = `/products${params.toString() ? '?' + params.toString() : ''}`;
+    console.log("Navigating to:", url);
+    navigate(url);
+    
+    // Close the megamenu
+    setIsCategoryMenuOpen(false);
   };
 
   // This should ONLY run on form submit
@@ -94,11 +99,7 @@ const Header = () => {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/categories`
-        );
-        if (!res.ok) throw new Error("Failed to fetch categories");
-        const data = await res.json();
+        const data = await categoriesAPI.getAll();
         setCategories(data);
       } catch (err) {
         console.error("Error loading categories:", err);
@@ -116,21 +117,9 @@ const Header = () => {
   };
 
   const switchUserRole = async () => {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/auth/switch-role`,
-      {
-        method: "PUT",
-        credentials: "include",
-      }
-    );
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Failed to switch role");
-    }
-
+    const result = await authAPI.switchRole();
     refreshUser();
-
-    return response.json();
+    return result;
   };
 
   const handleRoleSwitch = () => {
@@ -155,9 +144,7 @@ const Header = () => {
     }, 4000); // wait 4s before switching
   };
 
-  const totalItems =
-    orderItems.reduce((sum, item) => sum + item.quantity, 0) +
-    bookingItems.length;
+  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
   // Menu Button Component (3-lines icon)
   const MenuButton = ({ onClick, isOpen }) => (
@@ -232,7 +219,7 @@ const Header = () => {
                     type="text"
                     value={searchQuery}
                     onChange={handleInputChange}
-                    placeholder="Search products & services..."
+                    placeholder="Search products..."
                     className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent shadow-sm text-sm"
                   />
                 </div>
@@ -246,12 +233,6 @@ const Header = () => {
                 className="text-gray-600 hover:text-black transition-colors font-medium text-sm"
               >
                 Products
-              </Link>
-              <Link
-                to="/services"
-                className="text-gray-600 hover:text-black transition-colors font-medium text-sm"
-              >
-                Services
               </Link>
               <Link
                 to="/stores"
@@ -323,23 +304,6 @@ const Header = () => {
                 </Link>
               )}
 
-              {user && (
-                <Link
-                  to="/chats"
-                  className="relative p-2.5 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
-                  aria-label={`You have ${chatUnreadCount} unread messages`}
-                  title={`Chat ${
-                    isChatConnected ? "(Connected)" : "(Disconnected)"
-                  } - ${chatUnreadCount} unread`}
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  {chatUnreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 font-medium">
-                      {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
-                    </span>
-                  )}
-                </Link>
-              )}
               
               {user && (
                 <Link
@@ -411,13 +375,6 @@ const Header = () => {
                             My Orders
                           </Link>
                           <Link
-                            to="/bookings"
-                            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                            onClick={() => setIsUserMenuOpen(false)}
-                          >
-                            My Bookings
-                          </Link>
-                          <Link
                             to="/wishlist"
                             className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
                             onClick={() => setIsUserMenuOpen(false)}
@@ -457,16 +414,6 @@ const Header = () => {
                             <div className="flex items-center space-x-2">
                               <Package className="w-4 h-4" />
                               <span>Orders</span>
-                            </div>
-                          </Link>
-                          <Link
-                            to="/bookings"
-                            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                            onClick={() => setIsUserMenuOpen(false)}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <Calendar className="w-4 h-4" />
-                              <span>Bookings</span>
                             </div>
                           </Link>
                         </>
@@ -529,7 +476,7 @@ const Header = () => {
                       type="text"
                       value={searchQuery}
                       onChange={handleInputChange}
-                      placeholder="Search products & services..."
+                      placeholder="Search products..."
                       className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-sm"
                     />
                   </div>
@@ -543,13 +490,6 @@ const Header = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Products
-                  </Link>
-                  <Link
-                    to="/services"
-                    className="flex items-center px-3 py-2.5 text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors font-medium"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Services
                   </Link>
                   <Link
                     to="/stores"

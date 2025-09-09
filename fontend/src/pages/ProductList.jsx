@@ -5,6 +5,7 @@ import SearchFilters from "../components/SearchFilters";
 import LoadingSpinner from "../components/LoadingSpinner";
 import EmptyState from "../components/EmptyState";
 import { Package } from "lucide-react";
+import { productsAPI, categoriesAPI } from "../utils/api";
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
@@ -20,23 +21,8 @@ const ProductList = () => {
     try {
       setLoading(true);
       setError("");
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/listing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(filters),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(data);
-      } else {
-        setError("Failed to fetch products");
-      }
+      const data = await productsAPI.getListing(filters);
+      setProducts(data);
     } catch (error) {
       console.error("Error fetching products:", error);
       setError("Network error. Please try again.");
@@ -47,9 +33,7 @@ const ProductList = () => {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
+      const data = await categoriesAPI.getAll();
       setCategories(data);
     } catch (err) {
       console.error("Error loading categories:", err);

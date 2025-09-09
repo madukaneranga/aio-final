@@ -2,7 +2,7 @@
 import express from "express";
 import Package from "../models/Package.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { getUserPackage } from '../utils/getUserPackage.js';
+import { getUserPackage } from "../utils/getUserPackage.js";
 
 const router = express.Router();
 
@@ -10,7 +10,10 @@ const router = express.Router();
 router.get("/", authenticate, async (req, res) => {
   try {
     const packages = await Package.find().sort({ amount: 1 });
-    res.json(packages);
+    res.json({
+      data: packages,
+      success: true,
+    });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch packages" });
   }
@@ -24,7 +27,7 @@ router.get(
     try {
       const userId = req.user._id;
       const pkg = await getUserPackage(userId);
-      res.json(pkg);
+      res.json({ data: pkg, success: true });
     } catch (error) {
       res.status(400).json({ error: error.message });
     }

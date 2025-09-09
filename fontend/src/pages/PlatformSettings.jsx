@@ -22,6 +22,7 @@ import {
 import { formatLKR } from '../utils/currency';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
+import { platformAPI } from '../utils/api';
 
 const PlatformSettings = () => {
   const { user } = useAuth();
@@ -43,20 +44,12 @@ const PlatformSettings = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/platform-settings`, {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
-        setFormData(data);
-      } else {
-        setError('Failed to fetch platform settings');
-      }
+      const data = await platformAPI.getSettings();
+      setSettings(data);
+      setFormData(data);
     } catch (error) {
       console.error('Error fetching settings:', error);
-      setError('Network error occurred');
+      setError('Failed to fetch platform settings');
     } finally {
       setLoading(false);
     }
@@ -68,27 +61,13 @@ const PlatformSettings = () => {
     setSuccess('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/platform-settings`, {
-        method: 'PUT',
-        credentials: "include",
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (response.ok) {
-        const updatedSettings = await response.json();
-        setSettings(updatedSettings);
-        setFormData(updatedSettings);
-        setSuccess('Platform settings updated successfully!');
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to update settings');
-      }
+      const updatedSettings = await platformAPI.updateSettings(formData);
+      setSettings(updatedSettings);
+      setFormData(updatedSettings);
+      setSuccess('Platform settings updated successfully!');
     } catch (error) {
       console.error('Error updating settings:', error);
-      setError('Network error occurred');
+      setError(error.message || 'Failed to update settings');
     } finally {
       setSaving(false);
     }
@@ -96,6 +75,7 @@ const PlatformSettings = () => {
 
   const handleReset = async () => {
     try {
+      // Note: This would need to be implemented as a separate API endpoint
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/platform-settings/reset`, {
         method: 'POST',
         credentials: "include",
@@ -468,18 +448,6 @@ const PlatformSettings = () => {
                   />
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Max Services per Store
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={getNestedValue(formData, 'platformConfig.maxServicesPerStore') || 100}
-                    onChange={(e) => updateFormData('platformConfig.maxServicesPerStore', parseInt(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                  />
-                </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -494,18 +462,6 @@ const PlatformSettings = () => {
                   />
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Max Images per Service
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={getNestedValue(formData, 'platformConfig.maxImagesPerService') || 5}
-                    onChange={(e) => updateFormData('platformConfig.maxImagesPerService', parseInt(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                  />
-                </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -557,7 +513,7 @@ const PlatformSettings = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[
-                  { key: 'enableReviews', label: 'Enable Reviews', icon: Star, description: 'Allow customers to review products and services' },
+                  { key: 'enableReviews', label: 'Enable Reviews', icon: Star, description: 'Allow customers to review products' },
                   { key: 'enableSubscriptions', label: 'Enable Subscriptions', icon: Calendar, description: 'Enable store owner subscriptions' },
                   { key: 'enableAnalytics', label: 'Enable Analytics', icon: Database, description: 'Provide analytics and reporting features' },
                   { key: 'enableNotifications', label: 'Enable Notifications', icon: Bell, description: 'Send email and push notifications' }

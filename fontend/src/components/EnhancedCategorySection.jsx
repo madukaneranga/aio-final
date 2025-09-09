@@ -121,65 +121,65 @@ const EnhancedCategorySection = ({
     }
   };
 
-  // Enhanced mock data with professional categories
+  // Enhanced mock data with product categories
   const enhancedCategories =
     categories && categories.length > 0
       ? categories
       : [
           {
             _id: 1,
-            name: "Digital Marketing & SEO",
+            name: "Electronics & Gadgets",
             image: [
-              "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=600&h=400&fit=crop",
             ],
           },
           {
             _id: 2,
-            name: "Web Development & Design",
+            name: "Fashion & Clothing",
             image: [
-              "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=400&fit=crop",
             ],
           },
           {
             _id: 3,
-            name: "Graphic Design & Branding",
+            name: "Home & Furniture",
             image: [
-              "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&h=400&fit=crop",
             ],
           },
           {
             _id: 4,
-            name: "Business Consulting",
+            name: "Beauty & Personal Care",
             image: [
-              "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=400&fit=crop",
             ],
           },
           {
             _id: 5,
-            name: "Content Creation & Copywriting",
+            name: "Sports & Fitness",
             image: [
-              "https://images.unsplash.com/photo-1486312338219-ce68e2c6b81d?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&h=400&fit=crop",
             ],
           },
           {
             _id: 6,
-            name: "Photography & Video",
+            name: "Books & Stationery",
             image: [
-              "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&h=400&fit=crop",
             ],
           },
           {
             _id: 7,
-            name: "E-commerce Solutions",
+            name: "Food & Beverages",
             image: [
-              "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&h=400&fit=crop",
             ],
           },
           {
             _id: 8,
-            name: "Legal & Financial Services",
+            name: "Health & Wellness",
             image: [
-              "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=600&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600&h=400&fit=crop",
             ],
           },
         ];

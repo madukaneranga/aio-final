@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, Image, Video, Tag, X, Search, Plus, Clock } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase";
+import { socialAPI } from "../utils/api";
 
 const PostCreator = () => {
   const [postData, setPostData] = useState({
@@ -100,21 +101,7 @@ const PostCreator = () => {
 
   // API call to create post
   const createPostAPI = async (postData) => {
-    const response = await fetch('/api/posts', {
-      method: 'POST',
-      credentials: "include",
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(postData)
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create post');
-    }
-
-    return response.json();
+    return await socialAPI.createPost(postData);
   };
 
   // Product search function
@@ -122,14 +109,10 @@ const PostCreator = () => {
     setProductSearch(query);
     if (query.length > 2) {
       try {
-        const response = await fetch(`/api/posts/products/search?q=${encodeURIComponent(query)}`, {
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          const data = await response.json();
+        try {
+          const data = await socialAPI.searchProducts(query);
           setSearchResults(data.products || []);
-        } else {
+        } catch (apiError) {
           // Fallback to mock data if API fails
           const filtered = mockProducts.filter(product =>
             product.name.toLowerCase().includes(query.toLowerCase())

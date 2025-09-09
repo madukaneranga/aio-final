@@ -16,7 +16,8 @@ const __dirname = path.dirname(__filename);
 const allowedOrigins = [
   "http://localhost:5173", // Vite dev server
   "http://localhost:3000", // React/Next.js dev
-  "http://127.0.0.1:5173", // Alternative localhost
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",// Alternative localhost
   process.env.CLIENT_URL, // Production frontend URL
   process.env.FRONTEND_URL, // Alternative env var
 ].filter(Boolean); // Remove undefined values
@@ -71,9 +72,7 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import storeRoutes from "./routes/stores.js";
 import productRoutes from "./routes/products.js";
-import serviceRoutes from "./routes/services.js";
 import orderRoutes from "./routes/orders.js";
-import bookingRoutes from "./routes/bookings.js";
 import paymentRoutes from "./routes/payments.js";
 import reviewRoutes from "./routes/reviews.js";
 import subscriptionRoutes from "./routes/subscriptions.js";
@@ -81,19 +80,18 @@ import notificationsRoutes from "./routes/notifications.js";
 import platformSettingsRoutes from "./routes/platformSettings.js";
 import packageRoutes from "./routes/packages.js";
 import sitemapRoutes from "./routes/sitemap.js";
-import walletRoutes from "./routes/wallet.js";
 import adminRoutes from "./routes/admin.js";
-import analyticsRoutes from "./routes/analytics.js";
 import emailSubscriptionRoutes from "./routes/emailSubscriptions.js";
 import categoriesRoutes from "./routes/categories.js";
 import postRoutes from "./routes/posts.js";
 import flashDealRoutes from "./routes/flashDeals.js";
-import chatRoutes from "./routes/chats.js";
 import contactRevealRoutes from "./routes/contactReveal.js";
 import cartRoutes from "./routes/cart.js";
 import wishlistRoutes from "./routes/wishlist.js";
-import impressionRoutes from "./routes/impressions.js";
 import thankYouRoutes from "./routes/thankYou.js";
+import transactionRoutes from "./routes/transactions.js";
+import walletRoutes from "./routes/wallet.js";
+
 
 // Route Registration
 if (process.env.NODE_ENV !== "test") {
@@ -105,28 +103,24 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/stores", storeRoutes);
 app.use("/api/products", productRoutes);
-app.use("/api/services", serviceRoutes);
 app.use("/api/orders", orderRoutes);
-app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/platform-settings", platformSettingsRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/notifications", notificationsRoutes);
-app.use("/api/wallet", walletRoutes);
-app.use("/api/analytics", analyticsRoutes);
 app.use("/api/email-subscriptions", emailSubscriptionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/flash-deals", flashDealRoutes);
-app.use("/api/chat", chatRoutes);
 app.use("/api", contactRevealRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/impressions", impressionRoutes);
 app.use("/api/thank-you", thankYouRoutes);
+app.use("/api/transactions", transactionRoutes);
+app.use("/api/wallet", walletRoutes);
 
 // Special routes
 app.use("/sitemap.xml", sitemapRoutes);

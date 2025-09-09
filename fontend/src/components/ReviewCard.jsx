@@ -39,11 +39,6 @@ const ReviewCard = ({ review, showStoreResponse = true, showType = false }) => {
                 Product Order
               </span>
             )}
-            {review.bookingId && (
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                Service Booking
-              </span>
-            )}
           </div>
         )}
       </div>

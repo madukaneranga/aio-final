@@ -1,14 +1,11 @@
-
 import express from "express";
 import Product from "../models/Product.js";
-import Service from "../models/Service.js";
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
     const products = await Product.find({}, "_id");
-    const services = await Service.find({}, "_id");
 
     const staticUrls = `
   <url>
@@ -17,10 +14,6 @@ router.get("/", async (req, res) => {
   </url>
   <url>
     <loc>https://aiocart.lk/products</loc>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://aiocart.lk/services</loc>
     <priority>0.9</priority>
   </url>
   <url>
@@ -39,21 +32,11 @@ router.get("/", async (req, res) => {
       )
       .join("");
 
-    const serviceUrls = services
-      .map(
-        (s) => `
-  <url>
-    <loc>https://aiocart.lk/service/${s._id}</loc>
-    <priority>0.8</priority>
-  </url>`
-      )
-      .join("");
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${staticUrls}
   ${productUrls}
-  ${serviceUrls}
 </urlset>`;
 
     res.header("Content-Type", "application/xml");
