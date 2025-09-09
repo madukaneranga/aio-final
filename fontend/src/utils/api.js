@@ -1224,6 +1224,19 @@ export const storesAPI = {
     return handleResponse(response);
   },
 
+  _updateProfileImage: async (storeId, payload) => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/stores/${storeId}/profile-image`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      }
+    );
+    return handleResponse(response);
+  },
+
   // Data-only wrapper functions
   followStore: async (storeId) => {
     const result = await storesAPI._followStore(storeId);
@@ -1247,6 +1260,12 @@ export const storesAPI = {
 
   uploadVerificationDocs: async (storeId, formData) => {
     const result = await storesAPI._uploadVerificationDocs(storeId, formData);
+    return result.data;
+  },
+
+  updateProfileImage: async (storeId, payload) => {
+    console.log("Updating profile image with data:", payload);
+    const result = await storesAPI._updateProfileImage(storeId, payload);
     return result.data;
   },
 };

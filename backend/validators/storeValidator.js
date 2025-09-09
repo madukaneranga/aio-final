@@ -183,6 +183,7 @@ export const validateProfileImage = (req, res, next) => {
   const errors = [];
   const { profileImage } = req.body;
 
+  console.log("Validating profile image:", profileImage);
   if (!profileImage) {
     errors.push({ field: 'profileImage', message: 'Profile image is required' });
   } else if (typeof profileImage !== 'string') {

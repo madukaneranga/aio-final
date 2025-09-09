@@ -118,6 +118,11 @@ class SubscriptionController {
       } = req.body;
 
       // ✅ Generate local signature
+      if (!process.env.PAYHERE_SECRET) {
+        console.error("PAYHERE_SECRET environment variable is not set");
+        return res.status(500).send("Server configuration error");
+      }
+
       const localMd5Sig = crypto
         .createHash("md5")
         .update(
