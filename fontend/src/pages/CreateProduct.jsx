@@ -7,6 +7,7 @@ import imageCompression from "browser-image-compression";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase";
 import ColorSelector from "../components/ColorSelect";
+import { categoriesAPI, productsAPI } from "../utils/api";
 
 const CreateProduct = () => {
   const { user } = useAuth();
@@ -35,7 +36,7 @@ const CreateProduct = () => {
     isPreorder: false,
     shipping: "",
     condition: "",
-    warrentyMonths: "",
+    warrantyMonths: "",
     variants: [], // Combined variants: { name, hex, size, stock }
     tags: [],
   });
@@ -70,9 +71,7 @@ const CreateProduct = () => {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
+      const data = await categoriesAPI.getAll();
       setCategories(data);
     } catch (err) {
       console.error("Error loading categories:", err);
@@ -202,7 +201,7 @@ const CreateProduct = () => {
         return;
       }
 
-      // Prepare payload, transform variants: convert stock to number
+      // Prepare variants payload first (needed for validation)
       const variantsPayload =
         formData.variants.length > 0
           ? formData.variants.map(({ name, hex, size, stock }) => ({
@@ -219,6 +218,31 @@ const CreateProduct = () => {
           ? variantsPayload.reduce((acc, v) => acc + v.stock, 0)
           : Number(formData.stock) || 0;
 
+      // Frontend validation to catch common issues before API call
+      const validationErrors = [];
+      
+      if (!formData.title.trim()) validationErrors.push("Title is required");
+      if (!formData.description.trim()) validationErrors.push("Description is required");
+      if (!formData.price || parseFloat(formData.price) <= 0) validationErrors.push("Valid price is required");
+      if (imageUrls.length === 0) validationErrors.push("At least one image is required");
+      
+      // Check stock requirements based on backend validation
+      if (variantsPayload.length === 0) {
+        if (!formData.stock || parseInt(formData.stock) < 5) {
+          validationErrors.push("Stock must be at least 5 items (no variants)");
+        }
+      } else {
+        if (totalStock < 5) {
+          validationErrors.push("Total stock from variants must be at least 5 items");
+        }
+      }
+      
+      if (validationErrors.length > 0) {
+        setError(`Validation issues: ${validationErrors.join("; ")}`);
+        setLoading(false);
+        return;
+      }
+
       const payload = {
         title: formData.title,
         description: formData.description,
@@ -232,31 +256,28 @@ const CreateProduct = () => {
         isPreorder: formData.isPreorder,
         shipping: formData.shipping,
         condition: formData.condition,
-        warrentyMonths: Number(formData.warrentyMonths) || 0,
+        warrantyMonths: Number(formData.warrantyMonths) || 0,
         variants: variantsPayload.length > 0 ? variantsPayload : undefined,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      console.log("Payload:", payload);
 
-      if (response.ok) {
-        navigate("/dashboard");
-      } else {
-        const data = await response.json();
-        setError(data.error || "Failed to create product");
-      }
+      await productsAPI.create(payload);
+      navigate("/dashboard");
     } catch (error) {
-      console.error(error);
-      setError("Network error. Please try again.");
+      console.error("Full error:", error);
+      
+      // Enhanced error handling to show specific validation issues
+      if (error.message.includes("Bad Request")) {
+        // Try to extract more details from the error
+        setError(`Validation failed: ${error.message}. Check console for details.`);
+      } else if (error.message.includes("Product store not found")) {
+        setError("You need to create a store first before adding products. Go to Store Management.");
+      } else if (error.message.includes("Authentication required")) {
+        setError("Please login again and try creating the product.");
+      } else {
+        setError(`Error: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -544,8 +565,8 @@ const CreateProduct = () => {
                 </label>
                 <input
                   type="number"
-                  name="warrentyMonths"
-                  value={formData.warrentyMonths}
+                  name="warrantyMonths"
+                  value={formData.warrantyMonths}
                   onChange={handleChange}
                   min="0"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"
@@ -620,7 +641,7 @@ const CreateProduct = () => {
             {/* Tags Section -  */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                Service Tags
+                Product Tags
               </label>
               <p className="text-xs text-gray-500 mb-2">
                 Press Enter or comma to add tags. Great for search and

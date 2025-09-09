@@ -15,6 +15,7 @@ import {
   Users,
   Building,
 } from "lucide-react";
+import { emailSubscriptionsAPI } from "../utils/api";
 
 const Footer = () => {
   const [email, setEmail] = useState("");
@@ -41,23 +42,7 @@ const Footer = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/email-subscriptions`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Subscription failed");
-        setIsLoading(false);
-        return;
-      }
-
+      await emailSubscriptionsAPI.subscribe({ email });
       // Success
       setIsSubscribed(true);
       setIsLoading(false);
@@ -67,7 +52,7 @@ const Footer = () => {
         setEmail("");
       }, 2500);
     } catch (err) {
-      setError("Network error. Please try again later.");
+      setError(err.message || "Network error. Please try again later.");
       setIsLoading(false);
     }
   };
@@ -286,7 +271,7 @@ const Footer = () => {
               <p className="text-white font-medium group-hover/contact:text-white transition-colors text-sm">
                 Colombo, Sri Lanka
               </p>
-              <p className="text-white/60 text-xs">Island-wide Service</p>
+              <p className="text-white/60 text-xs">Island-wide Delivery</p>
             </div>
           </div>
         </div>

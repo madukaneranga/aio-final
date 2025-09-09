@@ -5,6 +5,7 @@ import ColorSelector from "./ColorSelect";
 import imageCompression from "browser-image-compression";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../utils/firebase";
+import { categoriesAPI, productsAPI } from "../utils/api";
 
 const UpdateProduct = ({ product, onUpdate, onCancel, limitsInfo }) => {
   // Categories and selections
@@ -27,7 +28,7 @@ const UpdateProduct = ({ product, onUpdate, onCancel, limitsInfo }) => {
     isPreorder: false,
     shipping: "",
     condition: "",
-    warrentyMonths: "",
+    warrantyMonths: "",
     variants: [], // Combined variants: { name, hex, size, stock }
     tags: [],
     category: "",
@@ -52,7 +53,7 @@ const UpdateProduct = ({ product, onUpdate, onCancel, limitsInfo }) => {
         isPreorder: product.isPreorder || false,
         shipping: product.shipping || "",
         condition: product.condition || "",
-        warrentyMonths: product.warrentyMonths?.toString() || "",
+        warrantyMonths: product.warrantyMonths?.toString() || "",
         variants: product.variants || [],
         tags: product.tags || [],
         category: product.category || "",
@@ -92,9 +93,7 @@ const UpdateProduct = ({ product, onUpdate, onCancel, limitsInfo }) => {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
+      const data = await categoriesAPI.getAll();
       setCategories(data);
     } catch (err) {
       console.error("Error loading categories:", err);
@@ -240,30 +239,14 @@ const UpdateProduct = ({ product, onUpdate, onCancel, limitsInfo }) => {
         isPreorder: formData.isPreorder,
         shipping: formData.shipping,
         condition: formData.condition,
-        warrentyMonths: Number(formData.warrentyMonths) || 0,
+        warrantyMonths: Number(formData.warrantyMonths) || 0,
         variants: variantsPayload.length > 0 ? variantsPayload : undefined,
         tags: formData.tags,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/${product._id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (response.ok) {
-        onUpdate();
-        alert("Product updated successfully!");
-      } else {
-        const data = await response.json();
-        setError(data.error || "Failed to update product");
-      }
+      await productsAPI.update(product._id, payload);
+      onUpdate();
+      alert("Product updated successfully!");
     } catch (error) {
       console.error(error);
       setError("Network error. Please try again.");
@@ -515,8 +498,8 @@ const UpdateProduct = ({ product, onUpdate, onCancel, limitsInfo }) => {
                 </label>
                 <input
                   type="number"
-                  name="warrentyMonths"
-                  value={formData.warrentyMonths}
+                  name="warrantyMonths"
+                  value={formData.warrantyMonths}
                   onChange={handleChange}
                   min="0"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"

@@ -75,19 +75,9 @@ const platformSettingsSchema = new mongoose.Schema({
       default: 1000,
       min: 1
     },
-    maxServicesPerStore: {
-      type: Number,
-      default: 100,
-      min: 1
-    },
     maxImagesPerProduct: {
       type: Number,
       default: 10,
-      min: 1
-    },
-    maxImagesPerService: {
-      type: Number,
-      default: 5,
       min: 1
     },
     maxFileSize: {

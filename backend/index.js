@@ -10,8 +10,6 @@ import app from "./app.js";
 
 // --- Import Models ---
 import User from "./models/User.js";
-import Chat from "./models/Chat.js";
-import ChatAnalytics from "./models/ChatAnalytics.js";
 
 // --- Import Utilities ---
 import { setSocketInstance } from "./utils/socketUtils.js";
@@ -40,6 +38,7 @@ const allowedOrigins = [
   "http://localhost:5173", // Vite dev server
   "http://localhost:3000", // React/Next.js dev
   "http://127.0.0.1:5173", // Alternative localhost
+  "http://localhost:5174",
   process.env.CLIENT_URL, // Production frontend URL
   process.env.FRONTEND_URL, // Alternative env var
 ].filter(Boolean);
@@ -97,11 +96,6 @@ const roomUserMap = new Map(); // Track users in rooms
 io.userSocketMap = userSocketMap;
 setSocketInstance(io);
 
-import {
-  initializeChatHandlers,
-  handleChatDisconnect,
-} from "./utils/chatSocketHandlers.js";
-import { startOrderScheduler, stopOrderScheduler } from "./utils/scheduler.js";
 
 io.on("connection", (socket) => {
   const { userId, user } = socket;
@@ -110,7 +104,6 @@ io.on("connection", (socket) => {
     `🔌 Socket connected: ${user.name} (${userId}) - Socket ID: ${socket.id}`
   );
 
-  initializeChatHandlers(io, socket);
 
   // Join user to their personal room
   socket.join(userId);
@@ -178,7 +171,6 @@ io.on("connection", (socket) => {
 
   // Handle disconnect
   socket.on("disconnect", (reason) => {
-    handleChatDisconnect(io, socket);
 
     console.log(
       `🔌 Socket disconnected: ${user.name} (${userId}) - Reason: ${reason}`
@@ -273,8 +265,6 @@ const startServer = async () => {
       console.log(`🔗 Socket.IO CORS origins:`, allowedOrigins);
       console.log(`📊 Online users: ${getOnlineUsersCount()}`);
 
-      // Start order auto-confirmation scheduler
-      startOrderScheduler();
 
       if (process.env.NODE_ENV === "development") {
         console.log(`🔧 API Base URL: http://localhost:${PORT}/api`);
@@ -307,7 +297,6 @@ const gracefulShutdown = async (signal) => {
   try {
     // Stop order scheduler
     console.log("⏰ Stopping order scheduler...");
-    stopOrderScheduler();
     
     // Disconnect all socket connections
     console.log("🔌 Closing Socket.IO connections...");

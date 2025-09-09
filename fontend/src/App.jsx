@@ -5,8 +5,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 import { WishlistProvider } from "./contexts/WishlistContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
-import { ChatProvider } from "./contexts/ChatContext";
-import { ImpressionProvider } from "./contexts/ImpressionContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -17,12 +15,9 @@ import ScrollToTopButton from "./components/ScrollToTopButton";
 import Home from "./pages/Home";
 import Stores from "./pages/Stores";
 import Products from "./pages/Products";
-import Services from "./pages/Services";
 import ProductDetail from "./pages/ProductDetail";
-import ServiceDetail from "./pages/ServiceDetail";
 import StoreDetail from "./pages/StoreDetail";
 import Cart from "./pages/Cart";
-import BookingSummary from "./pages/BookingSummary";
 import Checkout from "./pages/Checkout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -30,15 +25,11 @@ import Profile from "./pages/Profile";
 import StoreDashboard from "./pages/StoreDashboard";
 import CreateStore from "./pages/CreateStore";
 import CreateProduct from "./pages/CreateProduct";
-import CreateService from "./pages/CreateService";
 import ManageProducts from "./pages/ManageProducts";
-import ManageServices from "./pages/ManageServices";
 import Orders from "./pages/Orders";
-import Bookings from "./pages/Bookings";
 import Receipt from "./pages/Receipt";
 import StoreManagement from "./pages/StoreManagement";
 import NotFound from "./pages/NotFound";
-import Admin from "./pages/Admin";
 import SalesAnalytics from "./pages/SalesAnalytics";
 import PlatformSettings from "./pages/PlatformSettings";
 import HelpCenter from "./pages/HelpCenter";
@@ -46,7 +37,6 @@ import ContactUs from "./pages/ContactUs";
 import Notifications from "./pages/Notifications";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
-import AdminWithdrawals from "./pages/AdminWithdrawals";
 import WalletDashboard from "./pages/WalletDashboard";
 import SubscriptionManagement from "./pages/SubscriptionManagement";
 import Maintenance from "./pages/Maintenance";
@@ -57,6 +47,7 @@ import SocialFeed from "./pages/SocialFeed";
 import CustomSales from "./pages/CustomSales";
 import Wishlist from "./pages/Wishlist";
 import ThankYou from "./pages/ThankYou";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import "./App.css";
 
@@ -67,18 +58,17 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <ChatProvider>
           <NotificationProvider>
             <CartProvider>
               <WishlistProvider>
-                <ImpressionProvider>
             <Router>
               {maintenanceMode ? (
                 <Maintenance />
               ) : (
                 <Routes>
-                  {/* ✅ Standalone route (no Header/Footer) */}
+                  {/* ✅ Standalone routes (no Header/Footer) */}
                   <Route path="/feed" element={<SocialFeed />} />
+                  <Route path="/admin/*" element={<AdminDashboard />} />
 
                   {/* ✅ All other routes use main layout */}
                   <Route
@@ -92,14 +82,9 @@ function App() {
                             <Route path="/" element={<Home />} />
                             <Route path="/stores" element={<Stores />} />
                             <Route path="/products" element={<Products />} />
-                            <Route path="/services" element={<Services />} />
                             <Route
                               path="/product/:id"
                               element={<ProductDetail />}
-                            />
-                            <Route
-                              path="/service/:id"
-                              element={<ServiceDetail />}
                             />
                             <Route
                               path="/store/:id"
@@ -107,10 +92,6 @@ function App() {
                             />
                             <Route path="/cart" element={<Cart />} />
                             <Route path="/wishlist" element={<Wishlist />} />
-                            <Route
-                              path="/booking-summary"
-                              element={<BookingSummary />}
-                            />
                             <Route path="/checkout" element={<Checkout />} />
                             <Route path="/thank-you" element={<ThankYou />} />
                             <Route path="/login" element={<Login />} />
@@ -129,19 +110,10 @@ function App() {
                               element={<CreateProduct />}
                             />
                             <Route
-                              path="/create-service"
-                              element={<CreateService />}
-                            />
-                            <Route
                               path="/manage-products"
                               element={<ManageProducts />}
                             />
-                            <Route
-                              path="/manage-services"
-                              element={<ManageServices />}
-                            />
                             <Route path="/orders" element={<Orders />} />
-                            <Route path="/bookings" element={<Bookings />} />
                             <Route path="/receipt/:id" element={<Receipt />} />
                             <Route
                               path="/store-management"
@@ -151,7 +123,6 @@ function App() {
                               path="/sales-analytics"
                               element={<SalesAnalytics />}
                             />
-                            <Route path="/admin" element={<Admin />} />
                             <Route
                               path="/platform-settings"
                               element={<PlatformSettings />}
@@ -173,10 +144,7 @@ function App() {
                               path="/notifications"
                               element={<Notifications />}
                             />
-                            <Route
-                              path="/admin-withdrawals"
-                              element={<AdminWithdrawals />}
-                            />
+           
                             <Route
                               path="/wallet-dashboard"
                               element={<WalletDashboard />}
@@ -203,11 +171,9 @@ function App() {
                 </Routes>
               )}
             </Router>
-                </ImpressionProvider>
               </WishlistProvider>
             </CartProvider>
           </NotificationProvider>
-        </ChatProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

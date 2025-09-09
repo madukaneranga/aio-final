@@ -13,59 +13,19 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
 import { formatLKR } from "../utils/currency";
-import useImpression from "../hooks/useImpression";
 
 const ProductCard = ({ product }) => {
   const cardRef = useRef(null);
   const { addToOrder } = useCart();
   const { user } = useAuth();
-  const { addToWishlist, removeFromWishlist, isInWishlist, isLoading: wishlistLoading } = useWishlist();
-  const { trackProductImpression, createImpressionObserver } = useImpression();
+  const { addToWishlist, removeFromWishlistByProductId, isInWishlist, isLoading: wishlistLoading } = useWishlist();
 
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [isWishlistActionLoading, setIsWishlistActionLoading] = useState(false);
   
   const isWishlisted = isInWishlist(product._id);
 
-  useEffect(() => {
-    const observer = createImpressionObserver((target) => {
-      // Track product impression using our new system
-      trackProductImpression(product);
-      
-      // Google Analytics 4 - Product View Event
-      if (typeof gtag !== 'undefined') {
-        gtag('event', 'view_item', {
-          currency: 'LKR',
-          value: product.price,
-          items: [{
-            item_id: product._id,
-            item_name: product.title,
-            category: product.category,
-            price: product.price
-          }]
-        });
-      }
-
-      // Microsoft Clarity - Product View Event
-      if (typeof clarity !== 'undefined') {
-        clarity('event', 'product_view', {
-          product_id: product._id,
-          product_name: product.title,
-          category: product.category,
-          price: product.price
-        });
-      }
-    }, { 
-      threshold: 0.5, // 50% of the card visible = impression
-      rootMargin: '0px'
-    });
-
-    if (cardRef.current) observer.observe(cardRef.current);
-
-    return () => {
-      if (cardRef.current) observer.unobserve(cardRef.current);
-    };
-  }, [product._id, trackProductImpression, createImpressionObserver, product]);
 
   //const formatLKR = (price) => `LKR ${price.toLocaleString()}`;
 
@@ -109,19 +69,32 @@ const ProductCard = ({ product }) => {
     e.preventDefault();
     e.stopPropagation();
     
+    if (isWishlistActionLoading) return;
+    
     if (user?.role !== "customer") {
       alert("Only customers can add items to wishlist");
       return;
     }
     
+    setIsWishlistActionLoading(true);
+    
     try {
+      let success;
       if (isWishlisted) {
-        await removeFromWishlist(product._id);
+        success = await removeFromWishlistByProductId(product._id);
       } else {
-        await addToWishlist(product);
+        success = await addToWishlist(product);
+      }
+      
+      if (success === false) {
+        // Error was already handled by the context with toast
+        console.warn('Wishlist operation failed');
       }
     } catch (error) {
       console.error('Wishlist error:', error);
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setIsWishlistActionLoading(false);
     }
   };
 
@@ -158,14 +131,14 @@ const ProductCard = ({ product }) => {
                 <>
                   <button
                     onClick={handleWishlist}
-                    disabled={wishlistLoading}
+                    disabled={isWishlistActionLoading}
                     className={`p-2 sm:p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${
                       isWishlisted
                         ? "bg-black text-white"
                         : "bg-white/95 text-gray-700 hover:bg-black hover:text-white border border-gray-200"
                     }`}
                   >
-                    {wishlistLoading ? (
+                    {isWishlistActionLoading ? (
                       <div className="w-3 h-3 sm:w-4 sm:h-4 animate-spin border border-current border-t-transparent rounded-full" />
                     ) : (
                       <Heart

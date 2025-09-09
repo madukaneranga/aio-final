@@ -7,6 +7,7 @@ import {
 } from "../utils/validation.js";
 import { validationResult } from "express-validator";
 import mongoose from "mongoose";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -174,6 +175,8 @@ router.get("/:id", async (req, res) => {
 // POST /api/flash-deals - Create new flash deal (admin/store owner)
 router.post(
   "/",
+  authenticate,
+  authorize("admin", "store_owner"),
   flashDealValidationRules(),
   handleValidationErrors,
   async (req, res) => {
@@ -210,6 +213,8 @@ router.post(
 // PUT /api/flash-deals/:id - Update flash deal
 router.put(
   "/:id",
+  authenticate,
+  authorize("admin", "store_owner"),
   flashDealUpdateValidationRules(),
   handleValidationErrors,
   async (req, res) => {
@@ -256,7 +261,7 @@ router.put(
 );
 
 // DELETE /api/flash-deals/:id - Delete flash deal
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authenticate, authorize("admin", "store_owner"), async (req, res) => {
   try {
     const { id } = req.params;
 

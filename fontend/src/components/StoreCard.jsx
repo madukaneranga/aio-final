@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import useImpression from "../hooks/useImpression";
+import { storesAPI } from "../utils/api";
 
 const StoreCard = ({ store }) => {
   const cardRef = useRef(null);
@@ -18,14 +18,11 @@ const StoreCard = ({ store }) => {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [productCount, setProductCount] = useState(0);
   const { user } = useAuth();
-  const { trackStoreImpression, createImpressionObserver } = useImpression();
 
   useEffect(() => {
     const fetchCount = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${store._id}/item-count`);
-        const data = await response.json();
-        // Fix: Extract the count property from the response object
+        const data = await storesAPI.getItemCount(store._id);
         setProductCount(data.count);
       } catch (err) {
         console.error("Error fetching product count", err);
@@ -35,23 +32,6 @@ const StoreCard = ({ store }) => {
 
     fetchCount();
   }, [store._id]);
-
-  // Impression tracking
-  useEffect(() => {
-    const observer = createImpressionObserver((target) => {
-      // Track store impression using our new system
-      trackStoreImpression(store);
-    }, { 
-      threshold: 0.5, // 50% of the card visible = impression
-      rootMargin: '0px'
-    });
-
-    if (cardRef.current) observer.observe(cardRef.current);
-
-    return () => {
-      if (cardRef.current) observer.unobserve(cardRef.current);
-    };
-  }, [store._id, trackStoreImpression, createImpressionObserver]);
 
   const isNew = () => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -75,7 +55,10 @@ const StoreCard = ({ store }) => {
       <Link to={`/store/${store._id}`} className="block">
         <div className="relative w-full">
           {/* Store Card */}
-          <div ref={cardRef} className="group relative bg-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full">
+          <div
+            ref={cardRef}
+            className="group relative bg-white rounded-lg sm:rounded-xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 hover:border-black transform hover:-translate-y-1 sm:hover:-translate-y-2 w-full"
+          >
             {/* Badges */}
             <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 flex flex-col gap-1 sm:gap-2">
               {isNew() && (
@@ -83,14 +66,6 @@ const StoreCard = ({ store }) => {
                   NEW
                 </span>
               )}
-              {/* Store Type Badge */}
-              <span className="bg-gray-900 text-white text-xs font-bold px-2 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-lg backdrop-blur-sm tracking-wider uppercase flex items-center gap-1">
-                <Store className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                <span className="hidden sm:inline">{store.type}</span>
-                <span className="sm:hidden">
-                  {store.type.charAt(0).toUpperCase()}
-                </span>
-              </span>
             </div>
 
             {/* Status Badge */}
@@ -273,7 +248,7 @@ const StoreCard = ({ store }) => {
                 <div className="flex items-center gap-2 mb-2">
                   <Store className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
                   <span className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-widest">
-                    {store.type}
+                    Product
                   </span>
                   <span
                     className={`text-xs font-bold px-2 py-1 rounded-full ml-auto ${

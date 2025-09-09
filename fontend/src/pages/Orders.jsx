@@ -21,6 +21,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import EmptyState from "../components/EmptyState";
 import StatusBadge from "../components/StatusBadge";
 import { Star } from "lucide-react";
+import { ordersAPI, reviewsAPI } from "../utils/api";
 
 const Orders = () => {
   const { user } = useAuth();
@@ -52,21 +53,13 @@ const Orders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const endpoint =
-        user.role === "store_owner"
-          ? "/api/orders/store"
-          : "/api/orders/customer";
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}${endpoint}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setOrders(data);
+      let data;
+      if (user.role === "store_owner") {
+        data = await ordersAPI.getOrdersByStore(user.storeId);
+      } else {
+        data = await ordersAPI.getAll();
       }
+      setOrders(data);
     } catch (error) {
       console.error("Error fetching orders:", error);
     } finally {
@@ -76,22 +69,9 @@ const Orders = () => {
 
   const updateOrderStatus = async (orderId, status, notes = "") => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status, notes }),
-        }
-      );
-
-      if (response.ok) {
-        fetchOrders();
-        setSelectedOrder(null);
-      }
+      await ordersAPI.updateStatus(orderId, status);
+      fetchOrders();
+      setSelectedOrder(null);
     } catch (error) {
       console.error("Error updating order status:", error);
     }
@@ -100,21 +80,8 @@ const Orders = () => {
   const cancelOrder = async (orderId) => {
     setCancelling(orderId);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/payments/${orderId}/cancel`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: "cancelled" }),
-        }
-      );
-
-      if (response.ok) {
-        fetchOrders();
-      }
+      await ordersAPI.cancel(orderId);
+      fetchOrders();
     } catch (error) {
       console.error("Error cancelling order:", error);
     } finally {
@@ -133,34 +100,18 @@ const Orders = () => {
     setSubmittingReview(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/reviews`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            storeId:
-              selectedOrderForReview.storeId._id ||
-              selectedOrderForReview.storeId,
-            orderId: selectedOrderForReview._id,
-            rating: reviewData.rating,
-            comment: reviewData.comment,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        alert("Review submitted successfully!");
-        setShowReviewModal(false);
-        setSelectedOrderForReview(null);
-        fetchOrders(); // Refresh orders to update review status
-      } else {
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
-      }
+      await reviewsAPI.create({
+        storeId:
+          selectedOrderForReview.storeId._id ||
+          selectedOrderForReview.storeId,
+        orderId: selectedOrderForReview._id,
+        rating: reviewData.rating,
+        comment: reviewData.comment,
+      });
+      alert("Review submitted successfully!");
+      setShowReviewModal(false);
+      setSelectedOrderForReview(null);
+      fetchOrders(); // Refresh orders to update review status
     } catch (error) {
       console.error("Error submitting review:", error);
       alert("Failed to submit review. Please try again.");
@@ -233,7 +184,7 @@ const Orders = () => {
 
   // Navigate to receipt page
   const viewReceipt = (orderId) => {
-    navigate(`/receipt/${orderId}?type=order`);
+    navigate(`/receipt/${orderId}`);
   };
 
   // Mark order as delivered (COD)
@@ -244,24 +195,36 @@ const Orders = () => {
 
     try {
       setMarkingDelivered(orderId);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/mark-delivered`,
-        {
-          method: "PUT",
-          credentials: "include",
-        }
+      
+      // Optimistically update the order in state
+      setOrders(prevOrders => 
+        prevOrders.map(order => {
+          if (order._id === orderId) {
+            return {
+              ...order,
+              status: "delivered",
+              paymentDetails: {
+                ...order.paymentDetails,
+                paymentStatus: "paid",
+                paidAt: new Date().toISOString()
+              }
+            };
+          }
+          return order;
+        })
       );
-
-      if (response.ok) {
-        alert("Order marked as delivered successfully!");
-        fetchOrders(); // Refresh orders
-      } else {
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
-      }
+      
+      await ordersAPI.markDelivered(orderId);
+      alert("Order marked as delivered successfully!");
+      
+      // Fetch fresh data to ensure consistency
+      await fetchOrders();
     } catch (error) {
       console.error("Error marking order as delivered:", error);
       alert("Error marking order as delivered. Please try again.");
+      
+      // Revert optimistic update on error
+      await fetchOrders();
     } finally {
       setMarkingDelivered(null);
     }
@@ -275,24 +238,41 @@ const Orders = () => {
 
     try {
       setMarkingPaymentSent(orderId);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/mark-payment-sent`,
-        {
-          method: "PUT",
-          credentials: "include",
-        }
+      
+      // Optimistically update the order in state
+      setOrders(prevOrders => 
+        prevOrders.map(order => {
+          if (order._id === orderId) {
+            return {
+              ...order,
+              paymentDetails: {
+                ...order.paymentDetails,
+                paymentStatus: "customer_paid_pending_confirmation"
+              }
+            };
+          }
+          return order;
+        })
       );
-
-      if (response.ok) {
-        alert("Payment marked as sent! The seller will verify and confirm your payment.");
-        fetchOrders(); // Refresh orders
-      } else {
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
-      }
+      
+      const response = await ordersAPI.markPaymentSent(orderId);
+      console.log("Mark Payment Sent Response:", response);
+      alert("Payment marked as sent! The seller will verify and confirm your payment.");
+      
+      // Fetch fresh data to ensure consistency
+      await fetchOrders();
     } catch (error) {
       console.error("Error marking payment as sent:", error);
-      alert("Error marking payment as sent. Please try again.");
+      console.error("Error details:", {
+        message: error.message,
+        status: error.status,
+        response: error.response
+      });
+      
+      alert(`Error marking payment as sent: ${error.message || "Please try again."}`);
+      
+      // Revert optimistic update on error
+      await fetchOrders();
     } finally {
       setMarkingPaymentSent(null);
     }
@@ -306,28 +286,54 @@ const Orders = () => {
 
     try {
       setUpdatingPaymentStatus(orderId);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/update-payment-status`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ paymentStatus }),
-        }
+      
+      // Optimistically update the order in state
+      setOrders(prevOrders => 
+        prevOrders.map(order => {
+          if (order._id === orderId) {
+            return {
+              ...order,
+              paymentDetails: {
+                ...order.paymentDetails,
+                paymentStatus: paymentStatus,
+                paidAt: paymentStatus === "paid" ? new Date().toISOString() : order.paymentDetails?.paidAt
+              }
+            };
+          }
+          return order;
+        })
       );
-
-      if (response.ok) {
-        alert("Payment status updated successfully!");
-        fetchOrders(); // Refresh orders
-      } else {
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
-      }
+      
+      const response = await ordersAPI.updatePaymentStatus(orderId, paymentStatus);
+      
+      // Check if the response indicates success
+      console.log("API Response:", response);
+      
+      alert("Payment status updated successfully!");
+      
+      // Fetch fresh data to ensure consistency
+      await fetchOrders();
     } catch (error) {
       console.error("Error updating payment status:", error);
-      alert("Error updating payment status. Please try again.");
+      
+      // Log detailed error information
+      console.error("Error details:", {
+        message: error.message,
+        status: error.status,
+        response: error.response,
+        name: error.name,
+        stack: error.stack
+      });
+      
+      // Check if it's actually an API error or a JavaScript error
+      if (error.status && error.status >= 400) {
+        alert(`API Error: ${error.message || "Server error occurred"}`);
+      } else {
+        alert(`Unexpected error: ${error.message || "Please try again"}`);
+      }
+      
+      // Revert optimistic update on error
+      await fetchOrders();
     } finally {
       setUpdatingPaymentStatus(null);
     }
@@ -341,24 +347,32 @@ const Orders = () => {
 
     try {
       setConfirmingDelivery(orderId);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/confirm-delivery`,
-        {
-          method: "PUT",
-          credentials: "include",
-        }
+      
+      // Optimistically update the order in state
+      setOrders(prevOrders => 
+        prevOrders.map(order => {
+          if (order._id === orderId) {
+            return {
+              ...order,
+              status: "completed",
+              customerConfirmedAt: new Date().toISOString()
+            };
+          }
+          return order;
+        })
       );
-
-      if (response.ok) {
-        alert("Order confirmed successfully! Thank you for your confirmation.");
-        fetchOrders(); // Refresh orders
-      } else {
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
-      }
+      
+      await ordersAPI.confirmDelivery(orderId);
+      alert("Order confirmed successfully! Thank you for your confirmation.");
+      
+      // Fetch fresh data to ensure consistency
+      await fetchOrders();
     } catch (error) {
       console.error("Error confirming order:", error);
       alert("Error confirming order. Please try again.");
+      
+      // Revert optimistic update on error
+      await fetchOrders();
     } finally {
       setConfirmingDelivery(null);
     }

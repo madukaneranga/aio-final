@@ -52,17 +52,6 @@ export const truncateText = (text, maxLength = 100) => {
   return text.substring(0, maxLength) + '...';
 };
 
-// Generate time slots
-export const generateTimeSlots = (startHour = 9, endHour = 17, interval = 60) => {
-  const slots = [];
-  for (let hour = startHour; hour < endHour; hour++) {
-    slots.push(`${hour.toString().padStart(2, '0')}:00`);
-    if (interval === 30) {
-      slots.push(`${hour.toString().padStart(2, '0')}:30`);
-    }
-  }
-  return slots;
-};
 
 // Validate email
 export const isValidEmail = (email) => {
@@ -145,10 +134,8 @@ export const getImageUrl = (imagePath) => {
 // Default images
 export const defaultImages = {
   product: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop',
-  service: 'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop',
   store: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop',
   user: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop'
-
 };
 
 //violations  check
@@ -159,17 +146,11 @@ export const getUsageViolations = (usage, newLimits) => {
     violations.violatedProducts = usage.products.count - newLimits.items;
   }
 
-  if (usage.services?.count > newLimits.items) {
-    violations.violatedServices = usage.services.count - newLimits.items;
-  }
 
   if (usage.products?.images > newLimits.itemImages) {
     violations.violatedProductImages = usage.products.images - newLimits.itemImages;
   }
 
-  if (usage.services?.images > newLimits.itemImages) {
-    violations.violatedServiceImages = usage.services.images - newLimits.itemImages;
-  }
 
   if (usage.headerImages?.count > newLimits.headerImages) {
     violations.violatedHeaderImages = usage.headerImages.count - newLimits.headerImages;

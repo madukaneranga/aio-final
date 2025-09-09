@@ -7,7 +7,6 @@ import {
   Filter,
   Search,
   Star,
-  Calendar,
   Package,
   ExternalLink,
   Share2,
@@ -32,11 +31,9 @@ const Wishlist = () => {
     removeFromWishlist,
     updateItemPriority,
     updateItemNotes,
-    moveToCart,
-    getItemsByFilter,
     getStats,
   } = useWishlist();
-  const { addToOrder, addToBooking } = useCart();
+  const { addToOrder } = useCart();
 
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [filterType, setFilterType] = useState('all');
@@ -56,6 +53,9 @@ const Wishlist = () => {
 
   // Get filtered and sorted items
   const getFilteredItems = () => {
+    if (!Array.isArray(wishlistItems)) {
+      return [];
+    }
     let items = [...wishlistItems];
 
     // Apply filters
@@ -105,29 +105,16 @@ const Wishlist = () => {
 
   const handleAddToCart = async (item) => {
     try {
-      if (item.itemType === 'product') {
-        await addToOrder(
-          {
-            _id: item.itemId,
-            title: item.title,
-            price: item.price,
-            images: [item.image],
-            storeId: item.storeId,
-          },
-          1
-        );
-      } else {
-        await addToBooking(
-          {
-            _id: item.itemId,
-            title: item.title,
-            price: item.price,
-            images: [item.image],
-            storeId: item.storeId,
-          },
-          { date: '', time: '', notes: '' }
-        );
-      }
+      await addToOrder(
+        {
+          _id: item.itemId,
+          title: item.title,
+          price: item.price,
+          images: [item.image],
+          storeId: item.storeId,
+        },
+        1
+      );
     } catch (error) {
       console.error('Failed to add to cart:', error);
     }
@@ -224,15 +211,6 @@ const Wishlist = () => {
               </div>
               <div className="bg-white rounded-lg p-4 shadow-sm border">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-green-500" />
-                  <div>
-                    <p className="text-sm text-gray-600">Services</p>
-                    <p className="font-bold text-gray-900">{stats.serviceCount}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm border">
-                <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 text-red-500 fill-current" />
                   <div>
                     <p className="text-sm text-gray-600">High Priority</p>
@@ -244,7 +222,7 @@ const Wishlist = () => {
           </div>
         </div>
 
-        {wishlistItems.length === 0 ? (
+        {(!Array.isArray(wishlistItems) || wishlistItems.length === 0) ? (
           <div className="text-center py-16">
             <Heart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Your wishlist is empty</h2>
@@ -255,12 +233,6 @@ const Wishlist = () => {
                 className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
               >
                 Browse Products
-              </Link>
-              <Link
-                to="/services"
-                className="bg-white border-2 border-black text-black px-6 py-3 rounded-lg hover:bg-black hover:text-white transition-colors"
-              >
-                Browse Services
               </Link>
             </div>
           </div>
@@ -333,7 +305,6 @@ const Wishlist = () => {
                       >
                         <option value="all">All Items</option>
                         <option value="product">Products</option>
-                        <option value="service">Services</option>
                       </select>
                     </div>
 
@@ -378,7 +349,7 @@ const Wishlist = () => {
             {/* Results Count */}
             <div className="mb-6">
               <p className="text-gray-600">
-                Showing {filteredItems.length} of {wishlistItems.length} items
+                Showing {filteredItems.length} of {Array.isArray(wishlistItems) ? wishlistItems.length : 0} items
               </p>
             </div>
 
@@ -389,13 +360,11 @@ const Wishlist = () => {
                   <div key={item._id} className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow">
                     <div className="relative">
                       {/* Item Image */}
-                      <Link to={`/${item.itemType}/${item.itemId}`}>
+                      <Link to={`/product/${item.itemId}`}>
                         <img
                           src={
                             item.image ||
-                            (item.itemType === 'product'
-                              ? 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
-                              : 'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop')
+                            'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
                           }
                           alt={item.title}
                           className="w-full h-48 object-cover rounded-t-lg"
@@ -419,14 +388,7 @@ const Wishlist = () => {
                     </div>
 
                     <div className="p-4">
-                      <div className="flex items-center gap-1 mb-2">
-                        <Tag className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">
-                          {item.itemType}
-                        </span>
-                      </div>
-
-                      <Link to={`/${item.itemType}/${item.itemId}`}>
+                      <Link to={`/product/${item.itemId}`}>
                         <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2 hover:text-gray-700 transition-colors">
                           {item.title}
                         </h3>
@@ -457,23 +419,14 @@ const Wishlist = () => {
 
                       <div className="flex gap-2">
                         <button
-                          onClick={() => item.itemType === 'service' ? window.location.href = `/service/${item.itemId}` : handleAddToCart(item)}
+                          onClick={() => handleAddToCart(item)}
                           className="flex-1 bg-black text-white py-2 px-3 rounded text-sm font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-1"
                         >
-                          {item.itemType === 'service' ? (
-                            <>
-                              <Eye className="w-3 h-3" />
-                              View Service
-                            </>
-                          ) : (
-                            <>
-                              <ShoppingCart className="w-3 h-3" />
-                              Add to Cart
-                            </>
-                          )}
+                          <ShoppingCart className="w-3 h-3" />
+                          Add to Cart
                         </button>
                         <Link
-                          to={`/${item.itemType}/${item.itemId}`}
+                          to={`/product/${item.itemId}`}
                           className="p-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                         >
                           <ExternalLink className="w-3 h-3" />
@@ -488,13 +441,11 @@ const Wishlist = () => {
                 {filteredItems.map((item) => (
                   <div key={item._id} className="bg-white rounded-lg shadow-sm border p-6">
                     <div className="flex items-start gap-4">
-                      <Link to={`/${item.itemType}/${item.itemId}`}>
+                      <Link to={`/product/${item.itemId}`}>
                         <img
                           src={
                             item.image ||
-                            (item.itemType === 'product'
-                              ? 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
-                              : 'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop')
+                            'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop'
                           }
                           alt={item.title}
                           className="w-24 h-24 object-cover rounded-lg"
@@ -508,12 +459,9 @@ const Wishlist = () => {
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(item.priority)}`}>
                                 {item.priority}
                               </span>
-                              <span className="text-xs text-gray-500 uppercase tracking-wide">
-                                {item.itemType}
-                              </span>
                             </div>
 
-                            <Link to={`/${item.itemType}/${item.itemId}`}>
+                            <Link to={`/product/${item.itemId}`}>
                               <h3 className="text-lg font-semibold text-gray-900 mb-1 hover:text-gray-700 transition-colors">
                                 {item.title}
                               </h3>
@@ -596,23 +544,14 @@ const Wishlist = () => {
 
                             <div className="flex gap-2">
                               <button
-                                onClick={() => item.itemType === 'service' ? window.location.href = `/service/${item.itemId}` : handleAddToCart(item)}
+                                onClick={() => handleAddToCart(item)}
                                 className="bg-black text-white py-2 px-4 rounded text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-1"
                               >
-                                {item.itemType === 'service' ? (
-                                  <>
-                                    <Eye className="w-3 h-3" />
-                                    View Service
-                                  </>
-                                ) : (
-                                  <>
-                                    <ShoppingCart className="w-3 h-3" />
-                                    Add to Cart
-                                  </>
-                                )}
+                                <ShoppingCart className="w-3 h-3" />
+                                Add to Cart
                               </button>
                               <Link
-                                to={`/${item.itemType}/${item.itemId}`}
+                                to={`/product/${item.itemId}`}
                                 className="p-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                               >
                                 <ExternalLink className="w-4 h-4" />

@@ -68,15 +68,15 @@ export const ADMIN_CONFIG = {
   PERMISSIONS: {
     // Collections that can be created
     CREATABLE: [
-      'users', 'stores', 'products', 'services', 'categories', 
-      'packages', 'addons', 'variants', 'time-slots', 'flash-deals',
+      'users', 'stores', 'products', 'categories', 
+      'packages', 'addons', 'variants', 'flash-deals',
       'email-subscriptions', 'notifications', 'platform-settings', 'marketing'
     ],
     
     // Collections that can be edited
     EDITABLE: [
-      'users', 'stores', 'products', 'services', 'orders', 'bookings',
-      'categories', 'packages', 'addons', 'variants', 'time-slots',
+      'users', 'stores', 'products', 'orders',
+      'categories', 'packages', 'addons', 'variants',
       'flash-deals', 'email-subscriptions', 'notifications', 'posts',
       'post-comments', 'reviews', 'wallets', 
       'pending-transactions', 'subscriptions', 'platform-settings', 'marketing'
@@ -84,8 +84,8 @@ export const ADMIN_CONFIG = {
     
     // Collections that can be deleted
     DELETABLE: [
-      'products', 'services', 'categories', 'packages', 'addons', 
-      'variants', 'time-slots', 'flash-deals', 'email-subscriptions',
+      'products', 'categories', 'packages', 'addons', 
+      'variants', 'flash-deals', 'email-subscriptions',
       'notifications', 'posts', 'post-comments', 'post-likes', 'reviews',
       'chats', 'pending-transactions', 'search-history', 'comment-likes',
       'comment-reactions', 'platform-settings', 'marketing'

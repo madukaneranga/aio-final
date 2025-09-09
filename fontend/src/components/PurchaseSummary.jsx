@@ -25,12 +25,11 @@ import {
   createDeliveryTimeline
 } from "../utils/deliveryEstimate";
 
-const PurchaseSummary = ({ data, type = "order" }) => {
+const PurchaseSummary = ({ data }) => {
   const [copiedId, setCopiedId] = useState(false);
   
   if (!data) return null;
 
-  const isOrder = type === "order";
   const purchaseId = data.combinedId || data._id;
   const shortId = purchaseId.slice(-8).toUpperCase();
 
@@ -52,9 +51,9 @@ const PurchaseSummary = ({ data, type = "order" }) => {
     });
   };
 
-  // Calculate delivery estimate for orders
+  // Calculate delivery estimate
   let deliveryEstimate = null;
-  if (isOrder && data.shippingAddress) {
+  if (data.shippingAddress) {
     const customerProvince = getProvinceFromCity(data.shippingAddress.state);
     const storeProvince = data.storeId?.province || "Western";
     const hasPreorder = hasPreorderItems(data.items);
@@ -115,10 +114,10 @@ const PurchaseSummary = ({ data, type = "order" }) => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {isOrder ? "Order Confirmed!" : "Booking Confirmed!"}
+                Order Created!
               </h2>
               <p className="text-gray-600">
-                Your {isOrder ? "order" : "booking"} has been successfully processed
+                Your order has been successfully processed
               </p>
             </div>
           </div>
@@ -131,7 +130,7 @@ const PurchaseSummary = ({ data, type = "order" }) => {
         {/* Purchase ID */}
         <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
           <div>
-            <p className="text-sm text-gray-600">{isOrder ? "Order" : "Booking"} ID</p>
+            <p className="text-sm text-gray-600">Order ID</p>
             <p className="text-lg font-mono font-semibold text-gray-900">#{shortId}</p>
           </div>
           <button
@@ -153,141 +152,83 @@ const PurchaseSummary = ({ data, type = "order" }) => {
         </div>
       </div>
 
-      {/* Items/Service Details */}
+      {/* Order Items */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          {isOrder ? "Order Items" : "Service Details"}
+          Order Items
         </h3>
         
-        {isOrder ? (
-          <div className="space-y-4">
-            {data.items?.map((item, index) => (
-              <div key={index} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex-shrink-0">
-                  <img
-                    src={
-                      item.productId?.images?.[0]?.startsWith("http")
-                        ? item.productId.images[0]
-                        : item.productId?.images?.[0] 
-                        ? `${import.meta.env.VITE_API_URL}${item.productId.images[0]}`
-                        : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
-                    }
-                    alt={item.productId?.title || "Product"}
-                    className="w-16 h-16 object-cover rounded-lg"
-                  />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{item.productId?.title || "Product"}</h4>
-                  <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                  {item.productId?.isPreorder && (
-                    <span className="inline-block px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded mt-1">
-                      Preorder
-                    </span>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-gray-900">{formatLKR(item.price * item.quantity)}</p>
-                  <p className="text-sm text-gray-600">{formatLKR(item.price)} each</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center space-x-4">
+        <div className="space-y-4">
+          {data.items?.map((item, index) => (
+            <div key={index} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
               <div className="flex-shrink-0">
                 <img
                   src={
-                    data.serviceId?.images?.[0]?.startsWith("http")
-                      ? data.serviceId.images[0]
-                      : data.serviceId?.images?.[0]
-                      ? `${import.meta.env.VITE_API_URL}${data.serviceId.images[0]}`
-                      : "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop"
+                    item.productId?.images?.[0]?.startsWith("http")
+                      ? item.productId.images[0]
+                      : item.productId?.images?.[0] 
+                      ? `${import.meta.env.VITE_API_URL}${item.productId.images[0]}`
+                      : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
                   }
-                  alt={data.serviceId?.title || "Service"}
+                  alt={item.productId?.title || "Product"}
                   className="w-16 h-16 object-cover rounded-lg"
                 />
               </div>
               <div className="flex-1">
-                <h4 className="font-medium text-gray-900">{data.serviceId?.title || "Service"}</h4>
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    {data.bookingDetails?.date ? formatDate(data.bookingDetails.date) : "Date TBD"}
-                  </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Clock className="w-4 h-4 mr-2" />
-                    {data.bookingDetails?.startTime && data.bookingDetails?.endTime 
-                      ? `${data.bookingDetails.startTime} - ${data.bookingDetails.endTime}`
-                      : "Time TBD"}
-                  </div>
-                </div>
+                <h4 className="font-medium text-gray-900">{item.productId?.title || "Product"}</h4>
+                <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                {item.productId?.isPreorder && (
+                  <span className="inline-block px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded mt-1">
+                    Preorder
+                  </span>
+                )}
               </div>
               <div className="text-right">
-                <p className="font-semibold text-gray-900">{formatLKR(data.totalAmount)}</p>
+                <p className="font-semibold text-gray-900">{formatLKR(item.price * item.quantity)}</p>
+                <p className="text-sm text-gray-600">{formatLKR(item.price)} each</p>
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Delivery Information */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Delivery Information</h3>
+        
+        {/* Delivery Estimate */}
+        {deliveryEstimate && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-3 mb-2">
+              <Truck className="w-5 h-5 text-blue-600" />
+              <h4 className="font-medium text-blue-900">Estimated Delivery</h4>
+            </div>
+            <p className="text-blue-800 font-medium">
+              {getDeliveryEstimateText(deliveryEstimate)}
+            </p>
+            {deliveryEstimate.hasPreorderItems && (
+              <p className="text-sm text-blue-700 mt-1">
+                ⏰ Extra processing time included for preorder items
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Shipping Address */}
+        {data.shippingAddress && (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2 text-gray-900 font-medium">
+              <MapPin className="w-4 h-4" />
+              <span>Shipping Address</span>
+            </div>
+            <div className="pl-6 text-gray-600">
+              <p>{data.shippingAddress.street}</p>
+              <p>{data.shippingAddress.city}, {data.shippingAddress.state} {data.shippingAddress.zipCode}</p>
+              <p>{data.shippingAddress.country}</p>
             </div>
           </div>
         )}
       </div>
-
-      {/* Delivery/Service Information */}
-      {isOrder ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Delivery Information</h3>
-          
-          {/* Delivery Estimate */}
-          {deliveryEstimate && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center space-x-3 mb-2">
-                <Truck className="w-5 h-5 text-blue-600" />
-                <h4 className="font-medium text-blue-900">Estimated Delivery</h4>
-              </div>
-              <p className="text-blue-800 font-medium">
-                {getDeliveryEstimateText(deliveryEstimate)}
-              </p>
-              {deliveryEstimate.hasPreorderItems && (
-                <p className="text-sm text-blue-700 mt-1">
-                  ⏰ Extra processing time included for preorder items
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Shipping Address */}
-          {data.shippingAddress && (
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2 text-gray-900 font-medium">
-                <MapPin className="w-4 h-4" />
-                <span>Shipping Address</span>
-              </div>
-              <div className="pl-6 text-gray-600">
-                <p>{data.shippingAddress.street}</p>
-                <p>{data.shippingAddress.city}, {data.shippingAddress.state} {data.shippingAddress.zipCode}</p>
-                <p>{data.shippingAddress.country}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Service Information</h3>
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center space-x-2 text-gray-900 font-medium">
-                <Calendar className="w-4 h-4" />
-                <span>Appointment Details</span>
-              </div>
-              <div className="pl-6 text-gray-600">
-                <p>Date: {data.bookingDetails?.date ? formatDate(data.bookingDetails.date) : "To be confirmed"}</p>
-                <p>Time: {data.bookingDetails?.startTime && data.bookingDetails?.endTime 
-                  ? `${data.bookingDetails.startTime} - ${data.bookingDetails.endTime}`
-                  : "To be confirmed"}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Store & Payment Information */}
       <div className="grid md:grid-cols-2 gap-6">
@@ -364,7 +305,7 @@ const PurchaseSummary = ({ data, type = "order" }) => {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Link
-            to={`/receipt/${data._id}?type=${type}`}
+            to={`/receipt/${data._id}?type=order`}
             className="flex items-center justify-center space-x-2 p-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
           >
             <ReceiptIcon className="w-4 h-4" />
@@ -372,11 +313,11 @@ const PurchaseSummary = ({ data, type = "order" }) => {
           </Link>
           
           <Link
-            to={isOrder ? "/orders" : "/bookings"}
+            to="/orders"
             className="flex items-center justify-center space-x-2 p-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Package className="w-4 h-4" />
-            <span className="text-sm">Track {isOrder ? "Order" : "Booking"}</span>
+            <span className="text-sm">Track Order</span>
           </Link>
           
           {data.storeId?.contactInfo?.phone && (

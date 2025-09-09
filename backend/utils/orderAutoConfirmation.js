@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
 import Store from "../models/Store.js";
-import WalletTransaction from "../models/WalletTransaction.js";
+import WalletTransaction from "../models/Transaction.js";
+import Wallet from "../models/Wallet.js";
 import Notification from "../models/Notification.js";
 import { emitNotification } from "./socketUtils.js";
 
@@ -45,6 +46,34 @@ export async function processAutoConfirmation() {
             description: "Order completed - auto-confirmed after 14 days"
           }
         );
+
+        // Update store owner's wallet totalEarnings and balance
+        if (order.storeId && order.storeId.ownerId) {
+          const walletUpdate = { 
+            $inc: { 
+              'balance.totalEarnings': order.storeAmount
+            },
+            $set: {
+              'metadata.lastTransactionDate': new Date(),
+              'metadata.lastBalanceUpdate': new Date()
+            }
+          };
+
+          // For PayHere payments, move from pending to available balance
+          if (order.paymentDetails?.paymentMethod === 'payhere') {
+            walletUpdate.$inc['balance.pendingBalance'] = -order.storeAmount;
+            walletUpdate.$inc['balance.availableBalance'] = order.storeAmount;
+          } else {
+            // For COD and bank transfers, add directly to available balance
+            walletUpdate.$inc['balance.availableBalance'] = order.storeAmount;
+          }
+
+          await Wallet.findOneAndUpdate(
+            { userId: order.storeId.ownerId },
+            walletUpdate,
+            { upsert: true }
+          );
+        }
 
         // Update store total sales if not already updated
         await Store.findByIdAndUpdate(order.storeId, {

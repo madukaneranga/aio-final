@@ -20,6 +20,10 @@ import {
   UserPlus,
   RotateCcw,
 } from "lucide-react";
+import { socialAPI } from "../utils/api";
+
+// Shared API base URL for both components
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // CommentSidebar Component
 const CommentSidebar = ({
@@ -42,8 +46,6 @@ const CommentSidebar = ({
   const [commentsLoaded, setCommentsLoaded] = useState(false);
   const textareaRef = useRef(null);
   const bottomRef = useRef(null);
-
-  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
   // Reset state when postId changes
   useEffect(() => {
@@ -95,23 +97,10 @@ const CommentSidebar = ({
 
       console.log("Loading comments for post:", targetPostId, "page:", pageNum);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/posts/${targetPostId}/comments?page=${pageNum}&limit=20`,
-        {
-          credentials: "include",
-          headers: getAuthHeaders(),
-        }
-      );
-
-      console.log("Comments response status:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Comments API error:", response.status, errorData);
-        throw new Error(`Failed to load comments (${response.status})`);
-      }
-
-      const data = await response.json();
+      const data = await socialAPI.getPostComments(targetPostId, {
+        page: pageNum,
+        limit: 20
+      });
       console.log("Comments data:", data);
 
       // Process comments
@@ -162,22 +151,10 @@ const CommentSidebar = ({
         )
       );
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/posts/comments/${commentId}/replies?page=1&limit=10`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
-      
-      console.log(`Response status: ${response.status}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log(`❌ Failed to load replies. Status: ${response.status}, Error: ${errorText}`);
-        throw new Error(`Failed to load replies (${response.status}): ${errorText}`);
-      }
-
-      const data = await response.json();
+      const data = await socialAPI.getReplies(commentId, {
+        page: 1,
+        limit: 10
+      });
       console.log("Raw API Response:", data);
 
       const replies = data.replies || [];
@@ -238,24 +215,10 @@ const CommentSidebar = ({
         parentComment: replyingTo,
       });
 
-      const response = await fetch(`${API_BASE_URL}/api/posts/${currentPostId}/comment`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          text: newComment.trim(),
-          parentComment: replyingTo,
-        }),
+      const data = await socialAPI.addPostComment(currentPostId, {
+        text: newComment.trim(),
+        parentComment: replyingTo,
       });
-
-      console.log("Comment submit response status:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Comment submit error:", response.status, errorData);
-        throw new Error("Failed to add comment");
-      }
-
-      const data = await response.json();
       console.log("Comment submit success:", data);
 
       if (replyingTo) {
@@ -306,16 +269,7 @@ const CommentSidebar = ({
 
   const likeComment = async (commentId, isReply = false, parentId = null) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/posts/comments/${commentId}/like`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to like comment");
-      }
-
-      const data = await response.json();
+      const data = await socialAPI.likeComment(commentId);
 
       if (isReply && parentId) {
         // Update reply like status
@@ -652,7 +606,6 @@ const SocialFeed = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState({});
 
   const videoRefs = useRef({});
-  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
   useEffect(() => {
     loadPosts();
@@ -670,16 +623,10 @@ const SocialFeed = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/api/posts/feed?page=${page}&limit=10`, {
-        credentials: "include",
-        headers: getAuthHeaders(),
+      const data = await socialAPI.getFeed({
+        page: page,
+        limit: 10
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch posts");
-      }
-
-      const data = await response.json();
 
       if (page === 1) {
         setPosts(data.posts || []);
@@ -698,10 +645,7 @@ const SocialFeed = () => {
 
   const trackView = async (postId) => {
     try {
-      await fetch(`${API_BASE_URL}/api/posts/${postId}/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
+      await socialAPI.viewPost(postId);
     } catch (error) {
       console.error("Failed to track view:", error);
     }
@@ -721,16 +665,9 @@ const SocialFeed = () => {
         )
       );
 
-      const response = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to like post");
-      }
-
-      const data = await response.json();
+      const data = await socialAPI.likePost ? 
+        await socialAPI.likePost(postId) :
+        await socialAPI.likePost(postId); // Fallback to socialAPI
 
       setPosts((prevPosts) =>
         prevPosts.map((post) =>
@@ -888,19 +825,13 @@ const SocialFeed = () => {
 
     try {
       const nextPage = page + 1;
-      const response = await fetch(
-        `${API_BASE_URL}/api/posts/feed?page=${nextPage}&limit=10`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setPosts((prev) => [...prev, ...(data.posts || [])]);
-        setHasMore(data.pagination?.hasMore || false);
-        setPage(nextPage);
-      }
+      const data = await socialAPI.getFeed({
+        page: nextPage,
+        limit: 10
+      });
+      setPosts((prev) => [...prev, ...(data.posts || [])]);
+      setHasMore(data.pagination?.hasMore || false);
+      setPage(nextPage);
     } catch (error) {
       console.error("Failed to load more posts:", error);
     }

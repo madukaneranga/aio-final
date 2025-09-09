@@ -1,16 +1,30 @@
 import express from "express";
+import mongoose from "mongoose";
 import Order from "../models/Order.js";
-import Booking from "../models/Booking.js";
-import WalletTransaction from "../models/WalletTransaction.js";
+import WalletTransaction from "../models/Transaction.js";
 import { authenticate } from "../middleware/auth.js";
+import { validationErrorResponse } from "../utils/responseFormatter.js";
 
 const router = express.Router();
+
+// Validation middleware for transaction ID
+const validateTransactionId = (req, res, next) => {
+  const { transactionId } = req.params;
+
+  if (!transactionId || !mongoose.Types.ObjectId.isValid(transactionId)) {
+    return res.status(400).json(validationErrorResponse([
+      { field: 'transactionId', message: 'Valid transaction ID is required' }
+    ]));
+  }
+
+  next();
+};
 
 /**
  * Get thank you page data for orders
  * GET /api/thank-you/order/:transactionId
  */
-router.get("/order/:transactionId", authenticate, async (req, res) => {
+router.get("/order/:transactionId", authenticate, validateTransactionId, async (req, res) => {
   try {
     const { transactionId } = req.params;
     console.log(`ThankYou API - Order request for transaction: ${transactionId}, user: ${req.user._id}`);
@@ -68,7 +82,7 @@ router.get("/order/:transactionId", authenticate, async (req, res) => {
       }
 
       // Return pending transaction data
-      if (pendingTransaction.type === 'payment' && pendingTransaction.orderData) {
+      if (pendingTransaction.type === 'sale' && pendingTransaction.orderData) {
         console.log(`ThankYou API - Returning pending order data`);
         const orderData = pendingTransaction.orderData;
         
@@ -115,7 +129,8 @@ router.get("/order/:transactionId", authenticate, async (req, res) => {
     }
 
     console.log(`ThankYou API - Order found successfully for transaction: ${transactionId}`);
-    res.json(order);
+    console.log(`ThankYou API - Order details:`, order);
+    res.json({data:order});
 
   } catch (error) {
     console.error("Error fetching order for thank you page:", error);
@@ -127,74 +142,6 @@ router.get("/order/:transactionId", authenticate, async (req, res) => {
   }
 });
 
-/**
- * Get thank you page data for bookings
- * GET /api/thank-you/booking/:transactionId
- */
-router.get("/booking/:transactionId", authenticate, async (req, res) => {
-  try {
-    const { transactionId } = req.params;
-
-    // First try to find completed booking
-    let booking = await Booking.findById(transactionId)
-      .populate('userId', 'name email phone')
-      .populate('storeId', 'name email phone address province')
-      .populate({
-        path: 'serviceId',
-        select: 'title images price category duration'
-      });
-
-    if (booking && booking.userId._id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    // If no completed booking found, check for pending transaction
-    if (!booking) {
-      const pendingTransaction = await WalletTransaction.findById(transactionId)
-        .populate('userId', 'name email phone');
-
-      if (!pendingTransaction || pendingTransaction.userId._id.toString() !== req.user._id.toString()) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
-
-      // Return pending transaction data
-      if (pendingTransaction.type === 'payment' && pendingTransaction.bookingData) {
-        const bookingData = pendingTransaction.bookingData;
-        return res.json({
-          _id: transactionId,
-          status: "pending",
-          paymentStatus: "pending",
-          totalAmount: Math.abs(pendingTransaction.amount),
-          paymentMethod: pendingTransaction.paymentMethod,
-          createdAt: pendingTransaction.createdAt,
-          scheduledDate: bookingData.scheduledDate,
-          scheduledTime: bookingData.scheduledTime,
-          notes: bookingData.notes,
-          serviceId: {
-            _id: bookingData.serviceId,
-            title: "Service (Pending)",
-            duration: "To be confirmed"
-          },
-          storeId: {
-            _id: bookingData.storeId,
-            name: "Store (Pending)"
-          },
-          userId: pendingTransaction.userId
-        });
-      }
-    }
-
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
-
-    res.json(booking);
-
-  } catch (error) {
-    console.error("Error fetching booking for thank you page:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
 
 /**
  * Get purchase statistics for user (optional for thank you page enhancements)
@@ -205,37 +152,23 @@ router.get("/stats", authenticate, async (req, res) => {
     const userId = req.user._id;
 
     // Get user's purchase statistics
-    const [orderStats, bookingStats] = await Promise.all([
-      Order.aggregate([
-        { $match: { userId: require('mongoose').Types.ObjectId(userId) } },
-        {
-          $group: {
-            _id: null,
-            totalOrders: { $sum: 1 },
-            totalSpent: { $sum: "$totalAmount" },
-            avgOrderValue: { $avg: "$totalAmount" }
-          }
+    const orderStats = await Order.aggregate([
+      { $match: { customerId: new mongoose.Types.ObjectId(userId) } },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalSpent: { $sum: "$totalAmount" },
+          avgOrderValue: { $avg: "$totalAmount" }
         }
-      ]),
-      Booking.aggregate([
-        { $match: { userId: require('mongoose').Types.ObjectId(userId) } },
-        {
-          $group: {
-            _id: null,
-            totalBookings: { $sum: 1 },
-            totalSpent: { $sum: "$totalAmount" },
-            avgBookingValue: { $avg: "$totalAmount" }
-          }
-        }
-      ])
+      }
     ]);
 
     const stats = {
-      orders: orderStats[0] || { totalOrders: 0, totalSpent: 0, avgOrderValue: 0 },
-      bookings: bookingStats[0] || { totalBookings: 0, totalSpent: 0, avgBookingValue: 0 }
+      orders: orderStats[0] || { totalOrders: 0, totalSpent: 0, avgOrderValue: 0 }
     };
 
-    res.json(stats);
+    res.json({data:stats});
 
   } catch (error) {
     console.error("Error fetching user stats:", error);

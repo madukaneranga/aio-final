@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ProductCard from "../components/ProductCard";
-import ServiceCard from "../components/ServiceCard";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { Star, ArrowLeft } from "lucide-react";
 import StoreHero from "../components/StoreHero";
 import StoreInfo from "../components/StoreInfo";
+import { storesAPI, reviewsAPI } from "../utils/api";
 import { set } from "mongoose";
 
 const StoreDetail = () => {
@@ -71,9 +71,7 @@ const StoreDetail = () => {
     const updateViews = async () => {
       try {
         viewUpdateAttempted.current.add(id);
-        await fetch(`${import.meta.env.VITE_API_URL}/api/stores/${id}/views`, {
-          method: "PATCH",
-        });
+        await storesAPI.updateViews(id);
       } catch (error) {
         console.error("Error updating views:", error);
         viewUpdateAttempted.current.delete(id);
@@ -102,45 +100,25 @@ const StoreDetail = () => {
   const fetchFollowData = async () => {
     try {
       setError("");
-
-      const url = `${
-        import.meta.env.VITE_API_URL
-      }/api/stores/${id}/follow-check`;
-
-      const response = await fetch(url, {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        // If user is not authenticated, just set default values
-        if (response.status === 401) {
-          setFollowData({ isFollowing: false, isOwnStore: false });
-          return;
-        }
-        throw new Error(`Failed to fetch follow data: ${response.status}`);
+      const followData = await storesAPI.getFollowCheck(id);
+      setFollowData(followData);
+    } catch (error) {
+      // If user is not authenticated, just set default values
+      if (error.status === 401) {
+        setFollowData({ isFollowing: false, isOwnStore: false });
+        return;
       }
+      console.error("Error fetching follow data:", error);
 
       const data = await response.json();
       console.log("Follow data:", data);
       setFollowData(data);
-    } catch (error) {
-      console.error("Error fetching follow data:", error);
-      // Don't show error for follow data, just set defaults
-      setFollowData({ isFollowing: false, isOwnStore: false });
     }
   };
   const fetchStoreData = async () => {
     try {
       setError("");
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/${id}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch store: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await storesAPI.getById(id);
       setStoreData(data);
     } catch (error) {
       console.error("Error fetching store data:", error);
@@ -151,13 +129,8 @@ const StoreDetail = () => {
   const fetchReviews = async () => {
     try {
       setError("");
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/reviews/store/${id}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setReviews(data || []);
-      }
+      const reviews = await reviewsAPI.getByStore(id);
+      setReviews(reviews || []);
     } catch (error) {
       console.error("Error fetching reviews:", error);
       setReviews([]);
@@ -292,19 +265,17 @@ const StoreDetail = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
             <h2 className="text-3xl font-bold mb-4 text-gray-900">
-              {store.type === "product" ? "Our Products" : "Our Services"}
+              Our Products
             </h2>
             <p className="text-gray-600">
-              {listings.length}{" "}
-              {store.type === "product" ? "products" : "services"} available
+              {listings.length} products available
             </p>
           </div>
 
           {listings.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-lg text-gray-500">
-                No {store.type === "product" ? "products" : "services"}{" "}
-                available yet
+                No products available yet
               </p>
               <p className="mt-2 text-gray-400">
                 Check back later for new listings
@@ -312,13 +283,9 @@ const StoreDetail = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4">
-              {listings.map((item) =>
-                store.type === "product" ? (
-                  <ProductCard key={item._id} product={item} />
-                ) : (
-                  <ServiceCard key={item._id} service={item} />
-                )
-              )}
+              {listings.map((item) => (
+                <ProductCard key={item._id} product={item} />
+              ))}
             </div>
           )}
         </div>
@@ -458,11 +425,6 @@ const StoreDetail = () => {
                         {review.orderId && (
                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                             Product Order
-                          </span>
-                        )}
-                        {review.bookingId && (
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                            Service Booking
                           </span>
                         )}
                       </div>

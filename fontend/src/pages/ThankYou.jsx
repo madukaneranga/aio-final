@@ -2,13 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { 
   CheckCircle, 
-  Calendar,
   Package,
   ArrowLeft,
   AlertCircle,
-  Loader,
   Gift,
-  Star,
   Timer
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -18,6 +15,7 @@ import RecommendationGrid from "../components/RecommendationGrid";
 import { calculateDeliveryEstimate, getDeliveryEstimateText } from "../utils/deliveryEstimate";
 import { formatLKR } from "../utils/currency";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { ordersAPI } from "../utils/api";
 
 const ThankYou = () => {
   const [searchParams] = useSearchParams();
@@ -31,16 +29,15 @@ const ThankYou = () => {
   
 
   const transactionId = searchParams.get("transactionId");
-  const type = searchParams.get("type"); // 'order' or 'booking'
   const paymentMethod = searchParams.get("paymentMethod");
   
 
 
   useEffect(() => {
-    console.log(`ThankYou - useEffect triggered. transactionId: ${transactionId}, type: ${type}, user:`, user, 'authLoading:', authLoading);
+    console.log(`ThankYou - useEffect triggered. transactionId: ${transactionId}, user:`, user, 'authLoading:', authLoading);
     
-    if (!transactionId || !type) {
-      console.error(`ThankYou - Missing required params. transactionId: ${transactionId}, type: ${type}`);
+    if (!transactionId) {
+      console.error(`ThankYou - Missing required params. transactionId: ${transactionId}`);
       setError("Invalid purchase information");
       setLoading(false);
       return;
@@ -62,28 +59,20 @@ const ThankYou = () => {
     
     // Auth is loaded and user exists, fetch purchase data
     fetchPurchaseData();
-  }, [transactionId, type, user, authLoading]);
+  }, [transactionId, user, authLoading]);
 
   // Track purchase completion for analytics
   useEffect(() => {
     if (purchaseData && !loading && !error) {
       // Google Analytics 4 - Enhanced E-commerce Purchase Event
       if (typeof gtag !== 'undefined') {
-        const items = type === "order" ? 
-          purchaseData.items?.map(item => ({
-            item_id: item.productId?._id,
-            item_name: item.productId?.title,
-            category: item.productId?.category,
-            quantity: item.quantity,
-            price: item.productId?.price
-          })) :
-          [{
-            item_id: purchaseData.serviceId?._id,
-            item_name: purchaseData.serviceId?.title,
-            category: purchaseData.serviceId?.category,
-            quantity: 1,
-            price: purchaseData.totalAmount
-          }];
+        const items = purchaseData.items?.map(item => ({
+          item_id: item.productId?._id,
+          item_name: item.productId?.title,
+          category: item.productId?.category,
+          quantity: item.quantity,
+          price: item.productId?.price
+        }));
 
         gtag('event', 'purchase', {
           transaction_id: purchaseData._id,
@@ -96,44 +85,33 @@ const ThankYou = () => {
       // Microsoft Clarity - Custom Purchase Event
       if (typeof clarity !== 'undefined') {
         clarity('event', 'purchase', {
-          type: type,
+          type: 'order',
           amount: purchaseData.totalAmount,
           transaction_id: purchaseData._id
         });
       }
     }
-  }, [purchaseData, loading, error, type]);
+  }, [purchaseData, loading, error]);
 
   const fetchPurchaseData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/thank-you/${type}/${transactionId}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setPurchaseData(data);
-        
-        // Calculate delivery estimate for orders
-        if (type === "order" && data.shippingAddress) {
-          const estimate = calculateDeliveryEstimate({
-            customerProvince: data.shippingAddress.province || "Western",
-            storeProvince: data.storeId?.province || "Western",
-            shippingMethod: data.shippingMethod || "standard",
-            hasPreorderItems: data.items?.some(item => item.productId?.isPreorder),
-            storeProcessingDays: data.storeId?.processingDays || 0
-          });
-          setDeliveryEstimate(estimate);
-        }
-      } else {
-        const errorData = await response.text();
-        throw new Error(`Failed to fetch purchase data: ${response.status}`);
+      const data = await ordersAPI.getThankYouOrder(transactionId);
+      console.log("ThankYou - Fetched purchase data:", data);
+      setPurchaseData(data);
+      
+      // Calculate delivery estimate
+      if (data.shippingAddress) {
+        const estimate = calculateDeliveryEstimate({
+          customerProvince: data.shippingAddress.province || "Western",
+          storeProvince: data.storeId?.province || "Western",
+          shippingMethod: data.shippingMethod || "standard",
+          hasPreorderItems: data.items?.some(item => item.productId?.isPreorder),
+          storeProcessingDays: data.storeId?.processingDays || 0
+        });
+        setDeliveryEstimate(estimate);
       }
     } catch (err) {
       console.error("ThankYou - Error fetching purchase data:", err);
@@ -145,11 +123,11 @@ const ThankYou = () => {
   };
 
   const handleContinueShopping = () => {
-    navigate(type === "order" ? "/products" : "/services");
+    navigate("/products");
   };
 
   const handleViewPurchase = () => {
-    navigate(`/${type === "order" ? "orders" : "bookings"}`);
+    navigate("/orders");
   };
 
   console.log(`ThankYou - Rendering with: loading=${loading}, authLoading=${authLoading}, error=${error}, purchaseData=${!!purchaseData}`);
@@ -191,7 +169,7 @@ const ThankYou = () => {
   console.log("ThankYou - Rendering success state with purchaseData");
   
   const isPending = purchaseData.status === "pending" || purchaseData.paymentStatus === "pending";
-  const isOrder = type === "order";
+  const isOrder = true; // Only handling product orders now
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -231,7 +209,7 @@ const ThankYou = () => {
                 Thank You! 🎉
               </h1>
               <p className="text-gray-600 text-lg">
-                Your {isOrder ? "order" : "booking"} has been confirmed successfully!
+                Your order has been placed successfully!
               </p>
             </div>
           )}
@@ -242,7 +220,7 @@ const ThankYou = () => {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">
-                {isOrder ? "Order" : "Booking"} Details
+                Order Details
               </h3>
               <div className="space-y-2 text-sm">
                 <p><strong>ID:</strong> #{purchaseData._id?.slice(-8).toUpperCase()}</p>
@@ -258,7 +236,7 @@ const ThankYou = () => {
               </div>
             </div>
             
-            {isOrder && deliveryEstimate && (
+            {deliveryEstimate && (
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">
                   <Package className="w-4 h-4 inline mr-1" />
@@ -274,23 +252,6 @@ const ThankYou = () => {
                 </div>
               </div>
             )}
-            
-            {!isOrder && purchaseData.scheduledDate && (
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Service Information
-                </h3>
-                <div className="text-sm">
-                  <p className="font-medium text-blue-700">
-                    Scheduled: {new Date(purchaseData.scheduledDate).toLocaleDateString()}
-                  </p>
-                  <p className="text-gray-600 mt-1">
-                    Duration: {purchaseData.serviceId?.duration || "As needed"}
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -300,7 +261,7 @@ const ThankYou = () => {
             onClick={handleViewPurchase}
             className="flex-1 bg-black text-white py-3 px-6 rounded-lg hover:bg-gray-800 transition-colors text-center"
           >
-            View {isOrder ? "Order" : "Booking"} Details
+            View Order Details
           </button>
           <button
             onClick={handleContinueShopping}
@@ -313,9 +274,7 @@ const ThankYou = () => {
         {/* Detailed Purchase Summary */}
         <div className="mb-8">
           <PurchaseSummary 
-            purchaseData={purchaseData}
-            type={type}
-            deliveryEstimate={deliveryEstimate}
+            data={purchaseData}
           />
         </div>
 
@@ -323,7 +282,6 @@ const ThankYou = () => {
         <div className="mb-8">
           <SocialShareButtons 
             purchaseData={purchaseData}
-            type={type}
           />
         </div>
 
@@ -331,7 +289,6 @@ const ThankYou = () => {
         <div className="mb-8">
           <RecommendationGrid
             purchaseData={purchaseData}
-            type={type}
           />
         </div>
 
@@ -344,37 +301,18 @@ const ThankYou = () => {
             </h3>
             
             <div className="grid md:grid-cols-2 gap-4 mt-4 text-left">
-              {isOrder ? (
-                <>
-                  <div className="bg-white p-4 rounded-lg shadow-sm">
-                    <h4 className="font-semibold text-gray-900 mb-2">📦 Order Updates</h4>
-                    <p className="text-gray-600 text-sm">
-                      Track your order status and get real-time updates via email and SMS.
-                    </p>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg shadow-sm">
-                    <h4 className="font-semibold text-gray-900 mb-2">🚚 Delivery</h4>
-                    <p className="text-gray-600 text-sm">
-                      Your order will be delivered within the estimated timeframe. No need to be home!
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="bg-white p-4 rounded-lg shadow-sm">
-                    <h4 className="font-semibold text-gray-900 mb-2">📅 Service Confirmation</h4>
-                    <p className="text-gray-600 text-sm">
-                      The service provider will contact you 24 hours before your appointment.
-                    </p>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg shadow-sm">
-                    <h4 className="font-semibold text-gray-900 mb-2">⭐ Rate & Review</h4>
-                    <p className="text-gray-600 text-sm">
-                      After service completion, please share your experience to help others.
-                    </p>
-                  </div>
-                </>
-              )}
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <h4 className="font-semibold text-gray-900 mb-2">📦 Order Updates</h4>
+                <p className="text-gray-600 text-sm">
+                  Track your order status and get real-time updates via email and SMS.
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <h4 className="font-semibold text-gray-900 mb-2">🚚 Delivery</h4>
+                <p className="text-gray-600 text-sm">
+                  Your order will be delivered within the estimated timeframe. No need to be home!
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -382,7 +320,7 @@ const ThankYou = () => {
         {/* Customer Support */}
         <div className="text-center mt-8 p-4 bg-gray-100 rounded-lg">
           <p className="text-gray-600 text-sm">
-            Need help with your {isOrder ? "order" : "booking"}? 
+            Need help with your order? 
             <a href="/contact" className="text-blue-600 hover:underline ml-1">Contact Support</a>
           </p>
         </div>

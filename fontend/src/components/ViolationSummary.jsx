@@ -1,9 +1,7 @@
 const ViolationSummary = ({ violations }) => {
   /*const mockViolations = {
     violatedProducts: 5,
-    violatedServices: 2,
     violatedProductImages: 12,
-    violatedServiceImages: 3,
     violatedHeaderImages: 1,
     violatedVariants: true,
   };
@@ -20,18 +18,9 @@ const ViolationSummary = ({ violations }) => {
           {violations?.violatedProducts != null && (
             <li>{violations.violatedProducts} extra products above limit</li>
           )}
-          {violations?.violatedServices != null && (
-            <li>{violations.violatedServices} extra services above limit</li>
-          )}
           {violations?.violatedProductImages != null && (
             <li>
               {violations.violatedProductImages} extra product images above
-              limit
-            </li>
-          )}
-          {violations?.violatedServiceImages != null && (
-            <li>
-              {violations.violatedServiceImages} extra service images above
               limit
             </li>
           )}

@@ -37,7 +37,7 @@ const categorySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["product", "service", "common"],
+      enum: ["product", "common"],
       required: true,
     },
     image: [

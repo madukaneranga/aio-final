@@ -11,6 +11,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { formatLKR } from "../utils/currency";
+import { paymentsAPI, profileAPI } from "../utils/api";
 
 const provinces = [
   "Western",
@@ -25,14 +26,7 @@ const provinces = [
 ];
 
 const Checkout = () => {
-  const {
-    orderItems,
-    bookingItems,
-    orderTotal,
-    bookingTotal,
-    clearOrder,
-    clearBookings,
-  } = useCart();
+  const { orderItems, orderTotal, clearOrder } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -48,16 +42,14 @@ const Checkout = () => {
   const [payhereReady, setPayhereReady] = useState(false);
   const [bankDetailsForSelection, setBankDetailsForSelection] = useState(null);
 
-  const totalItems =
-    orderItems.reduce((sum, item) => sum + item.quantity, 0) +
-    bookingItems.length;
-  const subtotal = orderTotal + bookingTotal;
+  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = orderTotal;
   const platformFee = subtotal * 0.07;
   const grandTotal = subtotal + platformFee;
 
   // Load PayHere script and detect when ready
   useEffect(() => {
-    if (orderItems.length || bookingItems.length) {
+    if (orderItems.length) {
       fetchPaymentMethods();
     }
 
@@ -76,46 +68,28 @@ const Checkout = () => {
     } else {
       setPayhereReady(true);
     }
-  }, [orderItems, bookingItems, user]);
+  }, [orderItems, user]);
 
   // Fetch bank details when bank transfer is selected
   useEffect(() => {
-    if (selectedPaymentMethod === "bank_transfer" && (orderItems.length > 0 || bookingItems.length > 0)) {
+    if (selectedPaymentMethod === "bank_transfer" && orderItems.length > 0) {
       fetchBankDetailsForPreview();
     }
-  }, [selectedPaymentMethod, orderItems, bookingItems, grandTotal]);
+  }, [selectedPaymentMethod, orderItems, grandTotal]);
 
   // Fetch bank details for preview when bank transfer is selected
   const fetchBankDetailsForPreview = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/payments/bank-transfer-preview`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            orderItems: orderItems.map(item => ({
-              productId: item.id,
-              quantity: item.quantity,
-              price: item.price
-            })),
-            bookingItems: bookingItems.map(item => ({
-              serviceId: item.id,
-              selectedDate: item.selectedDate,
-              selectedTime: item.selectedTime,
-              price: item.price
-            })),
-            shippingAddress,
-            totalAmount: grandTotal
-          })
-        }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        setBankDetailsForSelection(data);
-      }
+      const response = await paymentsAPI.getBankTransferPreview({
+        orderItems: orderItems.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        shippingAddress,
+        totalAmount: grandTotal,
+      });
+      setBankDetailsForSelection(response);
     } catch (error) {
       console.error("Error fetching bank details preview:", error);
     }
@@ -123,52 +97,39 @@ const Checkout = () => {
 
   const fetchPaymentMethods = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/payments/payment-methods`
-      );
-      if (response.ok) {
-        const methods = await response.json();
-        
-        // Check user verification status for COD
-        if (user) {
-          try {
-            const verificationResponse = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/users/verification-status`,
-              { credentials: "include" }
-            );
-            
-            if (verificationResponse.ok) {
-              const verificationData = await verificationResponse.json();
-              const isVerified = verificationData.verificationStatus === "verified";
-              
-              // Update COD availability based on verification status
-              const updatedMethods = methods.map(method => {
-                if (method.id === "cod") {
-                  return { ...method, available: isVerified };
-                }
-                return method;
-              });
-              
-              setPaymentMethods(updatedMethods);
-            } else {
-              setPaymentMethods(methods);
-            }
-          } catch (verificationError) {
-            console.error("Error checking verification status:", verificationError);
-            setPaymentMethods(methods);
-          }
-        } else {
-          // If no user, disable COD
-          const updatedMethods = methods.map(method => {
+      const methods = await paymentsAPI.getMethods();
+
+      // Check user verification status for COD
+      if (user) {
+        try {
+          const verificationData = await profileAPI.getVerificationStatus();
+          const isVerified = verificationData.verificationStatus === "verified";
+
+          // Update COD availability based on verification status
+          const updatedMethods = methods.map((method) => {
             if (method.id === "cod") {
-              return { ...method, available: false };
+              return { ...method, available: isVerified };
             }
             return method;
           });
+
           setPaymentMethods(updatedMethods);
+        } catch (verificationError) {
+          console.error(
+            "Error checking verification status:",
+            verificationError
+          );
+          setPaymentMethods(methods);
         }
       } else {
-        console.error("Failed to fetch payment methods:", response.status);
+        // If no user, disable COD
+        const updatedMethods = methods.map((method) => {
+          if (method.id === "cod") {
+            return { ...method, available: false };
+          }
+          return method;
+        });
+        setPaymentMethods(updatedMethods);
       }
     } catch (error) {
       console.error("Error fetching payment methods:", error);
@@ -222,15 +183,24 @@ const Checkout = () => {
       return;
     }
 
+    if (orderItems.length === 0) {
+      alert("Your cart is empty");
+      return;
+    }
+
     if (
-      orderItems.length > 0 &&
-      (!shippingAddress.street ||
-        !shippingAddress.city ||
-        !shippingAddress.state ||
-        !shippingAddress.zipCode ||
-        isNaN(shippingAddress.zipCode))
+      !shippingAddress.street?.trim() ||
+      !shippingAddress.city?.trim() ||
+      !shippingAddress.state?.trim() ||
+      !shippingAddress.zipCode?.trim()
     ) {
-      alert("Please fill in all shipping address fields correctly");
+      alert("Please fill in all required shipping address fields");
+      return;
+    }
+
+    // Validate postal code format for Sri Lanka (5 digits)
+    if (!/^\d{5}$/.test(shippingAddress.zipCode.trim())) {
+      alert("Please enter a valid 5-digit postal code");
       return;
     }
 
@@ -243,74 +213,58 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      let endpoint = "";
-      switch (selectedPaymentMethod) {
-        case "payhere":
-          endpoint = "/api/payments/payhere-intent";
-          break;
-        case "bank_transfer":
-          endpoint = "/api/payments/bank-transfer-intent";
-          break;
-        case "cod":
-          endpoint = "/api/payments/cod-intent";
-          break;
-        default:
-          alert("Please select a payment method");
-          setLoading(false);
-          return;
-      }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}${endpoint}`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            paymentMethod: selectedPaymentMethod,
-            orderItems: orderItems.map((item) => ({
-              productId: item.id,
-              quantity: item.quantity,
-              storeId:
-                typeof item.storeId === "object"
-                  ? item.storeId._id
-                  : item.storeId || "unknown",
-            })),
-            bookingItems: bookingItems.map((item) => ({
-              serviceId: item.id,
-              storeId: item.storeId, 
-              bookingDetails: {
-                date: new Date(item.bookingDetails.date), 
-                startTime: item.bookingDetails.time, 
-                endTime: item.bookingDetails.endTime, 
-                duration: item.duration || item.bookingDetails.duration, 
-                timeZone: "Asia/Colombo", 
-              },
-              notes: item.bookingDetails.notes || item.notes, 
-            })),
-            shippingAddress,
-          }),
-        }
-      );
+      const orderData = {
+        paymentMethod: selectedPaymentMethod,
+        orderItems: orderItems.map((item) => ({
+          productId: item.id,
+          quantity: Number(item.quantity) || 1,
+          price: Number(item.price) || 0,
+          storeId:
+            typeof item.storeId === "object"
+              ? item.storeId._id
+              : item.storeId || "unknown",
+        })),
+        shippingAddress: {
+          ...shippingAddress,
+          street: shippingAddress.street.trim(),
+          city: shippingAddress.city.trim(),
+          state: shippingAddress.state.trim(),
+          zipCode: shippingAddress.zipCode.trim(),
+        },
+        totalAmount: Number(grandTotal) || 0,
+      };
 
-      if (!response.ok) {
-        const data = await response.json();
-        if (data.requiresVerification) {
-          alert("Document verification required for Cash on Delivery. Please upload your ID/Passport in your profile settings.");
+      let responseData;
+      try {
+        responseData = await paymentsAPI.initialize(
+          orderData,
+          selectedPaymentMethod
+        );
+      } catch (error) {
+        console.error("Payment initialization error:", error);
+        if (error.message && error.message.includes("verification")) {
+          alert(
+            "Document verification required for Cash on Delivery. Please upload your ID/Passport in your profile settings."
+          );
           navigate("/profile");
           setLoading(false);
           return;
         }
-        alert(
-          `Payment creation failed: ${data.error || "Unknown error"}`
-        );
+        if (error.message && error.message.includes("stock")) {
+          alert("Some items in your cart are out of stock. Please review your cart and try again.");
+          setLoading(false);
+          return;
+        }
+        if (error.message && error.message.includes("bank")) {
+          alert("Bank details not available for this store. Please try another payment method.");
+          setLoading(false);
+          return;
+        }
+        alert(`Payment creation failed: ${error.message || "Unknown error"}`);
         setLoading(false);
         return;
       }
-
-      const responseData = await response.json();
 
       if (selectedPaymentMethod === "payhere") {
         const { paymentParams } = responseData;
@@ -323,46 +277,44 @@ const Checkout = () => {
         // Start PayHere payment
         try {
           const paymentResult = await startPayHerePayment(paymentParams);
-          
+
           if (paymentResult.success) {
             // Only clear cart if payment was successful
             clearOrder();
-            clearBookings();
-            
+
             // Navigate to thank you page with transaction ID
-            const transactionId = responseData.transactionId || responseData._id;
-            const type = bookingItems.length > 0 ? "booking" : "order";
-            console.log(`Checkout - PayHere success. Navigating with transactionId: ${transactionId}, type: ${type}`);
+            const transactionId =
+              responseData.transactionId || responseData._id;
             console.log(`Checkout - Full responseData:`, responseData);
-            navigate(`/thank-you?transactionId=${transactionId}&type=${type}&paymentMethod=payhere`);
+            navigate(
+              `/thank-you?transactionId=${transactionId}&paymentMethod=payhere`
+            );
           }
         } catch (paymentError) {
-          console.log("PayHere payment failed or cancelled:", paymentError.message);
+          console.log(
+            "PayHere payment failed or cancelled:",
+            paymentError.message
+          );
           // Don't clear cart or navigate - user stays on checkout page
           setLoading(false);
           return;
         }
-        
       } else if (selectedPaymentMethod === "bank_transfer") {
         // Clear cart and navigate directly to thank you page
         clearOrder();
-        clearBookings();
-        
+
         // Navigate to thank you page with transaction ID
         const transactionId = responseData.transactionId || responseData._id;
-        const type = bookingItems.length > 0 ? "booking" : "order";
-        console.log(`Checkout - Bank Transfer success. Navigating with transactionId: ${transactionId}, type: ${type}`);
-        navigate(`/thank-you?transactionId=${transactionId}&type=${type}&paymentMethod=bank_transfer`);
+        navigate(
+          `/thank-you?transactionId=${transactionId}&paymentMethod=bank_transfer`
+        );
       } else if (selectedPaymentMethod === "cod") {
         clearOrder();
-        clearBookings();
-        
+
         // Navigate to thank you page with transaction ID
         const transactionId = responseData.transactionId || responseData._id;
-        const type = bookingItems.length > 0 ? "booking" : "order";
-        console.log(`Checkout - COD success. Navigating with transactionId: ${transactionId}, type: ${type}`);
         console.log(`Checkout - Full responseData:`, responseData);
-        navigate(`/thank-you?transactionId=${transactionId}&type=${type}&paymentMethod=cod`);
+        navigate(`/thank-you?transactionId=${transactionId}&paymentMethod=cod`);
       }
     } catch (error) {
       console.error("Checkout error:", error);
@@ -415,93 +367,91 @@ const Checkout = () => {
           {/* Checkout Form */}
           <div className="space-y-6">
             {/* Shipping Address */}
-            {orderItems.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Shipping Address
-                </h2>
-                <div className="space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Shipping Address
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Street Address *
+                  </label>
+                  <input
+                    type="text"
+                    name="street"
+                    value={shippingAddress.street}
+                    onChange={handleAddressChange}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    placeholder="123 Main Street"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Street Address *
+                      City *
                     </label>
                     <input
                       type="text"
-                      name="street"
-                      value={shippingAddress.street}
+                      name="city"
+                      value={shippingAddress.city}
                       onChange={handleAddressChange}
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                      placeholder="123 Main Street"
+                      placeholder="Colombo"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        name="city"
-                        value={shippingAddress.city}
-                        onChange={handleAddressChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                        placeholder="Colombo"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Province *
-                      </label>
-                      <select
-                        name="state"
-                        value={shippingAddress.state}
-                        onChange={handleAddressChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                      >
-                        <option value="">Select Province</option>
-                        <option value="Western">Western</option>
-                        <option value="Central">Central</option>
-                        <option value="Southern">Southern</option>
-                        <option value="Northern">Northern</option>
-                        <option value="Eastern">Eastern</option>
-                        <option value="North Western">North Western</option>
-                        <option value="North Central">North Central</option>
-                        <option value="Uva">Uva</option>
-                        <option value="Sabaragamuwa">Sabaragamuwa</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Province *
+                    </label>
+                    <select
+                      name="state"
+                      value={shippingAddress.state}
+                      onChange={handleAddressChange}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    >
+                      <option value="">Select Province</option>
+                      <option value="Western">Western</option>
+                      <option value="Central">Central</option>
+                      <option value="Southern">Southern</option>
+                      <option value="Northern">Northern</option>
+                      <option value="Eastern">Eastern</option>
+                      <option value="North Western">North Western</option>
+                      <option value="North Central">North Central</option>
+                      <option value="Uva">Uva</option>
+                      <option value="Sabaragamuwa">Sabaragamuwa</option>
+                    </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Postal Code *
-                      </label>
-                      <input
-                        type="text"
-                        name="zipCode"
-                        value={shippingAddress.zipCode}
-                        onChange={handleAddressChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                        placeholder="10001"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Country
-                      </label>
-                      <input
-                        type="text"
-                        name="country"
-                        value={shippingAddress.country}
-                        onChange={handleAddressChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-gray-100 cursor-not-allowed"
-                        readOnly
-                      />
-                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Postal Code *
+                    </label>
+                    <input
+                      type="text"
+                      name="zipCode"
+                      value={shippingAddress.zipCode}
+                      onChange={handleAddressChange}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                      placeholder="10001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      name="country"
+                      value={shippingAddress.country}
+                      onChange={handleAddressChange}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-gray-100 cursor-not-allowed"
+                      readOnly
+                    />
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Payment Method */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
@@ -582,85 +532,120 @@ const Checkout = () => {
                 </div>
 
                 {/* Bank Transfer Details - Show when selected */}
-                {selectedPaymentMethod === "bank_transfer" && bankDetailsForSelection && (
-                  <div className="mt-6 p-6 bg-white border-2 border-gray-300 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Bank Transfer Instructions
-                    </h3>
-                    
-                    <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-800 font-medium mb-2">
-                        Please transfer LKR {formatLKR(grandTotal)} to the bank account(s) below:
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Bank details will also be available in your Orders section after checkout.
-                      </p>
-                    </div>
+                {selectedPaymentMethod === "bank_transfer" &&
+                  bankDetailsForSelection && (
+                    <div className="mt-6 p-6 bg-white border-2 border-gray-300 rounded-lg">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Bank Transfer Instructions
+                      </h3>
 
-                    {bankDetailsForSelection.bankDetails?.map((bank, index) => (
-                      <div key={index} className="mb-4 p-4 border border-gray-300 rounded-lg bg-white">
-                        <h4 className="text-md font-semibold text-gray-900 mb-3">
-                          {bank.storeName}
-                        </h4>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-sm">
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bank Name</label>
-                            <p className="text-gray-900 font-medium">{bank.bankDetails.bankName}</p>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Account Holder</label>
-                            <p className="text-gray-900 font-medium">{bank.bankDetails.accountHolderName}</p>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Account Number</label>
-                            <p className="text-gray-900 font-mono font-bold">{bank.bankDetails.accountNumber}</p>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Branch</label>
-                            <p className="text-gray-900 font-medium">{bank.bankDetails.branchName}</p>
-                          </div>
-                          {bank.bankDetails.routingNumber && (
-                            <div className="md:col-span-2">
-                              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Routing Number</label>
-                              <p className="text-gray-900 font-mono font-bold">{bank.bankDetails.routingNumber}</p>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="bg-gray-100 p-3 rounded-lg border border-gray-200">
-                          <p className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Contact Store After Transfer:</p>
-                          <div className="flex flex-wrap gap-3">
-                            {bank.contactInfo.whatsapp && (
-                              <a
-                                href={`https://wa.me/${bank.contactInfo.whatsapp.replace(/\D/g, '')}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-900 hover:text-black font-medium text-sm"
-                              >
-                                WhatsApp: {bank.contactInfo.whatsapp}
-                              </a>
-                            )}
-                            {bank.contactInfo.email && (
-                              <a
-                                href={`mailto:${bank.contactInfo.email}`}
-                                className="text-gray-900 hover:text-black font-medium text-sm"
-                              >
-                                Email: {bank.contactInfo.email}
-                              </a>
-                            )}
-                          </div>
-                        </div>
+                      <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-gray-800 font-medium mb-2">
+                          Please transfer LKR {formatLKR(grandTotal)} to the
+                          bank account(s) below:
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Bank details will also be available in your Orders
+                          section after checkout.
+                        </p>
                       </div>
-                    ))}
 
-                    <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
-                      <p className="text-gray-800 text-sm">
-                        <strong>Important:</strong> Please contact the store via WhatsApp or email after making the transfer with your payment receipt for order confirmation.
-                      </p>
+                      {bankDetailsForSelection.bankDetails?.map(
+                        (bank, index) => (
+                          <div
+                            key={index}
+                            className="mb-4 p-4 border border-gray-300 rounded-lg bg-white"
+                          >
+                            <h4 className="text-md font-semibold text-gray-900 mb-3">
+                              {bank.storeName}
+                            </h4>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-sm">
+                              <div>
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                  Bank Name
+                                </label>
+                                <p className="text-gray-900 font-medium">
+                                  {bank.bankDetails.bankName}
+                                </p>
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                  Account Holder
+                                </label>
+                                <p className="text-gray-900 font-medium">
+                                  {bank.bankDetails.accountHolderName}
+                                </p>
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                  Account Number
+                                </label>
+                                <p className="text-gray-900 font-mono font-bold">
+                                  {bank.bankDetails.accountNumber}
+                                </p>
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                  Branch
+                                </label>
+                                <p className="text-gray-900 font-medium">
+                                  {bank.bankDetails.branchName}
+                                </p>
+                              </div>
+                              {bank.bankDetails.routingNumber && (
+                                <div className="md:col-span-2">
+                                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                    Routing Number
+                                  </label>
+                                  <p className="text-gray-900 font-mono font-bold">
+                                    {bank.bankDetails.routingNumber}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="bg-gray-100 p-3 rounded-lg border border-gray-200">
+                              <p className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
+                                Contact Store After Transfer:
+                              </p>
+                              <div className="flex flex-wrap gap-3">
+                                {bank.contactInfo.whatsapp && (
+                                  <a
+                                    href={`https://wa.me/${bank.contactInfo.whatsapp.replace(
+                                      /\D/g,
+                                      ""
+                                    )}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-gray-900 hover:text-black font-medium text-sm"
+                                  >
+                                    WhatsApp: {bank.contactInfo.whatsapp}
+                                  </a>
+                                )}
+                                {bank.contactInfo.email && (
+                                  <a
+                                    href={`mailto:${bank.contactInfo.email}`}
+                                    className="text-gray-900 hover:text-black font-medium text-sm"
+                                  >
+                                    Email: {bank.contactInfo.email}
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      )}
+
+                      <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+                        <p className="text-gray-800 text-sm">
+                          <strong>Important:</strong> Please contact the store
+                          via WhatsApp or email after making the transfer with
+                          your payment receipt for order confirmation.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             </div>
           </div>
@@ -672,79 +657,37 @@ const Checkout = () => {
             </h2>
 
             {/* Cart Items */}
-            {orderItems.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-medium text-gray-900 mb-3">Products</h3>
-                <div className="space-y-3">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-3">
-                      <img
-                        src={
-                          item.image
-                            ? item.image.startsWith("http")
-                              ? item.image
-                              : `${import.meta.env.VITE_API_URL}${item.image}`
-                            : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
-                        }
-                        alt={item.title}
-                        className="w-12 h-12 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
-                          {item.title}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Qty: {item.quantity}
-                        </p>
-                      </div>
+            <div className="mb-6">
+              <h3 className="font-medium text-gray-900 mb-3">Products</h3>
+              <div className="space-y-3">
+                {orderItems.map((item) => (
+                  <div key={item.id} className="flex items-center space-x-3">
+                    <img
+                      src={
+                        item.image
+                          ? item.image.startsWith("http")
+                            ? item.image
+                            : `${import.meta.env.VITE_API_URL}${item.image}`
+                          : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop"
+                      }
+                      alt={item.title}
+                      className="w-12 h-12 object-cover rounded"
+                    />
+                    <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">
-                        {formatLKR(item.price * item.quantity)}
+                        {item.title}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Qty: {item.quantity}
                       </p>
                     </div>
-                  ))}
-                </div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {formatLKR(item.price * item.quantity)}
+                    </p>
+                  </div>
+                ))}
               </div>
-            )}
-
-            {/* Booking Items */}
-            {bookingItems.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-medium text-gray-900 mb-3">
-                  Service Bookings
-                </h3>
-                <div className="space-y-3">
-                  {bookingItems.map((item, index) => (
-                    <div
-                      key={`${item.id}-${index}`}
-                      className="flex items-center space-x-3"
-                    >
-                      <img
-                        src={
-                          item.image
-                            ? item.image.startsWith("http")
-                              ? item.image
-                              : `${import.meta.env.VITE_API_URL}${item.image}`
-                            : "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop"
-                        }
-                        alt={item.title}
-                        className="w-12 h-12 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
-                          {item.title}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {item.date} at {item.time}
-                        </p>
-                      </div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatLKR(item.price)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
 
             {/* Totals */}
             <div className="space-y-3 border-t pt-4">
@@ -772,7 +715,6 @@ const Checkout = () => {
           </div>
         </div>
       </div>
-
     </div>
   );
 };

@@ -78,10 +78,15 @@ const orderSchema = new mongoose.Schema({
     paidAt: Date,
     paymentMethod: {
       type: String,
-      enum: ["stripe", "bank_transfer", "cod", "wallet"],
+      enum: ["stripe", "bank_transfer", "cod", "wallet", "payhere"],
     },
     authorizationToken: String,
     bankTransferReference: String,
+    payhereFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     updatedAt: Date,
     updatedBy: String,
   },

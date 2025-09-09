@@ -5,6 +5,7 @@ import ImageUpload from "../components/ImageUpload";
 import ColorThemeSelector from "../components/ColorThemeSelector";
 import LoadingSpinner from "../components/LoadingSpinner";
 import imageCompression from "browser-image-compression";
+import { storesAPI, subscriptionsAPI, reviewsAPI } from "../utils/api";
 import {
   Store,
   Camera,
@@ -12,8 +13,6 @@ import {
   EyeOff,
   MessageSquare,
   Star,
-  Clock,
-  Calendar,
   Plus,
   Trash2,
   Settings,
@@ -61,23 +60,11 @@ const StoreManagement = () => {
     name: "",
     description: "",
     themeColor: "#000000",
-    storeType: "product",
     contactInfo: {
       email: "",
       phone: "",
       address: "",
       whatsapp: "",
-    },
-    serviceSettings: {
-      workingHours: {
-        start: "09:00",
-        end: "17:00",
-      },
-      workingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-      excludedDates: [],
-      timeZone: "Asia/Colombo",
-      bookingBuffer: 0,
-      advanceBookingDays: 30,
     },
     shippingInfo: {
       freeShipping: false,
@@ -99,7 +86,6 @@ const StoreManagement = () => {
 
   const [heroImages, setHeroImages] = useState([]);
   const [profileImage, setProfileImage] = useState(null);
-  const [newExcludedDate, setNewExcludedDate] = useState("");
   const [newDeliveryArea, setNewDeliveryArea] = useState("");
 
   // Verification documents state
@@ -107,85 +93,52 @@ const StoreManagement = () => {
   const [addressImages, setAddressImages] = useState([]);
   const [canReuploadDocs, setCanReuploadDocs] = useState(false);
 
-  const weekDays = [
-    { value: "monday", label: "Monday" },
-    { value: "tuesday", label: "Tuesday" },
-    { value: "wednesday", label: "Wednesday" },
-    { value: "thursday", label: "Thursday" },
-    { value: "friday", label: "Friday" },
-    { value: "saturday", label: "Saturday" },
-    { value: "sunday", label: "Sunday" },
-  ];
-
   useEffect(() => {
-  if (authLoading) return; // Wait for auth to complete
-  
-  if (user?.role === "store_owner" && user?.storeId) {
-    fetchStoreData();
-    fetchReviews();
-  } else {
-    navigate("/dashboard");
-  }
-}, [user, navigate, authLoading]);
+    if (authLoading) return; // Wait for auth to complete
+
+    if (user?.role === "store_owner" && user?.storeId) {
+      fetchStoreData();
+      fetchReviews();
+    } else {
+      navigate("/dashboard");
+    }
+  }, [user, navigate, authLoading]);
 
   const fetchStoreData = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/${user.storeId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setStore(data.store);
-        setFormData({
-          name: data.store.name || "",
-          description: data.store.description || "",
-          themeColor: data.store.themeColor || "#000000",
-          storeType: data.store.storeType || "product",
-          contactInfo: data.store.contactInfo || {
-            email: "",
-            phone: "",
-            address: "",
-            whatsapp: "",
-          },
-          serviceSettings: data.store.serviceSettings || {
-            workingHours: { start: "09:00", end: "17:00" },
-            workingDays: [
-              "monday",
-              "tuesday",
-              "wednesday",
-              "thursday",
-              "friday",
-            ],
-            excludedDates: [],
-            timeZone: "Asia/Colombo",
-            bookingBuffer: 0,
-            advanceBookingDays: 30,
-          },
-          shippingInfo: data.store.shippingInfo || {
-            freeShipping: false,
-            deliveryDaysMin: 3,
-            deliveryDaysMax: 7,
-            areas: [],
-          },
-          socialLinks: data.store.socialLinks || [],
-        });
+      const data = await storesAPI.getById(user.storeId);
+      setStore(data.store);
+      setFormData({
+        name: data.store.name || "",
+        description: data.store.description || "",
+        themeColor: data.store.themeColor || "#000000",
+        contactInfo: data.store.contactInfo || {
+          email: "",
+          phone: "",
+          address: "",
+          whatsapp: "",
+        },
+        shippingInfo: data.store.shippingInfo || {
+          freeShipping: false,
+          deliveryDaysMin: 3,
+          deliveryDaysMax: 7,
+          areas: [],
+        },
+        socialLinks: data.store.socialLinks || {},
+      });
 
-        // Check if user can reupload documents
-        setCanReuploadDocs(data.store.canReuploadDocs || false);
-      }
+      // Check if user can reupload documents
+      setCanReuploadDocs(data.store.canReuploadDocs || false);
 
       // Fetch subscription
-      const subscriptionResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/subscriptions/my-subscription`,
-        {
-          credentials: "include",
-        }
-      );
-      if (!subscriptionResponse.ok) {
-        throw new Error("Failed to fetch subscription");
+      try {
+        const subscriptionData = await subscriptionsAPI.getMySubscription();
+        setSubscription(subscriptionData);
+      } catch (subscriptionError) {
+        console.error("Error fetching subscription:", subscriptionError);
+        // Set default pending subscription instead of null  
+        setSubscription({ subscription: { status: "pending", package: null }, isSubscribed: false });
       }
-      const subscriptionData = await subscriptionResponse.json();
-      setSubscription(subscriptionData);
     } catch (error) {
       console.error("Error fetching store:", error);
       setError("Failed to load store data");
@@ -196,16 +149,8 @@ const StoreManagement = () => {
 
   const fetchReviews = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/reviews/manage`,
-        {
-          credentials: "include",
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setReviews(data);
-      }
+      const data = await reviewsAPI.getStoreReviews(user.storeId);
+      setReviews(data);
     } catch (error) {
       console.error("Error fetching reviews:", error);
     }
@@ -243,35 +188,16 @@ const StoreManagement = () => {
         name: formData.name,
         description: formData.description,
         themeColor: formData.themeColor,
-        storeType: formData.storeType,
         contactInfo: formData.contactInfo,
         heroImages: finalImages,
-        serviceSettings: formData.serviceSettings,
         shippingInfo: formData.shippingInfo,
         socialLinks: formData.socialLinks,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/${store._id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (response.ok) {
-        const updatedStore = await response.json();
-        setStore(updatedStore);
-        setHeroImages([]);
-        setSuccess("Store updated successfully!");
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to update store");
-      }
+      const updatedStore = await storesAPI.update(store._id, payload);
+      setStore(updatedStore);
+      setHeroImages([]);
+      setSuccess("Store updated successfully!");
     } catch (error) {
       setError("Network error. Please try again." + error);
     } finally {
@@ -300,27 +226,13 @@ const StoreManagement = () => {
         profileImage: imageUrl,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/${store._id}/profile-image`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
+      const updatedStore = await storesAPI.updateProfileImage(
+        store._id,
+        payload
       );
-
-      if (response.ok) {
-        const updatedStore = await response.json();
-        setStore(updatedStore);
-        setProfileImage(null);
-        setSuccess("Profile image updated successfully!");
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to update profile image");
-      }
+      setStore(updatedStore);
+      setProfileImage(null);
+      setSuccess("Profile image updated successfully!");
     } catch (error) {
       setError("Network error. Please try again." + error);
     }
@@ -357,36 +269,20 @@ const StoreManagement = () => {
         [type === "id" ? "idImages" : "addressVerificationImages"]: imageUrls,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/${
-          store._id
-        }/verification-docs`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
+      const updatedStore = await storesAPI.updateVerificationDocs(
+        store._id,
+        payload
       );
-
-      if (response.ok) {
-        const updatedStore = await response.json();
-        setStore(updatedStore);
-        if (type === "id") setIdImages([]);
-        else setAddressImages([]);
-        setSuccess(
-          `${
-            type === "id" ? "ID" : "Address"
-          } verification documents uploaded successfully!`
-        );
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to upload verification documents");
-      }
+      setStore(updatedStore);
+      if (type === "id") setIdImages([]);
+      else setAddressImages([]);
+      setSuccess(
+        `${
+          type === "id" ? "ID" : "Address"
+        } verification documents uploaded successfully!`
+      );
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error("Upload error:", error);
       setError("Network error. Please try again: " + error.message);
     } finally {
       setSaving(false);
@@ -405,32 +301,6 @@ const StoreManagement = () => {
           [field]: value,
         },
       }));
-    } else if (name.startsWith("serviceSettings.")) {
-      const parts = name.split(".");
-      if (parts.length === 3) {
-        // Handle nested objects like workingHours.start
-        const [, section, field] = parts;
-        setFormData((prev) => ({
-          ...prev,
-          serviceSettings: {
-            ...prev.serviceSettings,
-            [section]: {
-              ...prev.serviceSettings[section],
-              [field]: value,
-            },
-          },
-        }));
-      } else {
-        // Handle direct fields like timeZone
-        const field = parts[1];
-        setFormData((prev) => ({
-          ...prev,
-          serviceSettings: {
-            ...prev.serviceSettings,
-            [field]: type === "number" ? parseInt(value) || 0 : value,
-          },
-        }));
-      }
     } else if (name.startsWith("shippingInfo.")) {
       const field = name.split(".")[1];
       setFormData((prev) => ({
@@ -462,49 +332,6 @@ const StoreManagement = () => {
     }
   };
 
-  const handleWorkingDaysChange = (day) => {
-    setFormData((prev) => ({
-      ...prev,
-      serviceSettings: {
-        ...prev.serviceSettings,
-        workingDays: prev.serviceSettings.workingDays.includes(day)
-          ? prev.serviceSettings.workingDays.filter((d) => d !== day)
-          : [...prev.serviceSettings.workingDays, day],
-      },
-    }));
-  };
-
-  const addExcludedDate = () => {
-    if (
-      newExcludedDate &&
-      !formData.serviceSettings.excludedDates.includes(newExcludedDate)
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        serviceSettings: {
-          ...prev.serviceSettings,
-          excludedDates: [
-            ...prev.serviceSettings.excludedDates,
-            newExcludedDate,
-          ],
-        },
-      }));
-      setNewExcludedDate("");
-    }
-  };
-
-  const removeExcludedDate = (dateToRemove) => {
-    setFormData((prev) => ({
-      ...prev,
-      serviceSettings: {
-        ...prev.serviceSettings,
-        excludedDates: prev.serviceSettings.excludedDates.filter(
-          (date) => date !== dateToRemove
-        ),
-      },
-    }));
-  };
-
   const addDeliveryArea = () => {
     if (
       newDeliveryArea.trim() &&
@@ -534,22 +361,9 @@ const StoreManagement = () => {
   const toggleReviewVisibility = async (reviewId, isVisible) => {
     try {
       if (subscription && subscription.package === "standard") {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/reviews/${reviewId}/visibility`,
-          {
-            method: "PUT",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ isVisible }),
-          }
-        );
-
-        if (response.ok) {
-          fetchReviews();
-          setSuccess(`Review ${isVisible ? "shown" : "hidden"} successfully!`);
-        }
+        await reviewsAPI.updateVisibility(reviewId,  isVisible );
+        fetchReviews();
+        setSuccess(`Review ${isVisible ? "shown" : "hidden"} successfully!`);
       } else {
         setInvitation(
           "To manage reviews and enhance your brand credibility, simply upgrade your package. It's quick, easy, and unlocks powerful features to grow your business."
@@ -562,22 +376,10 @@ const StoreManagement = () => {
 
   const respondToReview = async (reviewId, message) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/reviews/${reviewId}/respond`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ message }),
-        }
-      );
-
-      if (response.ok) {
-        fetchReviews();
-        setSuccess("Response added successfully!");
-      }
+      console.log(reviewId, message);
+      await reviewsAPI.respondToReview(reviewId, message);
+      fetchReviews();
+      setSuccess("Response added successfully!");
     } catch (error) {
       setError("Failed to respond to review");
     }
@@ -628,13 +430,13 @@ const StoreManagement = () => {
     };
   };
 
- if (authLoading || loading) {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <LoadingSpinner size="xl" />
-    </div>
-  );
-}
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="xl" />
+      </div>
+    );
+  }
 
   if (!store) {
     return (
@@ -686,9 +488,9 @@ const StoreManagement = () => {
                     <Icon className="w-5 h-5" />
                     <span>
                       {tab.name}
-                      {tab.id === "reviews" && reviews.length > 0 && (
+                      {tab.id === "reviews" && reviews.filter(review => !review.response).length > 0 && (
                         <span className="ml-1 bg-black text-white text-xs px-2 py-1 rounded-full">
-                          {reviews.length}
+                          {reviews.filter(review => !review.response).length}
                         </span>
                       )}
                     </span>
@@ -837,195 +639,6 @@ const StoreManagement = () => {
                 />
               </div>
 
-              {/* Service Settings - Only show for service stores */}
-              {store.type === "service" && (
-                <div className="border-t pt-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
-                    <Clock className="w-5 h-5 mr-2" />
-                    Service & Booking Settings
-                  </h3>
-
-                  <div className="space-y-6">
-                    {/* Working Hours */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Working Hours
-                      </label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            Start Time
-                          </label>
-                          <input
-                            type="time"
-                            name="serviceSettings.workingHours.start"
-                            value={formData.serviceSettings.workingHours.start}
-                            onChange={handleChange}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            End Time
-                          </label>
-                          <input
-                            type="time"
-                            name="serviceSettings.workingHours.end"
-                            value={formData.serviceSettings.workingHours.end}
-                            onChange={handleChange}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Working Days */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Working Days
-                      </label>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        {weekDays.map((day) => (
-                          <label
-                            key={day.value}
-                            className="flex items-center space-x-2 cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.serviceSettings.workingDays.includes(
-                                day.value
-                              )}
-                              onChange={() =>
-                                handleWorkingDaysChange(day.value)
-                              }
-                              className="w-4 h-4 text-black focus:ring-black border-gray-300 rounded"
-                            />
-                            <span className="text-sm text-gray-700">
-                              {day.label}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Excluded Dates */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Excluded Dates (Holidays/Closures)
-                      </label>
-                      <div className="space-y-3">
-                        <div className="flex space-x-2">
-                          <input
-                            type="date"
-                            value={newExcludedDate}
-                            onChange={(e) => setNewExcludedDate(e.target.value)}
-                            min={new Date().toISOString().split("T")[0]}
-                            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                          />
-                          <button
-                            type="button"
-                            onClick={addExcludedDate}
-                            className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                        {formData.serviceSettings.excludedDates.length > 0 && (
-                          <div className="space-y-2">
-                            {formData.serviceSettings.excludedDates.map(
-                              (date, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
-                                >
-                                  <span className="text-sm text-gray-700">
-                                    {new Date(date).toLocaleDateString()}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeExcludedDate(date)}
-                                    className="text-red-500 hover:text-red-700"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Additional Settings */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Booking Buffer (minutes)
-                        </label>
-                        <input
-                          type="number"
-                          name="serviceSettings.bookingBuffer"
-                          value={formData.serviceSettings.bookingBuffer}
-                          onChange={handleChange}
-                          min="0"
-                          max="60"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                          placeholder="0"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Buffer time between bookings
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Advance Booking Days
-                        </label>
-                        <input
-                          type="number"
-                          name="serviceSettings.advanceBookingDays"
-                          value={formData.serviceSettings.advanceBookingDays}
-                          onChange={handleChange}
-                          min="1"
-                          max="365"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                          placeholder="30"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          How far in advance customers can book
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Time Zone
-                        </label>
-                        <select
-                          name="serviceSettings.timeZone"
-                          value={formData.serviceSettings.timeZone}
-                          onChange={handleChange}
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                        >
-                          <option value="Asia/Colombo">
-                            Asia/Colombo (Sri Lanka)
-                          </option>
-                          <option value="Asia/Kolkata">
-                            Asia/Kolkata (India)
-                          </option>
-                          <option value="UTC">UTC</option>
-                          <option value="America/New_York">
-                            America/New_York (EST)
-                          </option>
-                          <option value="Europe/London">
-                            Europe/London (GMT)
-                          </option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Color Theme Selector */}
               <ColorThemeSelector
                 selectedColor={formData.themeColor}
@@ -1156,154 +769,137 @@ const StoreManagement = () => {
                 </div>
               </div>
 
-              {store.type === "product" ? (
-                <div className="space-y-6">
-                  {/* Free Shipping Toggle */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        Free Shipping
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        Offer free shipping to your customers
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="shippingInfo.freeShipping"
-                        checked={formData.shippingInfo.freeShipping}
-                        onChange={handleChange}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-black/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
-                    </label>
-                  </div>
-
-                  {/* Delivery Timeframe */}
+              <div className="space-y-6">
+                {/* Free Shipping Toggle */}
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Delivery Timeframe
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Minimum Days
-                        </label>
-                        <input
-                          type="number"
-                          name="shippingInfo.deliveryDaysMin"
-                          value={formData.shippingInfo.deliveryDaysMin}
-                          onChange={handleChange}
-                          min="1"
-                          max="30"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Maximum Days
-                        </label>
-                        <input
-                          type="number"
-                          name="shippingInfo.deliveryDaysMax"
-                          value={formData.shippingInfo.deliveryDaysMax}
-                          onChange={handleChange}
-                          min="1"
-                          max="30"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Estimated delivery time for your products
+                    <h4 className="font-medium text-gray-900">Free Shipping</h4>
+                    <p className="text-sm text-gray-600">
+                      Offer free shipping to your customers
                     </p>
                   </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="shippingInfo.freeShipping"
+                      checked={formData.shippingInfo.freeShipping}
+                      onChange={handleChange}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-black/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
+                  </label>
+                </div>
 
-                  {/* Delivery Areas */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Delivery Areas
-                    </label>
-                    <div className="space-y-3">
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          value={newDeliveryArea}
-                          onChange={(e) => setNewDeliveryArea(e.target.value)}
-                          placeholder="Enter area name (e.g., Colombo, Kandy)"
-                          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                        />
-                        <button
-                          type="button"
-                          onClick={addDeliveryArea}
-                          className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {formData.shippingInfo.areas.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700">
-                            Current Delivery Areas:
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {formData.shippingInfo.areas.map((area, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <MapPin className="w-4 h-4 text-gray-500" />
-                                  <span className="text-sm text-gray-700">
-                                    {area}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => removeDeliveryArea(area)}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {formData.shippingInfo.areas.length === 0 && (
-                        <div className="text-center py-8 text-gray-500">
-                          <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                          <p>No delivery areas added yet</p>
-                          <p className="text-sm">
-                            Add areas where you can deliver products
-                          </p>
-                        </div>
-                      )}
+                {/* Delivery Timeframe */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Delivery Timeframe
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Minimum Days
+                      </label>
+                      <input
+                        type="number"
+                        name="shippingInfo.deliveryDaysMin"
+                        value={formData.shippingInfo.deliveryDaysMin}
+                        onChange={handleChange}
+                        min="1"
+                        max="30"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Maximum Days
+                      </label>
+                      <input
+                        type="number"
+                        name="shippingInfo.deliveryDaysMax"
+                        value={formData.shippingInfo.deliveryDaysMax}
+                        onChange={handleChange}
+                        min="1"
+                        max="30"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                      />
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  <Truck className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Service Store
-                  </h3>
-                  <p>
-                    Shipping settings are only available for product stores.
-                  </p>
-                  <p className="text-sm mt-1">
-                    Service bookings are handled through the booking system.
+                  <p className="text-xs text-gray-500 mt-2">
+                    Estimated delivery time for your products
                   </p>
                 </div>
-              )}
+
+                {/* Delivery Areas */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Delivery Areas
+                  </label>
+                  <div className="space-y-3">
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={newDeliveryArea}
+                        onChange={(e) => setNewDeliveryArea(e.target.value)}
+                        placeholder="Enter area name (e.g., Colombo, Kandy)"
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                      />
+                      <button
+                        type="button"
+                        onClick={addDeliveryArea}
+                        className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {formData.shippingInfo.areas.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700">
+                          Current Delivery Areas:
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {formData.shippingInfo.areas.map((area, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <MapPin className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-700">
+                                  {area}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeDeliveryArea(area)}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.shippingInfo.areas.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No delivery areas added yet</p>
+                        <p className="text-sm">
+                          Add areas where you can deliver products
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  disabled={saving || store.type !== "product"}
+                  disabled={saving}
                   className="bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center space-x-2"
                 >
                   {saving && <LoadingSpinner size="sm" />}
@@ -1314,7 +910,6 @@ const StoreManagement = () => {
           </div>
         )}
 
-        {/* Social Media Tab */}
         {/* Social Media Tab */}
         {activeTab === "social" && (
           <div className="bg-white rounded-lg shadow-sm p-8">
@@ -1491,13 +1086,26 @@ const StoreManagement = () => {
                   <p className="text-sm text-gray-600 mt-1">
                     Upload verification documents to build customer trust
                   </p>
-                  {process.env.NODE_ENV === 'development' && (
+                  {process.env.NODE_ENV === "development" && (
                     <div className="text-xs text-gray-500 mt-2 space-y-1">
                       <p>Debug Info:</p>
-                      <p>canReuploadDocs: {canReuploadDocs ? 'true' : 'false'}</p>
-                      <p>hasIdImages: {store.idImages && store.idImages.length > 0 ? 'true' : 'false'}</p>
-                      <p>hasAddressImages: {store.addressVerificationImages && store.addressVerificationImages.length > 0 ? 'true' : 'false'}</p>
-                      <p>isVerified: {store.isVerified ? 'true' : 'false'}</p>
+                      <p>
+                        canReuploadDocs: {canReuploadDocs ? "true" : "false"}
+                      </p>
+                      <p>
+                        hasIdImages:{" "}
+                        {store.idImages && store.idImages.length > 0
+                          ? "true"
+                          : "false"}
+                      </p>
+                      <p>
+                        hasAddressImages:{" "}
+                        {store.addressVerificationImages &&
+                        store.addressVerificationImages.length > 0
+                          ? "true"
+                          : "false"}
+                      </p>
+                      <p>isVerified: {store.isVerified ? "true" : "false"}</p>
                     </div>
                   )}
                 </div>
@@ -1581,7 +1189,10 @@ const StoreManagement = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              console.log('Attempting to upload ID documents:', idImages);
+                              console.log(
+                                "Attempting to upload ID documents:",
+                                idImages
+                              );
                               handleVerificationDocsUpload("id");
                             }}
                             disabled={saving}
@@ -1604,20 +1215,23 @@ const StoreManagement = () => {
                   {!canReuploadDocs &&
                     store.idImages &&
                     store.idImages.length > 0 && (
-                      <div className={`border rounded-lg p-3 ${
-                        store.isVerified 
-                          ? "bg-green-50 border-green-200" 
-                          : "bg-yellow-50 border-yellow-200"
-                      }`}>
-                        <p className={`text-sm ${
-                          store.isVerified 
-                            ? "text-green-800" 
-                            : "text-yellow-800"
-                        }`}>
-                          {store.isVerified 
+                      <div
+                        className={`border rounded-lg p-3 ${
+                          store.isVerified
+                            ? "bg-green-50 border-green-200"
+                            : "bg-yellow-50 border-yellow-200"
+                        }`}
+                      >
+                        <p
+                          className={`text-sm ${
+                            store.isVerified
+                              ? "text-green-800"
+                              : "text-yellow-800"
+                          }`}
+                        >
+                          {store.isVerified
                             ? "✓ Your ID documents have been verified and approved."
-                            : "Your ID documents are under review. You can only reupload if admin requests changes."
-                          }
+                            : "Your ID documents are under review. You can only reupload if admin requests changes."}
                         </p>
                       </div>
                     )}
@@ -1694,7 +1308,10 @@ const StoreManagement = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              console.log('Attempting to upload address documents:', addressImages);
+                              console.log(
+                                "Attempting to upload address documents:",
+                                addressImages
+                              );
                               handleVerificationDocsUpload("address");
                             }}
                             disabled={saving}
@@ -1719,20 +1336,23 @@ const StoreManagement = () => {
                   {!canReuploadDocs &&
                     store.addressVerificationImages &&
                     store.addressVerificationImages.length > 0 && (
-                      <div className={`border rounded-lg p-3 ${
-                        store.isVerified 
-                          ? "bg-green-50 border-green-200" 
-                          : "bg-yellow-50 border-yellow-200"
-                      }`}>
-                        <p className={`text-sm ${
-                          store.isVerified 
-                            ? "text-green-800" 
-                            : "text-yellow-800"
-                        }`}>
-                          {store.isVerified 
+                      <div
+                        className={`border rounded-lg p-3 ${
+                          store.isVerified
+                            ? "bg-green-50 border-green-200"
+                            : "bg-yellow-50 border-yellow-200"
+                        }`}
+                      >
+                        <p
+                          className={`text-sm ${
+                            store.isVerified
+                              ? "text-green-800"
+                              : "text-yellow-800"
+                          }`}
+                        >
+                          {store.isVerified
                             ? "✓ Your address documents have been verified and approved."
-                            : "Your address documents are under review. You can only reupload if admin requests changes."
-                          }
+                            : "Your address documents are under review. You can only reupload if admin requests changes."}
                         </p>
                       </div>
                     )}
@@ -1904,11 +1524,6 @@ const StoreManagement = () => {
                             {review.orderId && (
                               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                                 Order
-                              </span>
-                            )}
-                            {review.bookingId && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                                Booking
                               </span>
                             )}
                           </div>

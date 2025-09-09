@@ -5,6 +5,7 @@ import SearchFilters from "../components/SearchFilters";
 import LoadingSpinner from "../components/LoadingSpinner";
 import EmptyState from "../components/EmptyState";
 import { Store } from "lucide-react";
+import { storesAPI } from "../utils/api";
 
 const StoreList = () => {
   const [stores, setStores] = useState([]);
@@ -24,23 +25,8 @@ const StoreList = () => {
         typeof filters === "object" && filters !== null ? filters : {};
 
       console.log("Valid Filters:", validFilters);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stores/listing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(validFilters),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setStores(data);
-      } else {
-        setError("Failed to fetch stores");
-      }
+      const data = await storesAPI.getListing(validFilters);
+      setStores(data);
     } catch (error) {
       console.error("Error fetching stores:", error);
       setError("Network error. Please try again.");

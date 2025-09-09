@@ -1,9 +1,13 @@
-import React, { useEffect, useState, useCallback} from "react";
-
+import React, { useEffect, useState, useCallback } from "react";
+import { subscriptionsAPI } from "../utils/api";
 
 // Your existing Pricing component
-const Pricing = ({ selectedPackage, setSelectedPackage,  isUpgrade = false }) => {
-  const [packages, setPackages] = useState({});
+const Pricing = ({
+  selectedPackage,
+  setSelectedPackage,
+  isUpgrade = false,
+}) => {
+  const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const packageMeta = {
@@ -33,21 +37,17 @@ const Pricing = ({ selectedPackage, setSelectedPackage,  isUpgrade = false }) =>
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/packages`,
-          {
-            credentials: "include",
-          }
-        );
-        if (!res.ok) throw new Error("Failed to fetch packages");
-        const data = await res.json();
+        const data = await subscriptionsAPI.getPackages();
         setPackages(data);
       } catch (err) {
         console.error("Error:", err);
+        setPackages([]);
       } finally {
         setLoading(false);
       }
     };
+    console.log("Fetching packages...");
+    console.log(packages);
     fetchPackages();
   }, []);
 
@@ -66,15 +66,13 @@ const Pricing = ({ selectedPackage, setSelectedPackage,  isUpgrade = false }) =>
           {isUpgrade ? "Upgrade Your Package" : "Choose Your Package"}
         </h2>
         <p className="text-lg md:text-xl text-gray-600 mb-12 font-light">
-          {isUpgrade ? "Select a new plan that fits your growing needs" : "Elegant solutions for every business need"}
+          {isUpgrade
+            ? "Select a new plan that fits your growing needs"
+            : "Elegant solutions for every business need"}
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {packages.length === 0 ? (
-            <p className="col-span-3 text-gray-500 text-center">
-              No packages available.
-            </p>
-          ) : (
+          {packages && packages.length > 0 ? (
             packages.map((pkg, idx) => {
               const meta = packageMeta[pkg.name] || {
                 bg: "bg-white",
@@ -152,6 +150,10 @@ const Pricing = ({ selectedPackage, setSelectedPackage,  isUpgrade = false }) =>
                 </div>
               );
             })
+          ) : (
+            <p className="col-span-3 text-gray-500 text-center">
+              No packages available.
+            </p>
           )}
         </div>
       </div>
@@ -160,7 +162,3 @@ const Pricing = ({ selectedPackage, setSelectedPackage,  isUpgrade = false }) =>
 };
 
 export default Pricing;
-
-
-
-

@@ -4,6 +4,7 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import ImageGallery from "../components/ImageGallery";
 import { formatLKR } from "../utils/currency";
+import { productsAPI, storesAPI, reviewsAPI } from "../utils/api";
 import {
   ShoppingCart,
   Plus,
@@ -12,8 +13,6 @@ import {
   Store,
   ArrowLeft,
   Check,
-  Calendar as CalendarIcon,
-  Clock,
   Users,
   CheckCircle,
   XCircle,
@@ -56,19 +55,12 @@ const ProductDetail = () => {
 
   const fetchProduct = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/${id}`
-      );
-      const data = await response.json();
-      setProduct(data);
+      const product = await productsAPI.getById(id);
+      setProduct(product);
 
       // Fetch store details separately
-      if (data.storeId) {
-        const storeResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stores/${data.storeId}`
-        );
-        const storeData = await storeResponse.json();
-        //console.log("Fetched store data:", storeData); // ADD THIS
+      if (product.storeId) {
+        const storeData = await storesAPI.getById(product.storeId);
         setStore(storeData.store);
       }
     } catch (error) {
@@ -80,13 +72,10 @@ const ProductDetail = () => {
 
   const fetchReviews = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/reviews/store/${id}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setReviews(data || []);
-      }
+      console.log("Fetching reviews for product:", id);
+      const reviews = await reviewsAPI.getByProduct(id);
+      console.log("Fetched reviews:", reviews);
+      setReviews(reviews || []);
     } catch (error) {
       console.error("Error fetching reviews:", error);
       setReviews([]);
@@ -720,11 +709,6 @@ const ProductDetail = () => {
                         {review.orderId && (
                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                             Product Order
-                          </span>
-                        )}
-                        {review.bookingId && (
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                            product Booking
                           </span>
                         )}
                       </div>

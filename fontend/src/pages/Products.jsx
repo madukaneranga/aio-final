@@ -4,6 +4,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import { Search, Filter, X, ChevronDown, Sparkles } from "lucide-react";
 import CustomListing from "../components/CustomListing";
 import ProductsFiltersSidebar from "../components/ProductsFiltersSidebar";
+import { productsAPI, categoriesAPI } from "../utils/api";
 
 // Custom debounce hook
 const useDebounce = (value, delay) => {
@@ -105,19 +106,23 @@ const Products = () => {
 
     const searchFromUrl = searchParams.get("search");
     const categoryFromUrl = searchParams.get("category");
+    const subcategoryFromUrl = searchParams.get("subcategory");
+    const childCategoryFromUrl = searchParams.get("childCategory");
 
     console.log("=== INITIALIZING FROM URL ===");
     console.log("Current URL:", location.pathname + location.search);
     console.log("Search from URL:", searchFromUrl);
     console.log("Category from URL:", categoryFromUrl);
+    console.log("Subcategory from URL:", subcategoryFromUrl);
+    console.log("Child Category from URL:", childCategoryFromUrl);
     console.log("All URL params:", Object.fromEntries(searchParams.entries()));
 
     // Build initial filters from URL
     const initialFilters = {
       search: searchFromUrl || "",
       category: categoryFromUrl || "",
-      subcategory: "",
-      childCategory: "",
+      subcategory: subcategoryFromUrl || "",
+      childCategory: childCategoryFromUrl || "",
       priceRange: { min: "", max: "" },
       stock: "",
       rating: "",
@@ -177,42 +182,26 @@ const Products = () => {
         limit: PRODUCTS_PER_PAGE,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/listing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(apiFilters),
-        }
+      const data = await productsAPI.getListing(apiFilters);
+      console.log(
+        "Products fetched:",
+        data.products.length,
+        "items",
+        "Total:",
+        data.total
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(
-          "Products fetched:",
-          data.products.length,
-          "items",
-          "Total:",
-          data.total
-        );
-
-        if (append) {
-          setProducts((prev) => [...prev, ...data.products]);
-        } else {
-          setProducts(data.products);
-        }
-
-        setTotalProducts(data.total);
-        setHasMoreProducts(
-          data.products.length === PRODUCTS_PER_PAGE && data.hasMore
-        );
-        setCurrentPage(page);
+      if (append) {
+        setProducts((prev) => [...prev, ...data.products]);
       } else {
-        setError("Failed to fetch products");
-        console.error("API Error:", response.status, response.statusText);
+        setProducts(data.products);
       }
+
+      setTotalProducts(data.total);
+      setHasMoreProducts(
+        data.products.length === PRODUCTS_PER_PAGE && data.hasMore
+      );
+      setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching products:", error);
       setError("Network error. Please try again.");
@@ -243,6 +232,40 @@ const Products = () => {
     )
   );
 
+  // Handle URL parameter changes (for navigation from MegaMenu, etc.)
+  useEffect(() => {
+    // Only respond to URL changes after initial load
+    if (hasInitialized && initializationRef.current) {
+      const searchFromUrl = searchParams.get("search");
+      const categoryFromUrl = searchParams.get("category");
+      const subcategoryFromUrl = searchParams.get("subcategory");
+      const childCategoryFromUrl = searchParams.get("childCategory");
+
+      console.log("URL parameters changed, updating filters");
+      
+      // Update only the URL-related filters, preserve others
+      setFilters(prev => {
+        const newFilters = {
+          ...prev,
+          search: searchFromUrl || "",
+          category: categoryFromUrl || "",
+          subcategory: subcategoryFromUrl || "",
+          childCategory: childCategoryFromUrl || "",
+        };
+
+        // Auto-clear dependent filters when parent categories change
+        if (categoryFromUrl !== prev.category) {
+          newFilters.subcategory = subcategoryFromUrl || "";
+          newFilters.childCategory = childCategoryFromUrl || "";
+        } else if (subcategoryFromUrl !== prev.subcategory) {
+          newFilters.childCategory = childCategoryFromUrl || "";
+        }
+
+        return newFilters;
+      });
+    }
+  }, [searchParams, hasInitialized]);
+
   // Handle filter changes AFTER initialization
   useEffect(() => {
     // Only respond to filter changes after initial load
@@ -256,10 +279,8 @@ const Products = () => {
   // Load categories
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if (!res.ok) throw new Error("Failed to fetch categories");
-      const data = await res.json();
-      setCategories(data);
+      const categories = await categoriesAPI.getAll();
+      setCategories(categories);
     } catch (err) {
       console.error("Error loading categories:", err);
     }

@@ -1,15 +1,10 @@
 import mongoose from "mongoose";
 
 const wishlistItemSchema = new mongoose.Schema({
-  itemType: {
-    type: String,
-    enum: ["product", "service"],
-    required: true,
-  },
   itemId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    refPath: "itemType === 'product' ? 'Product' : 'Service'",
+    ref: "Product",
   },
   price: {
     type: Number,
@@ -87,8 +82,7 @@ wishlistSchema.pre("save", function (next) {
 wishlistSchema.methods.addItem = function (itemData) {
   const existingItem = this.items.find(
     item => 
-      item.itemId.toString() === itemData.itemId.toString() &&
-      item.itemType === itemData.itemType
+      item.itemId.toString() === itemData.itemId.toString() 
   );
 
   if (!existingItem) {
@@ -103,9 +97,17 @@ wishlistSchema.methods.addItem = function (itemData) {
 };
 
 wishlistSchema.methods.removeItem = function (itemId) {
-  const itemIndex = this.items.findIndex(
+  // Try to find by wishlist item _id first, then by product itemId
+  let itemIndex = this.items.findIndex(
     item => item._id.toString() === itemId.toString()
   );
+
+  // If not found by _id, try to find by product itemId
+  if (itemIndex === -1) {
+    itemIndex = this.items.findIndex(
+      item => item.itemId.toString() === itemId.toString()
+    );
+  }
 
   if (itemIndex !== -1) {
     this.items.splice(itemIndex, 1);
@@ -116,9 +118,16 @@ wishlistSchema.methods.removeItem = function (itemId) {
 };
 
 wishlistSchema.methods.updateItemPriority = function (itemId, priority) {
-  const item = this.items.find(
+  let item = this.items.find(
     item => item._id.toString() === itemId.toString()
   );
+
+  // If not found by _id, try to find by product itemId
+  if (!item) {
+    item = this.items.find(
+      item => item.itemId.toString() === itemId.toString()
+    );
+  }
 
   if (item) {
     item.priority = priority;
@@ -129,9 +138,16 @@ wishlistSchema.methods.updateItemPriority = function (itemId, priority) {
 };
 
 wishlistSchema.methods.addItemNotes = function (itemId, notes) {
-  const item = this.items.find(
+  let item = this.items.find(
     item => item._id.toString() === itemId.toString()
   );
+
+  // If not found by _id, try to find by product itemId
+  if (!item) {
+    item = this.items.find(
+      item => item.itemId.toString() === itemId.toString()
+    );
+  }
 
   if (item) {
     item.notes = notes;
@@ -141,23 +157,25 @@ wishlistSchema.methods.addItemNotes = function (itemId, notes) {
   return Promise.resolve(this);
 };
 
-wishlistSchema.methods.moveToCart = function (itemId, cartInstance, quantity = 1, bookingDetails = null) {
-  const item = this.items.find(
+wishlistSchema.methods.moveToCart = function (itemId, cartInstance, quantity = 1) {
+  let item = this.items.find(
     item => item._id.toString() === itemId.toString()
   );
 
+  // If not found by _id, try to find by product itemId
+  if (!item) {
+    item = this.items.find(
+      item => item.itemId.toString() === itemId.toString()
+    );
+  }
+
   if (item) {
     const cartItemData = {
-      itemType: item.itemType,
       itemId: item.itemId,
       price: item.price,
       quantity: quantity,
       storeId: item.storeId,
     };
-
-    if (bookingDetails) {
-      cartItemData.bookingDetails = bookingDetails;
-    }
 
     return Promise.all([
       cartInstance.addItem(cartItemData),
@@ -174,9 +192,6 @@ wishlistSchema.methods.getItemsByStore = function (storeId) {
   );
 };
 
-wishlistSchema.methods.getItemsByType = function (itemType) {
-  return this.items.filter(item => item.itemType === itemType);
-};
 
 wishlistSchema.methods.getItemsByPriority = function (priority) {
   return this.items.filter(item => item.priority === priority);
@@ -184,7 +199,7 @@ wishlistSchema.methods.getItemsByPriority = function (priority) {
 
 wishlistSchema.methods.generateShareToken = function () {
   if (!this.shareToken) {
-    this.shareToken = mongoose.Types.ObjectId().toString();
+    this.shareToken = new mongoose.Types.ObjectId().toString();
     this.isPublic = true;
   }
   return this.save();

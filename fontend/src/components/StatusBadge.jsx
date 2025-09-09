@@ -12,12 +12,6 @@ const StatusBadge = ({ status, type = 'order' }) => {
         delivered: { bg: 'bg-green-100', text: 'text-green-800', label: 'Delivered' },
         cancelled: { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelled' }
       },
-      booking: {
-        pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
-        confirmed: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Confirmed' },
-        completed: { bg: 'bg-green-100', text: 'text-green-800', label: 'Completed' },
-        cancelled: { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelled' }
-      },
       payment: {
         pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
         paid: { bg: 'bg-green-100', text: 'text-green-800', label: 'Paid' },

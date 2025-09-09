@@ -5,10 +5,10 @@ import { Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { formatLKR } from '../utils/currency';
 
 const Cart = () => {
-  const { orderItems, bookingItems, updateQuantity, removeFromOrder, removeFromBooking, orderTotal, bookingTotal } = useCart();
+  const { orderItems, updateQuantity, removeFromOrder, orderTotal } = useCart();
 
-  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0) + bookingItems.length;
-  const grandTotal = orderTotal + bookingTotal;
+  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const grandTotal = orderTotal;
 
   if (totalItems === 0) {
     return (
@@ -16,19 +16,13 @@ const Cart = () => {
         <div className="text-center">
           <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
-          <p className="text-gray-600 mb-8">Add some products or book services to get started</p>
+          <p className="text-gray-600 mb-8">Add some products to get started</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to="/products"
               className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
             >
               Browse Products
-            </Link>
-            <Link
-              to="/services"
-              className="bg-white border-2 border-black text-black px-6 py-3 rounded-lg hover:bg-black hover:text-white transition-colors"
-            >
-              Browse Services
             </Link>
           </div>
         </div>
@@ -44,24 +38,6 @@ const Cart = () => {
           <p className="text-gray-600 mt-2">
             {totalItems} item{totalItems !== 1 ? 's' : ''} in your cart
           </p>
-          
-          {/* Cart Type Information */}
-          {(orderItems.length > 0 || bookingItems.length > 0) && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                {orderItems.length > 0 && (
-                  <span>
-                    🛍️ <strong>Product Cart:</strong> You can add multiple products. Adding a service will clear all products.
-                  </span>
-                )}
-                {bookingItems.length > 0 && (
-                  <span>
-                    📅 <strong>Service Cart:</strong> Only one service can be booked at a time. Adding products will clear the service.
-                  </span>
-                )}
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -124,43 +100,6 @@ const Cart = () => {
                 </div>
               </div>
             )}
-
-            {/* Bookings */}
-            {bookingItems.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold mb-4">Service Bookings ({bookingItems.length})</h2>
-                <div className="space-y-4">
-                  {bookingItems.map((item) => (
-                    <div key={`${item.id}-${item.date}-${item.time}`} className="cart-item-animate flex items-center space-x-4 p-4 border border-gray-200 rounded-lg">
-                      <img
-                        src={item.image ? 
-                          (item.image.startsWith('http') ? item.image : `${import.meta.env.VITE_API_URL}${item.image}`) : 
-                          'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=400&h=300&fit=crop'
-                        }
-                        alt={item.title}
-                        className="w-16 h-16 object-cover rounded-lg"
-                      />
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{item.title}</h3>
-                        <p className="text-gray-600">{formatLKR(item.price)}</p>
-                        <p className="text-sm text-gray-500">
-                          {item.date} at {item.time}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatLKR(item.price)}</p>
-                        <button
-                          onClick={() => removeFromBooking(item.id)}
-                          className="text-red-500 hover:text-red-700 transition-colors mt-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Order Summary */}
@@ -171,12 +110,6 @@ const Cart = () => {
                 <div className="flex justify-between">
                   <span>Products ({orderItems.reduce((sum, item) => sum + item.quantity, 0)})</span>
                   <span>{formatLKR(orderTotal)}</span>
-                </div>
-              )}
-              {bookingItems.length > 0 && (
-                <div className="flex justify-between">
-                  <span>Services ({bookingItems.length})</span>
-                  <span>{formatLKR(bookingTotal)}</span>
                 </div>
               )}
               <div className="border-t pt-3">

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { formatLKR } from "../utils/currency";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { productsAPI } from "../utils/api";
 import {
   Plus,
   Edit,
@@ -33,19 +34,8 @@ const ManageProducts = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products?storeId=${user.storeId}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(data);
-      } else {
-        console.error("Failed to fetch products");
-      }
+      const data = await productsAPI.getAll({ storeId: user.storeId });
+      setProducts(data);
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
@@ -58,20 +48,9 @@ const ManageProducts = () => {
 
     setDeleting(productId);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/${productId}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        setProducts(products.filter((p) => p._id !== productId));
-        alert("Product deleted successfully!");
-      } else {
-        alert("Failed to delete product");
-      }
+      await productsAPI.delete(productId);
+      setProducts(products.filter((p) => p._id !== productId));
+      alert("Product deleted successfully!");
     } catch (error) {
       console.error("Error deleting product:", error);
       alert("Error deleting product");
@@ -109,26 +88,11 @@ const ManageProducts = () => {
           : {}),
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/products/${editingProduct._id}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (response.ok) {
-        fetchProducts();
-        setShowEditModal(false);
-        setEditingProduct(null);
-        alert("Product updated successfully!");
-      } else {
-        alert("Failed to update product");
-      }
+      await productsAPI.update(editingProduct._id, payload);
+      fetchProducts();
+      setShowEditModal(false);
+      setEditingProduct(null);
+      alert("Product updated successfully!");
     } catch (error) {
       console.error("Error updating product:", error);
       alert("Error updating product");

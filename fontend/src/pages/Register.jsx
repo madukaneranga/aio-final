@@ -97,7 +97,7 @@ const Register = () => {
                 >
                   <User className="w-6 h-6 mx-auto mb-2" />
                   <div className="font-medium">Shop</div>
-                  <div className="text-xs opacity-75">Buy products & services</div>
+                  <div className="text-xs opacity-75">Buy products</div>
                 </button>
                 <button
                   type="button"

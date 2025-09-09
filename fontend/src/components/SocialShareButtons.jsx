@@ -21,19 +21,16 @@ const SocialShareButtons = ({
 
   // Generate share content based on purchase type
   const generateShareContent = (platform) => {
-    const isOrder = type === "order";
-    const purchaseType = isOrder ? "order" : "booking";
-    const itemText = isOrder 
-      ? purchaseData.items?.length === 1 
+    const isOrder = true;
+    const itemText = purchaseData.items?.length === 1 
         ? purchaseData.items[0].productId?.title || "product"
-        : `${purchaseData.items?.length || 0} items`
-      : purchaseData.serviceId?.title || "service";
+        : `${purchaseData.items?.length || 0} items`;
     
     const storeName = purchaseData.storeId?.name || "AIO Cart";
     const totalAmount = formatLKR(purchaseData.totalAmount);
     
     const baseContent = {
-      text: `Just ${isOrder ? "ordered" : "booked"} ${itemText} from ${storeName} on AIO Cart! 🛒✨`,
+      text: `Just ordered ${itemText} from ${storeName} on AIO Cart! 🛒✨`,
       hashtags: ["AIOCart", "OnlineShopping", "SriLanka", storeName.replace(/\s+/g, '')],
       url: window.location.origin
     };
@@ -151,7 +148,7 @@ const SocialShareButtons = ({
       try {
         const content = generateShareContent('native');
         await navigator.share({
-          title: `My ${type} from AIO Cart`,
+          title: `My order from AIO Cart`,
           text: content.text,
           url: content.url
         });
